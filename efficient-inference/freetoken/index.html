@@ -47,6 +47,10 @@
   .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
                 border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
   .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
   @media (max-width:860px){.topbar a.jump{display:none}}
 
   header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
@@ -176,6 +180,7 @@
       <a class="jump" href="#s7">关联</a>
       <a class="jump" href="#s8">点评</a>
       <a class="jump" href="#s9">术语</a>
+      <a class="lang-toggle" href="en.html" title="Read in English" onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">EN</a>
       <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
     </div>
   </div>

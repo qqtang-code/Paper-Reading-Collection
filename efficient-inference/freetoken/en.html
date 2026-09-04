@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="English quick-read notes: FreeToken — bandwidth-adaptive MoE serving that turns consumer PCs into elastic inference platforms (8GB laptop → 35B model; one workstation GPU → 753B GLM-5.2). All 6 figures embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, FreeToken, MoE serving, edge inference, expert offloading, agentic workloads, bandwidth-adaptive">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Quick Read · FreeToken: Efficient Edge-Native MoE Serving with Bandwidth-Adaptive Execution">
+<meta property="og:description" content="Treat the consumer PC as one elastic inference platform: 8GB-laptop-class GPUs run 35B models, a single workstation GPU runs 753B GLM-5.2 — at speeds that hold up under real agent workloads. All figures embedded.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Quick Read · FreeToken: Bandwidth-Adaptive MoE Serving on Consumer Hardware</title>
+<style>
+  /* ===== illustrated paper-reading page (paper-reading-html skill v2, EN quick-read) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+  footer a{color:var(--accent); text-decoration:none}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">FreeToken<span> · Quick Read</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Challenges</a>
+      <a class="jump" href="#s4">Design</a>
+      <a class="jump" href="#s5">Implementation</a>
+      <a class="jump" href="#s6">Evaluation</a>
+      <a class="jump" href="#s7">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文精读版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark/light mode" title="Toggle dark/light mode">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · Quick-Read Edition · arXiv:2608.16157</div>
+    <h1>FreeToken: Edge-Native MoE Serving<br>with Bandwidth-Adaptive Execution</h1>
+    <div class="subtitle">Treat the personal computer as one unified, elastic inference platform: an 8GB-VRAM laptop runs a 35B model, a gaming desktop runs 284B, and a single workstation GPU runs the 753B GLM-5.2 — fast enough to sustain real agentic workloads.</div>
+    <div class="meta">
+      <span>Authors: Shuo Yang, Xiaoze Fan, Melissa Pan, Haocheng Xi, Zhe Wang, Shanlin Sun, Kurt Keutzer, Song Han, Matei Zaharia, Chenfeng Xu, Ion Stoica (UC Berkeley / UT Austin et al.; co-first authors; corresponding: Chenfeng Xu &amp; Ion Stoica)</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2608.16157">arXiv:2608.16157</a></span>
+      <span>Code: <a href="https://github.com/FlashML-org/FreeToken">github.com/FlashML-org/FreeToken</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Edge Inference</span><span class="pill">MoE Serving</span><span class="pill">Expert Offloading</span>
+      <span class="pill">CPU-GPU Hybrid Execution</span><span class="pill">Agentic Workloads</span><span class="pill">KV / State Caching</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Reading guide (all 6 figures embedded in the narrative)</h2>
+  <ol>
+    <li><a href="#s1">Overview: the claim and the key numbers</a></li>
+    <li><a href="#s2">Background: the usability gap (Figure 1)</a></li>
+    <li><a href="#s3">Three challenges of agentic MoE on the edge</a></li>
+    <li><a href="#s4">Design: two-tier memory + the q* policy (Figure 2)</a></li>
+    <li><a href="#s5">Implementation: dynamic behavior inside a static CUDA Graph</a></li>
+    <li><a href="#s6">Evaluation: workloads, attribution, cross-hardware (Table 1, Figures 3–5)</a></li>
+    <li><a href="#s7">Commentary: strengths and open questions</a></li>
+    <li><a href="#s9">Glossary (hover abbreviations anywhere)</a></li>
+  </ol>
+  <p class="muted" style="margin:10px 0 0; font-size:13.5px">This is the English quick-read edition: a complete digest of the argument with every figure at 300 DPI and original captions. The full section-by-section Chinese deep-read is <a href="index.html">one click away</a>.</p>
+</nav>
+
+<!-- ================= s1 Overview ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: the claim and the key numbers</h2>
+  <p class="lead"><abbr title="Mixture-of-Experts: layers with hundreds of experts where each token is routed to only a few — computation is sparse">MoE</abbr> models are a natural fit for the edge: each token passes through only a few of hundreds of experts. But saving <em>computation</em> doesn't save <em>weights</em> — the full expert pool can exceed VRAM by orders of magnitude. FreeToken's core claim: <strong>don't treat edge hardware as a "mini GPU"; treat the whole machine as one elastic inference platform</strong>, continuously remapping GPU, CPU, memory and PCIe interconnect according to the bandwidth and capacity actually available at runtime.</p>
+  <ul class="tight">
+    <li><b>Mechanism ① · Bandwidth-adaptive execution:</b>prefill hides expert transfers behind compute with full-layer double buffering; decode splits cache misses between PCIe fills and in-place CPU execution according to the <em>measured</em> bandwidths.</li>
+    <li><b>Mechanism ② · Semantics-aware caching:</b>recurrent-state checkpoints are anchored at the semantic boundaries agent frameworks actually edit (think / tool call / turn); the expert cache is one shared all-layer <abbr title="Least Recently Used: evict the least recently used entry first">LRU</abbr> that follows routing locality.</li>
+    <li><b>Mechanism ③ · Elastic edge resource management:</b>the GPU expert cache is rebuilt at scheduling safe points without restarting; weights load directly into their final host layout, so startup needs no GPU warm-up.</li>
+  </ul>
+
+  <div class="kv">
+    <div class="item"><div class="k">8GB laptop → 35B model</div><div class="v">39.3 tok/s<small>RTX 4060 laptop (NVFP4), coding-agent decode — 1.8× the best baseline</small></div></div>
+    <div class="item"><div class="k">One workstation GPU → 753B</div><div class="v">14.9 tok/s<small>GLM-5.2 on a single RTX PRO 6000 — 2.0× llama.cpp (7.3)</small></div></div>
+    <div class="item"><div class="k">TTFT tail (multi-turn agents)</div><div class="v">&lt; 44 s worst round<small>every baseline exceeds 150 s somewhere (KTransformers: 946 s)</small></div></div>
+    <div class="item"><div class="k">Decode stability</div><div class="v">≤ 12% decay<small>from single-turn W1 to the most agentic workload; KTransformers loses 31% by W2</small></div></div>
+  </div>
+
+  <div class="takeaway"><b>One-sentence summary:</b>once MoE fits the <em>computation</em> onto consumer silicon, local inference stops being about "does the model fit" and becomes about "how well the system orchestrates the whole machine". FreeToken derives a closed-form ratio from two measured bandwidths ($B_P$, $B_H$) and hands the residual cache misses simultaneously to PCIe transfer and CPU compute — exact outputs, saturated links — bringing 35B–753B open-weight inference from the data center back to machines people already own.</div>
+</section>
+
+<!-- ================= s2 Background ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">Background: the usability gap</h2>
+
+  <p>Open models are rapidly closing the <em>capability</em> gap with closed ones (Kimi-K3, GLM-5.2, DeepSeek-V4-Flash-0731…); the <em>access</em> gap is not closing — frontier models still live on million-dollar data-center GPUs, and continuous API spending weighs on individuals and small teams. MoE opens a door: DeepSeek-V4-Flash has 284B parameters across 43 MoE layers, each with 256 routed experts of which only 6 activate per token — 13B active parameters, which fits an RTX 5090's 32GB at deployment precision. <strong>But sparsity saves per-token compute, not the memory of the full expert pool</strong>: the complete weights still far exceed VRAM, so inactive experts must live in host memory (or disk) and stream in on demand. MoE thus hands us both the opportunity (computation is feasible) and the systems challenge (serving is hard).</p>
+
+  <p>The infrastructure reality backing the claim: Steam has 200M+ monthly active users, ~72% of systems with a discrete NVIDIA GPU — hundreds of millions of "capable but idle" machines. What's scarce isn't hardware, but a serving system that <em>treats heterogeneous consumer machines as one platform</em> and automatically maps GPU/CPU/memory/interconnect onto the strongest runnable configuration.</p>
+
+  <p>Existing edge engines (llama.cpp, KTransformers, Ollama) fall short of the theoretical capability on three axes: <b>prefill destroys sparsity</b> (the union of routes over thousands of prompt tokens touches nearly every expert per layer — the working set turns dense); <b>decode is the opposite trap</b> (few experts per token, but misses cause repeated transfer/eviction/in-memory execution with no principled policy); and <b>edge resources are diverse and dynamic</b> (VRAM budgets shift under the browser and the game). The cost–capability picture, and where FreeToken lands:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: FreeToken serves frontier-class models on consumer hardware at interactive speed — price/Elo frontier and decode throughput versus existing engines">
+    <figcaption>
+      <b>Figure 1:</b>FreeToken serves the models on the cost–capability Pareto frontier, at interactive speed on consumer hardware. (a) Blended API list price (9:1 input:output mix, following the token economics measured on real coding-agent traces) versus Code Arena Elo for representative hosted models. Blue squares mark models FreeToken serves, tagged with the consumer GPU class that serves them; the frontier segment from DeepSeek-V4-Flash to GLM-5.2 is exactly this set. (b) Mean decode throughput on real agentic workloads for the strongest model each hardware tier holds, against actively maintained edge engines. The dashed line marks the median decode speed of Codex in production traces (33 tok/s); × marks configurations an engine cannot serve.
+      <span class="ex">(a) X axis is blended hosted-API price (9:1 input:output), y axis is Code Arena web-dev Elo — cheap-and-strong sits bottom-right. The blue squares are exactly the models FreeToken runs natively on consumer GPUs: 35B-class → 4060 laptop, 284B-class → 5090 desktop, 753B-class → RTX PRO 6000. (b) The dashed line is Codex's production median decode speed of 33 tok/s: FreeToken meets or beats it in every hardware tier, while many baseline configurations are simply infeasible (×). The point of the figure: the old "cheap = weak" assumption is broken — locally-free models sit on the paid APIs' capability frontier.</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to view the original 300-DPI version; click again or press Esc to close.</p>
+</section>
+
+<!-- ================= s3 Challenges ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Challenges</div>
+  <h2 class="sec">Three challenges of agentic MoE on the edge</h2>
+
+  <h3>Challenge 1: prefill = expert transfer + recomputation, a double cost</h3>
+  <p>Every prefill adds seconds of expert streaming. Decode touches k experts per token, but prefill is thousands of tokens × every layer — the union of routes activates essentially the whole expert pool, so one prefill streams the entire pool from host memory across the CPU–GPU link. For FP4-deployed DeepSeek-V4-Flash: ~140GB of expert weights needs ~2 s over PCIe 5.0 ×16 (~60GB/s, RTX 5090), 5 s over PCIe 4.0 ×16 (~25GB/s, RTX 4090/3090), 10+ s over the ×8 links common in laptops. In engines that fetch experts on demand, those seconds are pure GPU idle.</p>
+  <p>And agent tool calls trigger re-prefill constantly. Hybrid-attention architectures (full attention + sliding window, as in DSV4-Flash / GPT-OSS; or recurrent layers like Qwen3.6's gated DeltaNet, Kimi-K3's Delta Attention) compress past context into a single state or a recent window; each state costs as much KV memory as hundreds of tokens, so engines keep only a few checkpoints. But agents edit the context almost every turn — dropping old tool outputs, trimming thinking segments — invalidating every checkpoint after the edit point and forcing a re-prefill of thousands of tokens back to the nearest survivor. Consumer GPUs can't afford the repetition: an RTX 5090's dense BF16 compute is ~1/5 of an H100's and ~1/10 of a B200's.</p>
+
+  <h3>Challenge 2: how to serve decode misses is decided by two measured bandwidths</h3>
+  <p>Three root causes behind slow baselines: <b>static placement misses routing traffic</b> — llama.cpp splits MoE tensors across devices at load time, KTransformers pins "hot" experts at load time, but routing changes token by token, so placement frozen at prefill catches only a fraction of traffic and leaves GPU and PCIe idle. <b>Consumer CPUs alone can't carry decode</b> — at small batch, expert execution is memory-bandwidth-bound; consumer CPUs with dual-channel memory deliver ~50GB/s (DDR4) or 80–90GB/s (DDR5) against 1–1.8TB/s from GPU HBM. <b>The right split is hardware-dependent</b> — a miss can be transferred over PCIe and run on the GPU, or executed in place on the CPU, and neither is universally optimal; an RTX 4060 laptop (LPDDR5) and an RTX 5090 desktop (DDR5) sit at opposite ends of the "memory bandwidth vs. PCIe bandwidth" scale, and the optimal mix can't be read off a spec sheet — it must be measured on the real machine.</p>
+
+  <h3>Challenge 3: no dedicated resources on the edge — even startup is slow</h3>
+  <p><b>VRAM budgets fluctuate</b>: the GPU shares with the compositor, the browser, the game — hundreds of MB to several GB get snatched at any moment; agent sessions accumulate context across turns while the expert working set stays fixed, so the KV/expert split chosen in round one is wrong many rounds later. The split must be adjustable at runtime without restarting the engine. <b>Startup is slow and frequent</b>: reading DSV4-Flash's ~140GB FP4 pool from 7GB/s NVMe takes ~20 s before any warm-up; edge users open and close engines and switch models constantly.</p>
+</section>
+
+<!-- ================= s4 Design ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Design</div>
+  <h2 class="sec">Design: two-tier expert memory + three mechanisms</h2>
+
+  <p>The system is organized around a <strong>two-tier expert memory hierarchy</strong>: the expert pool in CPU memory (the complete routed-expert weights, always the source of truth) + a single elastic <strong>all-layer shared expert cache</strong> on the GPU (each slot holds all tensors for one "layer–expert" pair; residency, lookup and execution all use the logical (layer, expert) identity, not tensor shards). Non-expert weights stay resident on the GPU.</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: FreeToken overview — double-buffered prefill with semantic anchors, and decode miss handling by the q* policy">
+    <figcaption>
+      <b>Figure 2:</b>FreeToken overview. (1) Prefill: expert loading is double-buffered at full-layer granularity, streaming layer l+1 over PCIe while the GPU computes layer l; recurrent-state checkpoints are anchored at special-token boundaries, so a context edit resumes from the nearest surviving anchor and re-prefills only the new suffix. (2) Decode: most routed experts hit the shared LRU expert cache (here 8 of 12, following temporal locality). The m=4 misses are divided by q*=m·B_P/B_H between cache fills over PCIe (one expert) and in-place CPU execution (three), using bandwidths profiled on the deployed machine; the GPU and CPU partial outputs merge exactly. The host-resident expert pool remains the source of truth throughout.
+      <span class="ex">Top half (1) is prefill: while the GPU computes layer l from buffer A, a dedicated stream fills buffer B with layer l+1's complete expert set — whole-layer transfer needs no routing results. On the right, "semantic anchors": state checkpoints (▲) pinned at special-token boundaries (thinking / response / tool call / tool output / answer); after an edit (✂ deleted block) execution resumes from the nearest surviving anchor and only the new suffix is re-prefilled. Bottom half (2) is decode: the GPU router picks top-12 experts; 8 hit the LRU cache; the 4 misses (m=4) split by q* = m·B_P/B_H — this machine profiles B_P:B_H ≈ 1:4, so 1 expert is filled over PCIe (into the cache, reusable later) and 3 execute in place on the CPU; the partial outputs y_GPU and y_CPU merge exactly into y. The figure's point: every decision follows <em>this machine's measured bandwidths</em>, and the output merge is exact — no approximation.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Mechanism ① · Prefill: full-layer double buffering + semantics-aware state cache</h3>
+  <p><b>Double buffering hides transfer behind compute.</b>Because prefill activates nearly every expert per layer, FreeToken doesn't fetch on demand: it borrows two "full-layer buffers" from the global slot pool — while the GPU computes layer l's routed experts from buffer A, a dedicated transfer stream fills buffer B with layer l+1's complete expert set. Whole-layer transfer needs no routing results, so weight streaming proceeds continuously in the background. The buffers share one slot pool with the decode cache — no separate prefill cache, no phase handoff; entries surviving prefill serve latency-sensitive decode directly. When the pool can't free two whole layers, it falls back to on-demand loading and never oversubscribes VRAM.</p>
+  <p><b>Semantic anchors let recurrent states survive edits.</b>Hybrid-attention models carry a second prefix resource besides the KV cache: the recurrent layers' "evolving state". Full-attention KV is managed by a radix prefix tree (as in SGLang); recurrent states can't be partially reused, so they live on checkpoints taken during prefill/decode. FreeToken keeps a small semantics-aware state cache: checkpoints hang on prefix-tree nodes, and a new request resumes from the nearest checkpoint that survives the edit. The checkpoint budget goes to special-token boundaries — thinking segments, tool calls, tool outputs, turn boundaries — precisely where agent frameworks edit: OpenClaw strips thinking blocks from all but the latest assistant turn, OpenCode replaces tool outputs beyond a protection window with placeholders, SWE-agent keeps only the last n observations. Frameworks preserve the exact prefix up to the edited block, so checkpoints anchored there are the most likely to survive; full-attention layers reuse KV up to the edit point, recurrent layers resume from the anchor, and only the genuinely new suffix is re-prefilled.</p>
+
+  <h3>Mechanism ② · Decode: semantics-aware expert cache + the q* bandwidth-adaptive policy</h3>
+  <p>At decode, the GPU router plus a cache lookup identify the set H of active experts already cached (executed on the GPU directly); the remaining m <em>unique missing experts</em> M are the hard part. Routing has strong temporal locality across steps (the same layer's consecutive tokens repeatedly route to overlapping/recent experts — measured across model families, Liang et al. 2025), so instead of a load-time placement, FreeToken keeps one <strong>all-layer shared LRU residency space</strong>: hits refresh recency, fills absorb newly selected experts, evictions drop the least recently demanded — scarce VRAM continuously tracks the current working set. The cache can't eliminate all misses (cold start, working-set shifts, capacity limits); the residual misses go to bandwidth-adaptive execution.</p>
+  <p>Split the m misses into a cache-fill set F and a CPU-execution set C (M = F ∪ C, q = |F|): F's experts transfer into cache slots, execute on the GPU, and stay for reuse; C's experts execute directly from the resident host pool without touching residency state. The two branches run concurrently: fills run at full PCIe speed while the CPU consumes only the host bandwidth left after the link saturates — turning "residual bandwidth" into progress on the current token without stalling cache updates.</p>
+  <p>The optimal split falls out of a residual-bandwidth argument. With S bytes per expert, and expert DMA sharing the host memory subsystem with CPU execution, the bandwidth left after PCIe saturates is:</p>
+  <div class="math">$$B_R = \max(B_H - B_P,\ 0)$$</div>
+  <p>The two branches take:</p>
+  <div class="math">$$T_{\text{fill}}(q) \approx \frac{qS}{B_P},\qquad T_{\text{cpu}}(m-q) \approx \frac{(m-q)S}{B_H - B_P}$$</div>
+  <p>Balancing the two concurrent branches (the layer's exposed latency is the slower of the two):</p>
+  <div class="math">$$\frac{q}{m-q} \approx \frac{B_P}{B_H - B_P} \quad\Longrightarrow\quad q^{*} \approx m \cdot \frac{B_P}{B_H}$$</div>
+  <p>This single formula covers the whole hardware spectrum: as $B_H$ approaches $B_P$, $q^*$ approaches m and the system degenerates to pure on-demand cache filling (no separate execution branch needed). In practice q* is rounded; which experts enter F is the replacement policy's business; and <b>at least one fill is always kept</b>, so the cache keeps warming even when the CPU carries most of the load. Both bandwidths are profiled on the target machine at deployment.</p>
+
+  <h3>Mechanism ③ · Elastic memory: VRAM affects performance, never correctness</h3>
+  <p>Because the CPU-resident pool is the source of truth, any change in GPU memory moves performance only. <b>Runtime cache reconfiguration:</b>after non-expert weights and runtime state are allocated, the remaining budget splits between KV pages and whole expert slots — and the split isn't pinned at startup: at any scheduling safe point the GPU expert cache can be rebuilt with a revised budget, without restarting the engine or reloading the host pool, re-capturing the execution path dynamically. <b>Fast startup:</b>weights read directly into their final host layout and <b>pin memory only after filling</b> (pinning empty buffers first faults in and zeroes several GB of pages for nothing); no warm-up is needed — the first request starts cold, misses flow through the ordinary decode path of §3.2, and the cache warms up by serving.</p>
+
+  <div class="note"><b>Exactness:</b>the CPU branch starts first; the GPU then walks the miss path (cache update → batched copies for F → grouped evaluation over the merged set G = H ∪ F) while CPU workers process C concurrently; the layer's exposed latency is the slower branch — exactly the quantity the formula balances. GPU and CPU compute partial sums that merge exactly, preserving the exact MoE output with <b>no algorithmic approximation</b>. The whole per-layer control flow (miss detection, set sizing, victim selection, CPU branch) is statically captured into a CUDA Graph — Section 5 explains how.</div>
+</section>
+
+<!-- ================= s5 Implementation ================= -->
+<section id="s5">
+  <div class="sec-no">05 · Implementation</div>
+  <h2 class="sec">Implementation: putting "dynamic" inside a "static" CUDA Graph</h2>
+
+  <p>FreeToken keeps the SGLang/vLLM GPU-centric architecture (paged KV + radix prefix reuse) and plugs into community kernel libraries (FlashInfer, Flash Linear Attention). On top sit two layers: a graph-compatible expert cache and storage/platform plumbing.</p>
+
+  <h3>A CUDA-Graph-compatible LRU cache</h3>
+  <p>The expert cache is inherently dynamic — which experts are missing, how many to fetch, which slots to evict change every step; host-driven control flow would pay an expensive device sync per MoE layer. FreeToken keeps all routing-related control <b>on the GPU</b>, expressing dynamic behavior with <b>data captured inside a static graph</b>: fixed-shape work buffers + a device-side valid count. A single GPU kernel per MoE layer deduplicates routed experts, classifies them against the residency table, derives q from the bandwidths, picks eviction victims, and rewrites logical routing IDs into physical slot IDs (or flags "CPU-execute"). Victim selection avoids the classic LRU trap of scanning the whole cache per eviction: one kernel pass finds the K least-recently-used candidate slots up front, and the miss path consumes the first q ≤ K on demand — victim discovery always costs one pass, independent of miss count. The resulting copy work-list drives a single fused transfer; expert banks share one logical-ID→slot mapping, so one device-side source/destination index list, launched once in fixed shape, applies to every bank; valid counts mask unused work. Result: fewer kernel launches, high PCIe utilization, and routing decisions moved off the host.</p>
+
+  <h3>CPU execution resident in the graph</h3>
+  <p>The CPU branch is captured into the same graph: for each supported decode batch size, stable pinned I/O buffers and persistent task descriptors are prepared, and the device→host copy, host-function submission node, concurrent GPU path, synchronization node and host→device result copy are all captured together. A replay <em>is</em> the complete heterogeneous step — no per-token Python scheduling. Workers are a persistent C++ pool pinned to physical cores, consuming expert weights with architecture-specific SIMD + in-kernel dequantization to stay bandwidth-bound, and returning gate-weighted per-token partial outputs.</p>
+
+  <h3>Expert storage and platform plumbing</h3>
+  <p><b>Expert banks + the FTW format:</b>model-specific checkpoint layouts are normalized into a few expert banks, each with the flattened "layer–expert" ID (lE+e) as the leading dimension; rows with the same ID across banks compose one complete expert, and the GPU kernels and CPU executor share the same logical identity. FTW (<b>F</b>ree<b>T</b>oken <b>W</b>eight) pre-merges expert weights into the runtime bank layout, so startup skips tensor discovery and repacking — parallel direct I/O reads aligned blocks straight into exactly-sized host banks, pinning only after the fill. <b>Platform adaptation:</b>GPU kernels are selected at load by expert representation/GPU architecture/CUDA environment; the CPU executor dispatches to available SIMD implementations and core topologies. When the full pool can't be pinned/registered for DMA (OS and driver limits), a <b>pure-CPU MoE backend</b> kicks in: weights stay in pageable host memory, all routed experts execute on the CPU, non-expert layers stay on the GPU, and only activation-sized inputs, routing metadata and aggregated outputs cross the CPU–GPU boundary — trading peak transfer bandwidth for "deployable even when the fast path can't come up".</p>
+</section>
+
+<!-- ================= s6 Evaluation ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Evaluation</div>
+  <h2 class="sec">Evaluation: 4 real agent workloads × 6 machines × 4 baselines</h2>
+
+  <h3>Setup</h3>
+  <p><b>Hardware:</b>six discrete-GPU systems — five consumer machines + one workstation (RTX PRO 6000 Blackwell, 96GB). The 3090/4090/5090 are rented dual-socket servers whose CPUs far outclass edge hosts, so all serving and bandwidth measurements cap them at 6 CPU threads pinned to the GPU's NUMA node; capped this way they deliver 56.7–77.3GB/s host bandwidth, the same magnitude as the two real edge machines at full threads (desktop 16-core: 53.8; laptop 14-core: 47.5). All bandwidths are measured on deployed tensor shapes, not taken from spec sheets.</p>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: the six test systems with measured B_P and B_H">
+    <figcaption>
+      <b>Table 1:</b>Test systems. B_P is the measured host-to-device expert-transfer bandwidth over PCIe; B_H is the measured effective bandwidth of the CPU-side MoE expert kernel. On the three rented servers the CPU-thread and DRAM columns give container quotas.
+      <span class="ex">B_P = measured PCIe expert-transfer bandwidth, B_H = measured effective CPU-side expert-kernel bandwidth. Note that the three "servers" are edge hosts simulated by capping cores and bandwidth; the real edge machines are the 5090 desktop (Ryzen 9950X3D, DDR5) and the 4060 laptop (LPDDR5). B_P:B_H spans 52.7:77.3 ≈ 1:1.5 (5090 server) to 11.8:47.5 ≈ 1:4 (4060 laptop) — the whole breadth of the scale, which is exactly why a fixed split policy can't work and q* must be measured per machine. The PRO 6000 has 512GiB DDR5 and high B_H (178GB/s), supporting the 753B-class demo.</span>
+    </figcaption>
+  </figure>
+
+  <p><b>Models:</b>DeepSeek-V4-Flash (284B/13B active, natively MXFP4-quantized experts) and Qwen3.6-35B-A3B (BF16; the 8GB laptop uses the official NVFP4 build); the cross-hardware study adds GLM-5.2 (753B/40B active, NVFP4, 433GB checkpoint). <b>Workloads:</b>W1 math reasoning (AIME — long CoT, no tools, single-turn, decode-dominated); W2 coding agent (SWE-bench tasks through the OpenCode framework with real tool execution); W3 coding agent on its native protocol (the same tasks through Claude Code's Anthropic-compatible endpoint, spawning concurrent sub-agents, sessions reaching 56–65k tokens); W4 email/calendar agent (OpenClaw default config for thirteen rounds, its 120s idle watchdog disabled so slower engines remain testable, ~24.5k-token system-context base). Coding tasks must produce the reference gold patch; W4 must complete all thirteen rounds. <b>Baselines:</b>llama.cpp / Ollama / KTransformers / MoE-Infinity (where supported), weight formats bit-aligned (MXFP4 blocks bit-exact). <b>Metrics:</b>mean per-request decode throughput and mean <abbr title="Time To First Token — the request-to-first-token latency that agents feel between tool rounds">TTFT</abbr>; agent trajectories differ per engine, so total wall-clock is not compared.</p>
+
+  <h3>End-to-end results (RTX 5090)</h3>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: end-to-end serving on the RTX 5090 across four workloads and two models — decode TPS and TTFT">
+    <figcaption>
+      <b>Figure 3:</b>End-to-end serving on the RTX 5090 across four workloads (1. AIME, 2. OpenCode+SWE, 3. Claude Code+SWE, 4. OpenClaw+Email/Cal) and two models (Qwen3.6-35B-A3B BF16 and DeepSeek-V4-Flash MXFP4). Top: decode TPS; bottom: mean TTFT (log scale). × marks configurations an engine cannot serve (Ollama and MoE-Infinity lack DSV4 support; MoE-Infinity provides no usable server for multi-turn agents).
+      <span class="ex">Top — decode speed: on Qwen3.6 FreeToken holds 77–83 tok/s, 1.8–2.3× the strongest baseline per workload (usually llama.cpp); on DSV4-Flash 22–25 tok/s, 1.5–1.9×. And the more agentic the workload, the more stable FreeToken stays: within 12% of its single-turn W1 rate, while the most context-hungry baseline (KTransformers on DSV4) has already lost 31% by W2 — single-stream benchmarks overstate baselines' agentic performance. MoE-Infinity only runs W1 (8.8 tok/s); long prompts abort at its per-expert prefill cap. Bottom — TTFT (log scale): FreeToken takes 5 of the 6 multi-turn cells for lowest mean (the exception, Qwen3.6×W3, goes to KTransformers' GPU-prefill arm); W1's short single-turn prompts go to llama.cpp. The tail gap is bigger than the means: FreeToken's worst round stays under 44 s while every baseline exceeds 150 s somewhere (llama.cpp 232 s, Ollama 179 s, KTransformers 946 s) — beyond OpenClaw's 120 s watchdog and Claude Code's default request timeout, real agent clients would simply abandon the request. Tail TTFT is an availability boundary, not a latency statistic.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Attribution: where the gains come from</h3>
+  <p><b>Pipelined prefill (Figure 4a).</b>Double buffering makes prefill transfer-bound: with overlap on, each 8,192-token chunk completes in 1.19–1.22 s — exactly the time to stream the 64.4GB expert pool at 52.7GB/s, i.e. the practical limit of PCIe 5.0 ×16, with expert compute fully hidden; throughput reaches 6.7k tok/s at 16k tokens. Disabling the second buffer serializes transfer and compute, losing 19% / 25% / 26% at 4k / 8k / 16k — the penalty grows with prompt length.</p>
+  <p><b>Expert locality (Figure 4b).</b>Decode routing has strong short-range locality — per-miss LRU beats any placement chosen at prefill time. Replaying identical routing traces from all four workloads over three placement policies at equal cache capacity: at RTX 5090 capacity (37% of Qwen3.6's expert pool, 11% of DSV4-Flash's), FreeToken's global LRU achieves decode expert-read miss rates of 16% / 39%, KTransformers' prefill-updated placement 41% / 59%, and llama.cpp's routing-blind static split 62% / 89% — the ordering holds at every capacity short of the full pool.</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: prefill TPS versus prompt length, and decode expert miss rate versus cache size under three placement policies">
+    <figcaption>
+      <b>Figure 4:</b>(a) Prefill TPS versus prompt length (RTX 5090, Qwen3.6-35B BF16), with and without FreeToken's pipelined full-layer loading. (b) Decode-time expert miss rate versus cache size (as a percentage of the expert pool) under the three engines' placement policies, replayed on identical routing traces; lines are means over W1–W4, bands the min–max range.
+      <span class="ex">(a) Prefill throughput vs. prompt length from 1k→16k: FreeToken (solid) rides the transfer ceiling and clearly separates from the no-overlap variant and KTransformers/llama.cpp/Ollama past 2k — the gap reaches 2–3× from 4k, confirming the value of hiding whole-layer transfers inside compute. (b) Miss rate vs. cache capacity (% of expert pool, min–max bands) for Qwen3.6 and DSV4-Flash: the policy curves order identically everywhere — FreeToken (LRU) &lt; KTransformers (prefill update) &lt; llama.cpp (static) — and the smaller the capacity, the wider the gaps. Static placement can't catch routing traffic; LRU follows the working set.</span>
+    </figcaption>
+  </figure>
+
+  <p><b>Cross-hardware serving (Figure 5).</b>W2 repeats on five consumer machines: FreeToken leads the best baseline by 1.3× (3090/4090), 1.9× (5090 server), 2.1× (5090 desktop), 1.8× (4060 laptop); on the 8GB ×8-lane laptop the NVFP4 build sustains 39.3 tok/s — 92% of a 4090. The two 5090 columns share silicon and differ only in the host: swapping from the multi-channel server to the dual-channel consumer desktop costs FreeToken 4% of decode speed, while llama.cpp — whose CPU-resident experts starve on dual-channel DDR5 — drops to 80%: dynamic split following measured bandwidths at work. Frontier tier: on a single RTX PRO 6000, FreeToken serves GLM-5.2 at 14.9 tok/s vs. llama.cpp's 7.3 (2.0×), with bit-identical expert weights and comparable mean TTFT (7.5 vs. 7.8 s); KTransformers has no servable path on this machine at all — its GLM-5.2 approach needs 753GB–1.5TB of host memory (the machine has 512GiB) and its CPU kernels can't read GLM-5.2's NVFP4 layout.</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: coding-agent decode TPS across consumer GPUs, plus the GLM-5.2 demonstration on RTX PRO 6000">
+    <figcaption>
+      <b>Figure 5:</b>Coding-agent decode TPS across consumer GPUs (SWE issues via the OpenCode harness), Qwen3.6-35B-A3B. 4060 laptop using NVFP4, the other Qwen3.6 columns BF16. The RTX PRO 6000 column is a separate demonstration: GLM-5.2 (753B-A40B, NVFP4) on the math workload; Ollama is not run there. × marks configurations an engine cannot serve.
+      <span class="ex">Six bars: 4060 laptop (8GB, weakest) → 3090 → 4090 → 5090 server → 5090 desktop → RTX PRO 6000 (GLM-5.2, separate demo). FreeToken tops every bar — 50+ tok/s in the desktop class, and even the 4060 laptop reaches ~39 tok/s, above the 33 tok/s production-Codex median. llama.cpp and KTransformers are simply infeasible (×) on the 4060 laptop — on the machines that need this system most, the baselines are absent.</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Evaluation in one paragraph:</b>① at equal VRAM, LRU following routing vs. static placement cuts miss rates from ~60%/~90% to ~16%/~39%; ② layered miss serving keeps FreeToken ahead across the whole host-bandwidth spectrum from 47 to 77GB/s; ③ throughput stays stable under agentic load (TTFT tail &lt; 44 s) while baselines blow past client timeouts; ④ the demos push "what can run" from 35B to 284B to 753B.</div>
+</section>
+
+<!-- ================= s7 Commentary ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Commentary</div>
+  <h2 class="sec">Commentary: strengths and open questions</h2>
+
+  <h3>Highlights</h3>
+  <ul class="tight">
+    <li><b>Turning the bottleneck into a signal.</b>Where others route around bandwidth, FreeToken puts the two measured bandwidths straight into the scheduling formula. q* = m·B_P/B_H is simple enough to live on-device inside a CUDA Graph, yet covers the entire hardware spectrum from "all fill" to "all CPU".</li>
+    <li><b>No correctness sacrificed.</b>Unlike HOBBIT/SiDA/SMoE-style lower-precision replicas or expert dropping, the output merge is exact and the model is untouched — a much wider compatibility surface for a general-purpose engine.</li>
+    <li><b>System-level completeness.</b>From the FTW weight format and startup layout, through CUDA-Graph-resident dynamic caching and runtime elastic rebuilds, to agent semantics (where anchors go, how to recover after edits) — a whole-stack design rather than an assembled demo; 20+ MoE models supported.</li>
+    <li><b>Honest evaluation.</b>Four real agent harnesses with real tool execution, gold-patch acceptance, bit-exact weight alignment — and candid disclosure that the rented "consumer" servers are 6-thread-capped simulations, validated against the real machines.</li>
+  </ul>
+
+  <h3>Open questions</h3>
+  <ul class="tight">
+    <li><b>The table is the data.</b>Table 1 admits that three of the "consumer machines" are capped servers; there is exactly one real 5090 desktop and one 4060 laptop — cross-machine generality rests on "capped simulation + deployment-time bandwidth profiling".</li>
+    <li><b>Scope.</b>The main comparison is thorough on two models (GLM-5.2 is a single-machine demo); "20+ MoE models" is a support statement, not all tested. The CPU branch depends on host memory bandwidth — if a browser or game runs alongside, the residual-bandwidth assumption shifts; the paper gives resource dynamics to runtime rebuilds, but q*'s B_H is profiled once at deployment, and online re-profiling isn't discussed.</li>
+    <li><b>What's not covered.</b>Multi-request concurrency and continuous batching (all metrics are per-request means); batch-size scaling; CUDA-Graph capture cost given "branches and syncs live in the graph"; and the relation to WiSP (same topic, bandwidth-aware expert paging) stays a textual comparison.</li>
+  </ul>
+
+  <div class="takeaway"><b>Positioning:</b>between the "MoE as sparse computation" academic line (MoE-Infinity et al.) and the "CPU as a second engine" engineering line (KTransformers et al.), FreeToken adds a <em>third coordinate</em>: splitting miss service by measured bandwidth, validated on agentic rather than single-turn benchmarks. The two transferable ideas: ① <b>semantic boundaries are cache anchors</b> — any frontend that edits context is telling you where it will truncate; ② <b>residual bandwidth is free compute</b> — after PCIe saturates, the CPU shouldn't idle; it should eat the experts that can't be moved but can be computed.</div>
+</section>
+
+<!-- ================= s9 Glossary ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Hover any dotted-underlined abbreviation in the text, or come back here any time.</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Reading glossary (abbreviations with dotted underlines are hoverable in the text)</caption>
+    <thead><tr><th>Abbr.</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>Layers with hundreds of experts; each token routes to only a few — computation is sparse</td></tr>
+      <tr><td>$B_P$</td><td>PCIe expert-transfer bandwidth</td><td>Measured host→GPU expert-transfer bandwidth; sets the fill branch's rate</td></tr>
+      <tr><td>$B_H$</td><td>Host expert-processing bandwidth</td><td>Measured effective CPU-side expert-kernel bandwidth; sets the CPU branch's rate</td></tr>
+      <tr><td>$q^*$</td><td>optimal fill count</td><td>q* ≈ m·B_P/B_H — of the m missed experts, how many to fill over PCIe vs. execute on the CPU</td></tr>
+      <tr><td>TTFT</td><td>Time To First Token</td><td>Request-to-first-token latency; what agents feel between tool rounds</td></tr>
+      <tr><td>KV cache</td><td>Key-Value cache</td><td>Attention layers' cached keys/values; often exceeds VRAM at the edge, hence a memory-management target</td></tr>
+      <tr><td>LRU</td><td>Least Recently Used</td><td>Evict the least recently used entry first; FreeToken's expert cache follows routing locality with it</td></tr>
+      <tr><td>CUDA Graph</td><td>—</td><td>Captures a sequence of kernels as a static graph replayed as a whole, eliminating per-launch and sync overhead</td></tr>
+      <tr><td>FTW</td><td>FreeToken Weight</td><td>FreeToken's weight format: pre-merged into the runtime bank layout, so startup skips repacking</td></tr>
+      <tr><td>MXFP4 / NVFP4</td><td>4-bit float formats</td><td>4-bit floating-point quantization formats; DSV4-Flash ships native MXFP4, some newer models NVFP4</td></tr>
+      <tr><td>radix prefix tree</td><td>—</td><td>Tree structure sharing KV/state by prefix; naturally supports cross-request prefix reuse</td></tr>
+      <tr><td>agentic workload</td><td>—</td><td>Multi-turn, tool-calling workloads with continuously edited context; TTFT-sensitive</td></tr>
+      <tr><td>gated DeltaNet / Delta Attention</td><td>—</td><td>Recurrent attention variants compressing the prefix into an evolving state; checkpoints needed for reuse</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    This page is a human-written English quick-read of arXiv:2608.16157 "FreeToken: Efficient Edge-Native MoE Serving with Bandwidth-Adaptive Execution". Images are extracted from the paper at 300 DPI and shown scaled proportionally (never cropped); commentary reflects the editor's views.<br>
+    Paper: <a href="https://arxiv.org/abs/2608.16157">arXiv:2608.16157</a> · Code: <a href="https://github.com/FlashML-org/FreeToken">github.com/FlashML-org/FreeToken</a> · Full Chinese deep-read: <a href="index.html">中文精读版</a><br>
+    <span style="opacity:.75">Dark mode supported · click images for full size · print-friendly</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="English quick-read notes: MMLongEmbed — the first systematic benchmark for long-context multimodal embedding models. 4 retrieval tasks, 8 datasets, 8,460 queries, 11 models. All 22 figures and tables embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, MMLongEmbed, multimodal embedding, long context, retrieval benchmark, needle-in-a-haystack, positional bias">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Quick Read · MMLongEmbed: Benchmarking Multimodal Embedding Models in Long-Context Scenarios">
+<meta property="og:description" content="A wide context window is not the same as long-context understanding: the first systematic MEM long-context benchmark — 4 tasks, 8 datasets, 8,460 queries, 11 models — exposing surface-feature matching, positional bias, and fine-grained degradation.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Quick Read · MMLongEmbed: A Long-Context Benchmark for Multimodal Embedding Models</title>
+<style>
+  /* ===== illustrated paper-reading page (paper-reading-html skill v2, EN quick-read) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+  footer a{color:var(--accent); text-decoration:none}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">MMLongEmbed<span> · Quick Read</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Motivation</a>
+      <a class="jump" href="#s3">Findings</a>
+      <a class="jump" href="#s4">Method</a>
+      <a class="jump" href="#s5">Models</a>
+      <a class="jump" href="#s6">Analysis</a>
+      <a class="jump" href="#s7">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文精读版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark/light mode" title="Toggle dark/light mode">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · Quick-Read Edition · Multimodal Embedding in Long Context</div>
+    <h1>MMLongEmbed: Benchmarking Multimodal Embedding<br>Models in Long-Context Scenarios</h1>
+    <div class="subtitle">Multimodal embedding models (MEMs) now advertise 32K+ token context windows — but a wide window is not the same as reading comprehension. This paper builds the first benchmark dedicated to MEM long-context ability: 4 retrieval tasks, 8 datasets, 8,460 queries — systematically exposing today's models' reliance on surface-feature matching and the decay of fine-grained information retention with length.</div>
+    <div class="meta">
+      <span>Authors: Haitian Wang, Ruoxi Sun, Quantong Qiu, Juntao Li, et al. (Soochow University × Ant Group)</span>
+      <span>Code: <a href="https://github.com/AmamiSora1228/MMLongEmbed">github.com/AmamiSora1228/MMLongEmbed</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Multimodal Embedding</span><span class="pill">Long Context</span><span class="pill">Retrieval Benchmark</span>
+      <span class="pill">Needle-In-A-Haystack</span><span class="pill">Cross-Modal Alignment</span><span class="pill">Temporal Reasoning</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Reading guide (all 22 figures and tables embedded in the narrative)</h2>
+  <ol>
+    <li><a href="#s1">Overview: the benchmark and what it found</a></li>
+    <li><a href="#s2">Motivation: why MMLongEmbed was needed</a></li>
+    <li><a href="#s3">Key findings: three counterintuitive conclusions</a></li>
+    <li><a href="#s4">Method: four tasks and hard-distractor construction</a></li>
+    <li><a href="#s5">Models and overall results</a></li>
+    <li><a href="#s6">Analysis: position bias, modality interference, length scaling</a></li>
+    <li><a href="#s7">Conclusion, limitations and commentary</a></li>
+    <li><a href="#s9">Glossary (hover abbreviations anywhere)</a></li>
+  </ol>
+  <p class="muted" style="margin:10px 0 0; font-size:13.5px">This is the English quick-read edition: a complete digest of the argument with every figure and table at 300 DPI and original captions. The full section-by-section Chinese deep-read is <a href="index.html">one click away</a>.</p>
+</nav>
+
+<!-- ================= s1 Overview ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: the benchmark and what it found</h2>
+  <p class="lead"><abbr title="Multimodal Embedding Model: maps text, document images, video frames etc. into one vector space, enabling cross-modal retrieval">MEMs</abbr> map heterogeneous modalities — text, document images, video frames — into a shared vector space, making "retrieve the right image/video/document with a text query" possible. The new <abbr title="Multimodal Large Language Model: LLMs that process text and visual inputs together">MLLM</abbr>-backed generation of MEMs (Qwen3-VL-Embedding, GME, …) has pushed context windows past 32K tokens, powering multimodal <abbr title="Retrieval-Augmented Generation: retrieve evidence from an external corpus first, then generate">RAG</abbr> and agent workflows. The authors put their finger on a sharp contradiction: <strong>the theoretical window length is not the model's real long-context understanding or representation ability</strong> — "it fits" is not "it reads".</p>
+  <p>MMLongEmbed fills that evaluation gap as the first systematic long-context MEM benchmark:</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">Scale</div><div class="v">8,460 queries<small>20,880 candidates in total</small></div></div>
+    <div class="item"><div class="k">Context length</div><div class="v">256 → 32,768<small>length-stratified pools</small></div></div>
+    <div class="item"><div class="k">Models</div><div class="v">11 evaluated<small>10 open-source (2B–8B) + 1 proprietary</small></div></div>
+    <div class="item"><div class="k">Tasks / datasets</div><div class="v">4 / 8<small>1 synthetic + 3 real task families</small></div></div>
+  </div>
+
+  <p>Four evaluation tasks span three input formats (pure text, pure image, interleaved image-text): <b>Visual Grounding</b> (a synthetic <abbr title="Needle-In-A-Haystack: hide a target piece of information in a long context and test whether it can be recovered; MM-NIAH is the multimodal version">NIAH</abbr> task) plus three real tasks — <b>Multi-Source Reasoning</b>, <b>Logical Summarization</b>, and <b>Temporal Summarization</b>. Dataset statistics:</p>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: statistics of tasks in MMLongEmbed — datasets, query/candidate counts, candidates per query">
+    <figcaption>
+      <b>Table 1:</b>Statistics of Tasks in MMLongEmbed.
+      <span class="ex">The 8 datasets split into a synthetic camp and a real camp. The synthetic Visual Grounding task draws from NeedleBench and MM-NIAH (interleaved web pages): 2,160 queries and candidates each, ~25 candidates per query. The real tasks: Multi-Source Reasoning uses MMDocRAG and HotpotQA; Logical Summarization uses MMLongBench and GovReport; Temporal Summarization uses YoukuDenseCaption and ActivityNet Captions — with candidates per query (C/Q) ranging from 280 to 640, held constant across length pools.</span>
+    </figcaption>
+  </figure>
+
+  <p>Length is the benchmark's central controlled variable: the synthetic task slices contexts into 8 length bins (256 to 32K); the real tasks use three pools at 8K / 16K / 32K. The figure below shows the length distribution of all candidates, with the four tasks cleanly separated:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: length distribution of candidates in the MMLongEmbed benchmark">
+    <figcaption>
+      <b>Figure 1:</b>Length Distribution of Candidates in the MMLongEmbed Benchmark.
+      <span class="ex">X axis is token count (log scale), y axis frequency: Multi-Source Reasoning covers the three real pools at 8K–32K (blue), Temporal Summarization sits in the mid-long range (orange), Visual Grounding spans all eight synthetic bins from 256–32K (green), and Logical Summarization concentrates at the longer end (yellow). Length stratification makes "context grows longer" a variable that can be examined in isolation.</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to view the original 300-DPI version; click again or press Esc to close.</p>
+
+  <h3>Three headline findings (spoilers)</h3>
+  <ul class="tight">
+    <li><b>Scale and capability are decoupled:</b>bigger models with higher embedding dimensions barely improve long-context performance — Qwen3 8B gains only ~1 point over 2B (53.41 vs 52.31), and on MMDocRAG's Hard subset the 8B (25.42) actually <em>loses</em> to the 2B (32.29).</li>
+    <li><b>Fine-grained retrieval decays systematically with length:</b>most models retrieve reliably only at ≤2K tokens, then degrade steadily; summarization-type tasks stay comparatively stable — real long documents have redundancy and dispersed evidence.</li>
+    <li><b>Deep understanding is the weak point:</b>once high-similarity distractors close off the surface-matching shortcut, scores fall off a cliff, and robustness to cross-modal redundancy varies wildly across models.</li>
+  </ul>
+
+  <div class="takeaway"><b>One-sentence positioning:</b>the first systematic benchmark at the intersection of "long context" and "multimodal embedding" — it does not test MEM generation but retrieval/representation: given one (short) query, find the correct one among a pile of (very long) multimodal candidates.</div>
+</section>
+
+<!-- ================= s2 Motivation ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Motivation</div>
+  <h2 class="sec">Motivation: why MMLongEmbed was needed</h2>
+
+  <h3>Three generations of MEMs, and three gaps in existing benchmarks</h3>
+  <p>MEMs have gone through roughly three generations: contrastive dual-tower architectures (CLIP) building a shared semantic space from massive image-text pretraining; MLLM-driven models (E5-V, VLM2Vec, GME, MM-Embed) learning more general embedding spaces on visual backbones; and reasoning-driven representation learning (Embed-RL, MMEmb-R1) embedding implicit reasoning into representation training. Context windows kept growing — to 32K, to Qwen3-VL-Embedding's document-level understanding, to a proprietary model's 128K.</p>
+  <p>Evaluation lagged behind. Mainstream embedding benchmarks (MTEB/MMEB/MIEB) focus on short inputs and simple understanding; the few long-input benchmarks (e.g. LongEmbed) carry three structural deficiencies, which MMLongEmbed addresses one by one:</p>
+  <ul class="tight">
+    <li><b>① Insufficient context diversity:</b>text-only, no coverage of interleaved web pages, document pages, video frames → MMLongEmbed brings four data sources (documents, web pages, video-frame sequences, long text) and three input formats.</li>
+    <li><b>② No length stratification:</b>input length isn't a controlled variable, so "how does performance evolve as context grows" can't be analyzed → length-stratified pooling, evaluated bin by bin.</li>
+    <li><b>③ Insufficient task difficulty:</b>difficulty isn't explicitly controlled; pooling whatever data is available lets many tasks be solved by surface matching → high-quality distractors: high-similarity needles in the synthetic task, "looks-alike" distractors in the real tasks.</li>
+  </ul>
+
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: comparison of MMLongEmbed with existing embedding benchmarks on data-source coverage and evaluation design">
+    <figcaption>
+      <b>Table 5:</b>Comparison of MMLongEmbed with existing embedding benchmarks across two dimensions: data source coverage and evaluation design.
+      <span class="ex">The seven-dimension coverage matrix: LongEmbed covers only text with no length stratification and no hard distractors; the MMEB family covers web pages and documents but not long context; MMTEB/LMEB are text-only. Only MMLongEmbed checks every box across all four data sources (web, document, video, text) and all three design features (long context + length stratification + hard distractors) — exactly its three points of differentiation.</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>Why "hard distractors" is the key design:</b>the traditional move is "enlarge the candidate pool" — but if candidates differ greatly, models rank correctly off shallow signals like lexical overlap and global similarity, and the benchmark measures nothing. MMLongEmbed does the opposite: distractors closely resemble the correct answer — differing in one key entity, one piece of key evidence, or in temporal structure — specifically probing deep semantic and structural dependence.</div>
+</section>
+
+<!-- ================= s3 Key findings ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Key Findings</div>
+  <h2 class="sec">Key findings: three counterintuitive conclusions</h2>
+  <p>Before the method, fix the paper's three most important empirical conclusions (all from §5–§6, evidenced later):</p>
+  <h3>Finding 1: scaling up ≠ stronger long-context ability</h3>
+  <p>Within a model family, 2–4× parameters bring marginal gains: Qwen3 8B vs 2B is 53.41 vs 52.31; GME 7B vs 2B is 24.63 vs 23.10 — with the 8B even losing to the 2B on the fine-grained Hard subset. Paired t-tests (Table 8) show the Qwen3 family difference is statistically insignificant (p=0.5375). Conclusion: without long-context-specific optimization, scale and embedding dimension alone cannot solve fine-grained discrimination in long contexts.</p>
+  <h3>Finding 2: degradation varies systematically with context length and key-information position</h3>
+  <p>With length as a controlled variable, clear patterns emerge: fine-grained retrieval (Visual Grounding) slides persistently after ~2K tokens; targets in the middle of the sequence score worst (positional bias, §6); summarization tasks stay relatively stable — redundancy is high, evidence dispersed, the "global semantic label" remains recoverable.</p>
+  <h3>Finding 3: current MEMs lean heavily on surface-feature matching</h3>
+  <p>Faced with carefully built high-similarity distractors, most models' high Easy scores collapse instantly: Logical Summarization drops from 80–90% to 10–20%; Temporal Summarization's Hard set is equally brutal. Cross-modal interference robustness is highly uneven — some models are modality-biased, some get "pierced" by mixed image-text noise, and only a few (e.g. Rzen-v2-7B) stay stable.</p>
+  <div class="takeaway"><b>Thesis:</b>today's MEMs are "broad relevance matchers", not "fine-grained semantic/structural understanders" — and long-context evaluation is precisely what exposes this truth.</div>
+</section>
+
+<!-- ================= s4 Method ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">Method: four tasks and hard-distractor construction</h2>
+
+  <h3>Length-stratified pooling + unified token counting</h3>
+  <p>All queries are comparatively short while candidate multimodal documents are much longer; query–candidate pairs are pooled by candidate length (8 bins for the synthetic task, 8K/16K/32K for the real ones), each pool evaluated independently, and candidate density (C/Q) is held constant across pools within a task. Because models tokenize images very differently, the paper adopts a unified multimodal token-count baseline (revised from MMLongBench): text via the Qwen3 tokenizer; images as 16×16 patch embeddings + 2×2 spatial merging — each visual token covering an effective 32×32 pixels:</p>
+  <div class="math">$$N_{\text{image}} = \left\lceil \frac{H}{32} \right\rceil \times \left\lceil \frac{W}{32} \right\rceil$$</div>
+  <p>Total context length sums over modalities:</p>
+  <div class="math">$$L = N_{\text{text}} + \sum_{i=1}^{K} N_{\text{image}}^{(i)}$$</div>
+  <p>Why unify: different models may differ by several times in tokens for the same image; if each model pooled by its own counting, one "length bin" would mean different difficulty for different models. The unified scheme keeps length a fair, comparable control variable.</p>
+
+  <h3>The construction pipeline</h3>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: overview of the MMLongEmbed data construction pipeline">
+    <figcaption>
+      <b>Figure 2:</b>Overview of the MMLongEmbed data construction pipeline.
+      <span class="ex">Top half: the synthetic Visual Grounding task injects needles at different insertion depths × context lengths, forming a pool matrix with every depth×length cell evaluated independently. Bottom half: the three real tasks first pool multimodal contexts by length, then build Easy pools (unperturbed) and Hard pools (targeted corruption): multi-source reasoning removes key evidence ("context replacement"), logical summarization swaps large text spans ("evidence destruction"), temporal summarization shuffles and reorders video event segments; the right side shows retrieval scoring examples (top-1 hit 0.575, top-2 distractor 0.361). Hard pools are strictly length-matched with Easy pools so models can't use length as a shortcut. ("Temporal Summary"/"Logical Summary" in the figure are abbreviations for Temporal/Logical Summarization.)</span>
+    </figcaption>
+  </figure>
+
+  <h3>Task 1 · Visual Grounding (synthetic — visual anchor localization)</h3>
+  <p>The multimodal needle-in-a-haystack: 25 text and 25 image query-anchor pairs selected from NeedleBench and MM-NIAH, with anchors embedded in interleaved image-text haystacks sampled from OBELICS. Contexts span 256–32,768 tokens in eight bins; insertion depth is discretized into 6 levels (0%–100%); each length×depth cell gets its own 25-candidate corpus. The pivotal design: <b>anchors are highly similar to their distractors</b>. Text anchors share nearly identical syntax and lexical overlap with distractors, differing only in the core entity — e.g. the target "The first band to play on the Moon was the Virtual Rocket Band." versus the distractor "…on Venus …"; a query like "which band first performed on the Moon?" forces a choice. Visual anchors are synthetically generated unique objects/scenes that cannot have leaked from training, placed among random backgrounds and visually similar distractor images — forcing zero-shot fine-grained alignment instead of coarse scene recognition. This task orthogonalizes "fine-grained instance-level discrimination" against "position/length" — the paper's sharpest scalpel.</p>
+
+  <h3>Task 2 · Multi-Source Reasoning (real — evidence chains across sources)</h3>
+  <p>Built on HotpotQA and MMDocRAG, testing the ability to capture structured evidence chains across 2–5 evidence fragments. Queries without "strongly linked anchors" are filtered out first (the auditor prompt below); original contexts ≤8K are expanded to 16K/32K with semantically irrelevant but natural filler while <b>keeping the relative positions of key evidence unchanged</b>. Hard distractors are generated by <b>breaking the reasoning chain</b>: a key evidence span (first / last / middle random segment) is removed from the expanded candidate and replaced with strictly length-matched coherent text — breaking the chain while erasing the length cue. Easy pools are undamaged versions padded to the same length.</p>
+
+  <figure class="fig">
+    <img src="figs/table11.png" alt="Table 11: multi-source reasoning case design for HotpotQA">
+    <figcaption>
+      <b>Table 11:</b>Multi-source reasoning case design for HotpotQA.
+      <span class="ex">Query: "Which album produced by Nathan Chapman for Taylor Swift, released in late 2010, was it?" The positive keeps the full reasoning-node chain [producer → ordinal → time → entity]; the Hard distractor changes the release year 2010 → 2008, breaking the [time] node into a temporal-ordinal contradiction; the Easy distractor swaps into an unrelated domain (an ABC aircraft engine), deleting the [entity/domain] node. The two difficulties separate "chain-level inconsistency" from "irrelevant negative".</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table12.png" alt="Table 12: system prompt for the Senior Data Auditor query filter">
+    <figcaption>
+      <b>Table 12:</b>System prompt for the Senior Data Auditor.
+      <span class="ex">The first gate of data construction: an LLM playing "Senior Data Auditor" decides whether a query contains strongly linked anchors — specific proper nouns, unique events, distinctive data, rare combinations — rejecting generic signals (like "AI", "the study"), and only passing queries that would retrieve the same document with ≥95% confidence among 10 million. This prevents queries that are solvable by lexical matching alone.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Task 3 · Logical Summarization (real — global document semantics)</h3>
+  <p>Built on GovReport (text) and MMLongBench (document images), testing alignment of a summary with a long document's global semantics, keeping only the subset requiring macro-level understanding rather than local excerpting. Hard variants replace large contiguous spans (first 25% / last 25% / middle 50%) with query-irrelevant content — and the <b>replacement source</b> is the key: for text, BM25 retrieves from a global index documents highly similar to the summary but factually different, and paragraphs are dynamically drawn from them; for multimodal, "unseen consecutive image pages" from the same source document's extended version are used. The injected noise has high lexical overlap, fluent prose, uniform visual format — <b>locally coherent, globally broken</b> — so local matching can't steal points.</p>
+
+  <figure class="fig">
+    <img src="figs/table10.png" alt="Table 10: logical summarization case design">
+    <figcaption>
+      <b>Table 10:</b>Logical case design.
+      <span class="ex">The query is a complete GAO audit summary about open burn pits for Afghan/Iraqi forces; the positive covers all three audit dimensions (compliance, alternatives, health monitoring); each of the three distractors covers only one sub-topic (compliance violations only, contractor logistics only, air-pollution background only) — yet all overlap the query's vocabulary heavily. A model reading only local keyword density can easily rank a Partial distractor above the ground truth.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Task 4 · Temporal Summarization (real — long-range temporal structure)</h3>
+  <p>Built on YoukuDenseCaption (Chinese) and ActivityNet Captions, testing understanding of long-range temporal structure: all videos are downsampled to 1 FPS into standard frame sequences, and the retrieval unit is the whole candidate video (an ordered frame sequence). A text query describes an event sequence ("first… then… finally…") and must retrieve the most relevant video; queries are rewritten from concatenated subtitles by Qwen2.5-32B-Instruct into coherent sequences with explicit transition words (prompt below), and Chinese annotations are zero-shot translated by the same model.</p>
+  <p>The core innovation of the Hard distractors is <b>event-level temporal perturbation</b>: instead of naive frame shuffling, videos are segmented at semantic boundaries first, then macro-structure transforms are applied (wholesale <b>temporal reversal</b>, <b>block permutation</b>) — preserving event-level semantic units while destroying global narrative and order, with a 0.5-second anti-overlap filter keeping event boundaries clean. Easy pools use other unperturbed videos.</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: task formulation for Temporal Summarization — Easy negatives from different videos, Hard negatives from the same video with shuffled order">
+    <figcaption>
+      <b>Figure 5:</b>Task formulation for Temporal Summarization.
+      <span class="ex">Top (Easy): negatives come from <b>different videos</b> — globally different scenes, separable by global semantics. Bottom (Hard): negatives come from the <b>same video</b> with nearly identical frame content, only the order of the time-overlapping portion shuffled — fine-grained temporal reasoning is required. "easy8k/16k/32k" and "hard8k/16k/32k" form 6 subtasks per dataset.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table13.png" alt="Table 13: system prompt for the Expert Video Caption Editor">
+    <figcaption>
+      <b>Table 13:</b>System prompt for the Expert Video Caption Editor.
+      <span class="ex">Rewrites raw subtitles into versions explicitly emphasizing temporal order (First/Then/Finally) under a hard constraint: no events, objects or details absent from the source text may be added — guaranteeing the temporal information in queries comes from the video itself, not LLM confabulation.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table14.png" alt="Table 14: system prompt for the Professional Translator">
+    <figcaption>
+      <b>Table 14:</b>System prompt for the Professional Translator.
+      <span class="ex">YoukuDenseCaption is annotated in Chinese; off-the-shelf translations would introduce textual artifacts. This prompt does greedy-decoding zero-shot literal translation — no additions, deletions or paraphrase — so evaluation reflects genuine visual-semantic alignment rather than text artifacts.</span>
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ================= s5 Models & overall results ================= -->
+<section id="s5">
+  <div class="sec-no">05 · Models &amp; Overall Results</div>
+  <h2 class="sec">Models and overall results</h2>
+
+  <h3>The 11 evaluated MEMs</h3>
+  <p>Eleven MEMs with ≥32K context windows: 10 open-source (2B–8B, embedding dimensions 1536–4096) + the proprietary Doubao-Seed-1.6 (128K window, parameters undisclosed), spanning three generations of techniques. To prevent <abbr title="Out Of Memory — over-long inputs' visual tokenization differences can cause OOM, so a middle-truncation strategy (keep head and tail, cut the middle) is used">OOM</abbr>, all models use middle truncation (keep head and tail).</p>
+
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: detailed model configurations — parameters, embedding dimensions, context windows">
+    <figcaption>
+      <b>Table 2:</b>Detailed model configurations.
+      <span class="ex">Note the bottom-right corner: Doubao-Seed-1.6's window reaches 131,072 tokens — an "outside champion" competing in the same arena. All 10 open models are 32,768; the Qwen3-VL family has the highest dimensions (8B at 4096), GME the lowest, Embed-RL and VLM2Vec at 1536.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: detailed information of the evaluated models — names, families, availability">
+    <figcaption>
+      <b>Table 7:</b>Detailed information of models evaluated in MMLongEmbed.
+      <span class="ex">The reproducibility list: Qwen3-VL-Embedding-2B/8B, GME-Qwen2-VL-2B/7B-Instruct, RzenEmbed-v2-7B (360), Ops-MM-embedding-v1-2B/7B (OpenSearch AI), Embed-RL-2B/4B, VLM2Vec-Qwen2VL-2B (TIGER-Lab), plus the proprietary Doubao seed1.6-embedding-1215.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Overall performance (Precision@1)</h3>
+  <p>The main table reports per-model <abbr title="Precision@1 — the fraction of queries whose top-1 retrieved candidate is the ground truth">P@1</abbr> over 14 subsets (4 tasks × Easy/Hard and per-dataset splits). Two coordinates for reading it: HARD columns (shaded) are the "surface matching closed off" scores, EASY the conventional retrieval scores; read model families vertically, difficulty decay horizontally.</p>
+
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: Precision@1 comparison of all evaluated MEMs on MMLongEmbed">
+    <figcaption>
+      <b>Table 3:</b>Precision@1 performance comparison of evaluated MEMs on the MMLongEmbed benchmark.
+      <span class="ex">① The average-score champion is Rzen-v2-7B (58.61), followed by a tight cluster — Qwen3-VL-8B (53.41), Ops-MM-v1-7B (53.90), Doubao-Seed-1.6 (52.11); ② Hard columns run 20–60 points below Easy, worst in the Summarization family (GovReport Hard mostly 8–28); ③ The GME family and VLM2Vec are near-nonfunctional on MMDocRAG/HotpotQA (0.42–25) yet fine on NeedleBench — different tasks expose entirely different capability dimensions.</span>
+    </figcaption>
+  </figure>
+
+  <p>Supplementary metrics (Recall@k / <abbr title="Mean Reciprocal Rank">MRR</abbr>@k / nDCG@k) qualify the P@1 story:</p>
+
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: supplementary retrieval metrics — Recall@k, MRR@k, nDCG@k">
+    <figcaption>
+      <b>Table 6:</b>Supplementary retrieval metrics on MMLongEmbed.
+      <span class="ex">P@1 alone underestimates some models: Embed-RL's R@10 reaches 86.71/87.16 (near the top) — it "recalls all the relevant content but can't rank it first"; precise ranking under high-similarity distractors is its weak spot. The GME family and VLM2Vec are bottom on every metric.</span>
+    </figcaption>
+  </figure>
+
+  <h3>The scale effect, statistically</h3>
+  <p>Paired t-tests (10,000 bootstrap resamples for 95% CIs) compare each family's largest vs smallest variant on query-level P@1:</p>
+
+  <figure class="fig">
+    <img src="figs/table8.png" alt="Table 8: statistical comparison of model-scale effects within each family">
+    <figcaption>
+      <b>Table 8:</b>Statistical comparison of model-scale effects within each model family.
+      <span class="ex">Three things to see: ① The Qwen3 family's difference is +0.33 with p=0.5375 and Cohen's d=0.007 — statistically insignificant; ② Ops-MM's +5.72 is the only family improvement with any weight (d=0.113); ③ All four families have effect sizes d ≤ 0.113 — tiny. "Bigger model" buys essentially nothing in long-context embedding. (Note: this P@1 is a query-level micro-average, slightly different from Table 3's macro-average over 14 equally weighted subsets — both are legitimate.)</span>
+    </figcaption>
+  </figure>
+
+  <h3>The difficulty ladder on Easy tasks</h3>
+  <p>Compared jointly, the Easy tasks form a clear ladder: <b>Visual Grounding is hardest</b> — instance-level detail discrimination is most models' long-context weakness; <b>Multi-Source Reasoning is middling</b> — HotpotQA clearly beats multimodal MMDocRAG, showing that <em>cross-modal alignment</em> (not the reasoning itself) is the bottleneck; <b>Summarization is easiest</b> — many models reach 80%+ even on videos, because summary-type queries allow global semantic matching without preserving fine-grained evidence.</p>
+</section>
+
+<!-- ================= s6 Analysis ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Empirical Analysis</div>
+  <h2 class="sec">Analysis: position bias, modality interference, length scaling</h2>
+
+  <h3>Position bias and fine-grained retention</h3>
+  <p>Visual Grounding's length×depth heatmaps (P@5) separate "length degradation" from "position sensitivity". Each heatmap: x axis is 8 context-length bins (0.25K–32K), y axis is 6 insertion depths (0%–100%), brighter is higher.</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: Precision@5 on Visual Grounding across insertion depths and context lengths — 8 representative models">
+    <figcaption>
+      <b>Figure 3:</b>Precision@5 on the Visual Grounding task across varying insertion depths and context lengths.
+      <span class="ex">Row 1, left to right: Rzen-v2-7B, Qwen3-VL-8B, Doubao-Seed-1.6, Qwen3-VL-2B; row 2: Ops-MM-v1-2B, GME-Qwen2-VL-7B, Embed-RL-2B, Embed-RL-4B. Two universal patterns: ① nearly every map is bright on the left (≤2K) and dark on the right (16K/32K) — fine-grained retrieval degrades persistently after 2K; ② every map has a dark band across the middle depths (40%–80%) while the ends (0% and 100%) stay bright — targets in the middle get lost, targets at the edges come back.</span>
+    </figcaption>
+  </figure>
+
+  <p>Two bottlenecks are thereby established: <b>① mid-position information loss + boundary preference</b> — retrieval drops significantly when evidence isn't at the sequence's start or end: representation across positions is non-uniform, and current models cannot retain information uniformly over long sequences; <b>② fine-grained retention decays quickly with length</b> — most models hold stable exact retrieval only at ≤2K tokens, and the decay appears across families, not tied to any architecture or scale. A linear mixed-effects model (needle instance as random intercept) confirms the positional bias statistically:</p>
+
+  <figure class="fig">
+    <img src="figs/table9.png" alt="Table 9: statistical analysis of positional bias on Visual Grounding — depth means and significance tests">
+    <figcaption>
+      <b>Table 9:</b>Statistical analysis of positional bias on Visual Grounding.
+      <span class="ex">The six depth columns run from sequence start to end; nearly every model's middle depths (levels 2–5) sit clearly below the two ends; every model's depth main effect Wald χ²(5) and quadratic term χ²(1) are highly significant (p&lt;0.0001) — positional bias is not noise but a statistically certain systematic phenomenon. Embed-RL-2B's middle levels fall to 53.7–58.7 while the ends hold 90.6 — the largest gap.</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>Implication:</b>positional bias means current MEMs don't truly do content-addressed memory over long sequences — more like "endpoint memory". That's a hard flaw for real scenarios where evidence sits mid-document.</div>
+
+  <h3>Robustness to heterogeneous cross-modal interference</h3>
+  <p>In the synthetic task, background distractors are split by modality — pure text, pure image, mixed — exposing how models handle heterogeneous background noise. The 8 representative models sort into three groups:</p>
+
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: performance of MEMs under heterogeneous background interference in Visual Grounding — text, mixed, image columns">
+    <figcaption>
+      <b>Table 4:</b>Performance of MEMs under heterogeneous background interference in Visual Grounding.
+      <span class="ex">Group 1, modality-biased models (Doubao, the Qwen3-VL family, Ops-MM-v1-2B, GME-7B): wild swings across the Text/Mix/Image columns with σ up to 6–13 (Doubao: text 75.83 vs image 85.14). Group 2, cross-modal-interference-sensitive models (the Embed-RL family): mixed-modality interference (61.94/62.43) scores <em>below</em> single modality (65+/73+) — "dizzy" when image and text mix. Group 3, modality-robust models: Rzen-v2-7B holds 82.7–86.9 across columns with σ of only 2.29.</span>
+    </figcaption>
+  </figure>
+
+  <p>The appendix extends the typing to all 11 models with formal definitions of the mean and sample standard deviation:</p>
+  <div class="math">$$\mu = \frac{1}{N}\sum_{i=1}^{N} x_i, \qquad \sigma = \sqrt{\frac{1}{N-1}\sum_{i=1}^{N}(x_i - \mu)^2}$$</div>
+
+  <figure class="fig">
+    <img src="figs/table15.png" alt="Table 15: full performance of all 11 MEMs under heterogeneous background interference">
+    <figcaption>
+      <b>Table 15:</b>Performance of MEMs under heterogeneous background interference in Visual Grounding (all evaluated models).
+      <span class="ex">The complete roster: the modality-biased group adds VLM2Vec (σ=13.69, the largest inter-column swing); the robust group adds Ops-MM-v1-7B (82.5/83.54/89.51, σ=3.83). Interesting: two sizes of the same family can land in different groups — 7B Ops is robust, 2B Ops is biased — suggesting training thoroughness matters more than raw scale for modality balance.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Performance dynamics as context scales</h3>
+  <p>The real tasks share one pattern: unlike the synthetic task's "sudden collapse" past some length, they degrade <b>gradually</b> — real corpora have higher density of salient evidence, so success doesn't hinge on perfect fine-grained retention.</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: model performance across context lengths 8K/16K/32K — Easy and Hard, three tasks plus overall average">
+    <figcaption>
+      <b>Figure 4:</b>Quantitative comparison of model performance across context lengths (8K, 16K, 32K).
+      <span class="ex">Top row Easy, bottom row Hard; left to right: Multi-Source Reasoning, Logical Summarization, Temporal Summarization, overall average. ① Multi-Source Reasoning declines gently at both ends, Hard faster; ② Logical Summarization's Easy curve is non-monotonic — 16K actually rises (more salient evidence helps summarization), 32K falls back; ③ Temporal Summarization: Easy is flat, Hard falls off a cliff — the same model scores 70–80 Easy but 20–30 Hard; ④ in the overall average the Hard curves sink across the board.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table16.png" alt="Table 16: score variations of all models across tasks under diverse context lengths">
+    <figcaption>
+      <b>Table 16:</b>Score variations of different models across tasks under diverse context lengths.
+      <span class="ex">Details worth zooming: ① In multi-source reasoning, Doubao-Seed-1.6's Easy collapses from 61.25 (8K) to 23.44 (32K) — a 128K window does not mean 32K works; ② the non-monotonic Easy curve of logical summarization is visible across nearly all models (16K above 8K); ③ temporal-summarization Hard is the most brutal battlefield — GME-2B holds only 5.47 at 32K Hard, and the Embed-RL family is in single digits across the board.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Shared failure modes on Hard tasks</h3>
+  <ul class="tight">
+    <li><b>Summarization is most fragile:</b>distractors that "keep partial semantics, break global structure" cause the largest drops — the very evidence that models live on global semantic matching.</li>
+    <li><b>Multi-Source Reasoning is comparatively stable:</b>it still catches evidence chains coarsely under high-similarity distractors, but chain completeness and logical-consistency assessment remain limited.</li>
+    <li><b>Temporal Summarization fails independently:</b>scores dive the moment order is perturbed — models are insensitive to long-range event structure; order-agnostic shallow visual similarity is what they rely on.</li>
+  </ul>
+
+  <p>The appendix's complete heatmaps add the models omitted from Figure 3:</p>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: complete visualization of insertion-depth × context-length performance for all evaluated models on Visual Grounding">
+    <figcaption>
+      <b>Figure 6:</b>Complete visualization of model performance w.r.t. insertion depth and context length in the visual grounding task across all evaluated models.
+      <span class="ex">Compared with Figure 3 this adds VLM2Vec and Ops-MM-v1-7B. VLM2Vec's map is almost entirely dark (wholesale failure of fine-grained visual discrimination), while Ops-MM 7B is visibly brighter than its 2B — the projection of technique and training differences onto the heatmap is far clearer than any total average score.</span>
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ================= s7 Conclusion & commentary ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Conclusion &amp; Commentary</div>
+  <h2 class="sec">Conclusion, limitations, and commentary</h2>
+
+  <h3>Conclusions (from the authors)</h3>
+  <p>MMLongEmbed's evaluation exposes a wide gap between "effective information use" and "representation ability": current MEMs lean heavily on surface feature matching and struggle to capture deep semantics and long-range structural dependencies. Fine-grained information retention decays significantly as context grows; summarization performance looks stable until fine-grained discrimination with distractors begins, where it collapses; and simply enlarging the context window, model scale, or embedding dimension solves none of it — fundamental long-context semantic modeling innovation is needed.</p>
+
+  <h3>Limitations (self-stated)</h3>
+  <ul class="tight">
+    <li>The evaluation caps at 32K tokens; the design doesn't directly scale to arbitrarily longer inputs.</li>
+    <li>Only text–image modalities — no audio or continuous 3D spatial data.</li>
+    <li>All datasets are English; multilingual long-context multimodal understanding is not assessed.</li>
+  </ul>
+
+  <h3>Commentary</h3>
+  <p><b>Strengths:</b>filling a real gap with rigorous methodology — the first benchmark to systematize "long context" and "multimodal embedding" together, and every design choice (length stratification, constant C/Q, length-matched replacement, unified token counting) closes a known evaluation shortcut. The quantitative diagnostics go beyond a leaderboard: LMM significance tests, bootstrap CIs, Cohen's d turn "8B isn't better than 2B" from an impression into a statistical conclusion; positional-bias and modality-robustness typing are reusable analysis paradigms. The distractor design is imaginative — event-level temporal perturbation (semantic segmentation + block permutation) tests temporal understanding far better than naive frame shuffling, and the BM25 "look-alike" text injection is worth borrowing.</p>
+  <p><b>Debatable points:</b>the real tasks sample only three lengths (8K/16K/32K), so the resolution of length dynamics is coarser than the synthetic task's, and the 8K floor already exceeds many practical retrieval scenarios; "Hard" is heterogeneous — each task's corruption mechanism differs, so cross-task Hard-score comparisons must be made carefully (differences may partly come from task definition rather than model ability); the proprietary model competes at a different weight (128K window + unknown parameters, mitigated but not eliminated by unified token counting); and video compressed to 1 FPS frame sequences means long-range temporal evaluation happens over frame-level representations, with audio and motion excluded — consistent with the authors' own stated limitation.</p>
+
+  <div class="takeaway"><b>What to take away:</b>the real bottleneck of long-context multimodal embedding isn't how much fits in the window — it's how much fine-grained information survives in the representation, where it sits, and whether it can be retrieved exactly against high-similarity interference. MMLongEmbed turns those three questions into measurable indicators. Obvious next directions from the data: reasoning-driven representation learning (the Embed-RL line) and stronger modality-balance training; folding positional bias and length stratification directly into training objectives (e.g. re-weighting mid-position evidence) may be the next engineering thesis this benchmark sets up.</div>
+</section>
+
+<!-- ================= s9 Glossary ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Hover any dotted-underlined abbreviation in the text, or come back here any time.</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Reading glossary (abbreviations with dotted underlines are hoverable in the text)</caption>
+    <thead><tr><th>Abbr.</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>MEM</td><td>Multimodal Embedding Model</td><td>Maps text/images/video into a unified vector space, supporting cross-modal retrieval</td></tr>
+      <tr><td>MLLM</td><td>Multimodal Large Language Model</td><td>LLMs that process text and visual inputs together</td></tr>
+      <tr><td>NIAH</td><td>Needle-In-A-Haystack</td><td>Hide a target in a long context and test recovery; MM-NIAH is the multimodal version</td></tr>
+      <tr><td>C/Q</td><td>Candidates per Query</td><td>Average candidate documents per query, held constant across length pools</td></tr>
+      <tr><td>P@1 / R@k / MRR@k / nDCG@k</td><td>Precision / Recall / Mean Reciprocal Rank / nDCG</td><td>Standard retrieval ranking metrics (top-1 exactness, recall, reciprocal rank, discounted gain)</td></tr>
+      <tr><td>RAG</td><td>Retrieval-Augmented Generation</td><td>Retrieve evidence from an external corpus before generating</td></tr>
+      <tr><td>LMM</td><td>Linear Mixed-effects Model</td><td>Fixed + random effects (here: needle instance as random intercept) for the positional-bias test</td></tr>
+      <tr><td>BM25</td><td>Best Matching 25</td><td>Classic sparse retrieval scoring, used here to fetch "look-alike" replacement paragraphs from same-topic documents</td></tr>
+      <tr><td>OOM</td><td>Out Of Memory</td><td>Memory overflow; the evaluation middle-truncates over-long inputs to prevent it</td></tr>
+      <tr><td>1 FPS</td><td>1 frame per second</td><td>Videos downsampled to one frame per second into standard temporal frame sequences</td></tr>
+      <tr><td>Hard / Easy Pool</td><td>—</td><td>The difficult subset with high-similarity distractors / the conventional unperturbed subset</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    This page is a human-written English quick-read of "MMLongEmbed: Benchmarking Multimodal Embedding Models in Long-Context Scenarios" (Soochow University × Ant Group). Images are extracted from the paper at 300 DPI and shown scaled proportionally (never cropped); commentary reflects the editor's views.<br>
+    Original repository: <a href="https://github.com/AmamiSora1228/MMLongEmbed">github.com/AmamiSora1228/MMLongEmbed</a> · Full Chinese deep-read: <a href="index.html">中文精读版</a><br>
+    <span style="opacity:.75">Dark mode supported · click images for full size · print-friendly</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>
