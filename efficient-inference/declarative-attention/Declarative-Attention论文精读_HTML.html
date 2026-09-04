@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="论文中文精读页:Language Models Can Control Their Own Attention (Declarative Attention),图文配合,全部图表高清内嵌">
+<meta name="keywords" content="论文精读, Declarative Attention, 稀疏注意力, KV cache, 长上下文推理, vLLM">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · 语言模型能控制自己的注意力(Declarative Attention)">
+<meta property="og:description" content="让模型在思维链里声明自己要看哪里:零训练跳过大部分 KV cache 读取,注意力开销最高降 52%,精度仅降 1–3pp。全部图表高清内嵌,图文配合讲解。">
+<meta property="og:url" content="https://qqtang-code.github.io/Declarative-Attention-Project-Page/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · 语言模型能控制自己的注意力(Declarative Attention)</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 协议示例代码块 */
+  pre.proto{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+            padding:14px 20px; margin:14px auto; max-width:820px; overflow-x:auto;
+            font-size:13.5px; line-height:1.75; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  pre.proto .tag{color:var(--accent); font-weight:700}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶栏:章节跳转 + 深色模式开关 -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">Declarative Attention<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">方法</a>
+      <a class="jump" href="#s4">系统</a>
+      <a class="jump" href="#s5">实验</a>
+      <a class="jump" href="#s6">规模化</a>
+      <a class="jump" href="#s7">效率分析</a>
+      <a class="jump" href="#s8">讨论点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.02737 · KAIST AI × Google DeepMind</div>
+    <h1>语言模型能控制自己的注意力<br>Language Models Can Control Their Own Attention</h1>
+    <div class="subtitle">让模型在思维链里"说出口"自己要看哪里:通过 <strong>Declarative Attention(DA)</strong> 协议,模型用可解析的标签声明注意力范围,推理引擎据此跳过大部分 <abbr title="Key-Value Cache,键值缓存:Transformer 推理时缓存的键/值张量,解码每步都要读取">KV cache</abbr> 读取——零训练、零额外打分器,15 项长上下文任务上注意力开销最高降 52.0%,精度只掉 1–3 个百分点。</div>
+    <div class="meta">
+      <span>作者:Namgyu Ho*、Huzama Ahmad*、Woosung Koh*、Se-Young Yun(KAIST AI;* 共同一作)</span>
+      <span>Tal Schuster、Cicero Nogueira dos Santos(Google DeepMind)</span>
+      <span>论文:<a href="https://arxiv.org/abs/2609.02737">arXiv:2609.02737</a>(2026-09-02,v1)</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">长上下文推理</span><span class="pill">稀疏注意力</span><span class="pill">KV Cache</span>
+      <span class="pill">Chain-of-Thought</span><span class="pill">vLLM</span><span class="pill">零样本(Zero-shot)</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图文按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:一图看懂 DA</a></li>
+    <li><a href="#s2">背景:长上下文解码为什么贵</a></li>
+    <li><a href="#s3">方法:Declarative Attention 协议</a></li>
+    <li><a href="#s4">系统实现:vLLM 集成与 roofline 账本</a></li>
+    <li><a href="#s5">实验设置与主结果(Table 1/2,Figure 2/7,Table 9)</a></li>
+    <li><a href="#s6">规模化:模型大小与上下文长度(Figure 3/4/8/9/10)</a></li>
+    <li><a href="#s7">效率与模式分析(Table 3/4/5,Figure 5/6,Table 10)</a></li>
+    <li><a href="#s8">讨论、局限与编者点评(Table 6/7/8)</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<!-- ================= s1 速览 ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览:一图看懂 DA</h2>
+  <p class="lead">这篇论文回答了一个看似简单的问题:<strong>模型既然"知道"该看上下文的哪一部分,为什么不让它自己说出来?</strong>现有的稀疏注意力方法都在模型外部用代理分数"猜"哪些 token 重要,而 DA 直接把注意力范围的选择权交给模型本身——模型在思维链中用 <code>&lt;global&gt;</code> / <code>&lt;focus&gt;</code> / <code>&lt;local&gt;</code> 三种标签声明"我接下来要看哪里",推理引擎像解析工具调用一样解析这些声明,然后只读取对应的 KV cache 块。</p>
+
+  <p>整篇论文的运行机制可以浓缩在 Figure 1 里:左上是构造好的 prompt(系统指令 + 12 个"magic chunk"分段的长上下文 + 问题 + DA 指令);右侧是模型的响应,它在三种模式间自由切换;底部的注意力掩码矩阵显示——每个推理步骤真正被读取的 KV 位置(实心)远小于完整上下文(虚线部分被跳过)。</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1:Declarative Attention 总览——prompt 结构、模型三模式响应与分段级注意力掩码">
+    <figcaption>
+      <b>Figure 1:</b>Declarative Attention (DA) lets a model control its own attention span. (Prompt) A system instruction, long context information divided into segments that we refer to as "magic chunks", the user's question, and the DA instruction. (Model Response) The model freely alternates between three modes: &lt;global&gt; navigates the full context, &lt;focus&gt; reasons upon the named chunk, and &lt;local&gt; reasons upon the information accumulated in the response so far. (Declarative Attention Mask) A segment-level attention mask is derived from the model response text based on the DA syntax. DA needs no auxiliary scorer and runs on off-the-shelf models with no training.
+      <span class="zh">中文解读:图中给出一个 25,466 token 的真实 prompt。模型先用 <b>R1(&lt;global&gt;)</b> 全局导航,定位到 Magic Chunk 1 含有 SFT 章节;再用 <b>R2(&lt;focus&gt;)</b> 只读取第 1 个分段,提取出"15K 数学答案 + 1.5K 对话"这一事实;最后用 <b>R3(&lt;local&gt;)</b> 完全不看上下文,只在自己已写出的响应里做加法得到 16,500。掩码矩阵的三行分别对应这三步:全局步读全部 A、B1…B12、C、D、R1(0% 缩减);聚焦步只读 A、B1、C、D 和已有响应(3,435 个 prompt token,<b>86.5% 缩减</b>);局部步连上下文分段都不读(1,124 个 prompt token,<b>95.6% 缩减</b>)。脚手架(系统指令 A、问题 C、指令 D)在任何模式下都保持可见。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图(300 DPI),再次点击或按 Esc 关闭。</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">注意力开销 · Gemma-4-31B</div><div class="v">−52.0%<small>每响应平均读取 token:13.43M → 6.45M</small></div></div>
+    <div class="item"><div class="k">注意力开销 · Qwen-3.6-27B</div><div class="v">−31.1%<small>22.54M → 15.52M</small></div></div>
+    <div class="item"><div class="k">精度代价</div><div class="v">−1.27pp / −2.75pp<small>Gemma:87.01%→85.74%;Qwen:85.31%→82.56%</small></div></div>
+    <div class="item"><div class="k">roofline 解码墙钟时间</div><div class="v">0.71× / 0.77×<small>单卡 B200、MFU 40%、MBU 70% 下的理论估算</small></div></div>
+  </div>
+
+  <div class="takeaway"><b>一句话总结:</b>DA 把"选择注意哪里"从网络内部推断(各步 O(N) 扫描)变成模型显式声明的文本(解析 O(1)),注意力掩码直接从模型自己生成的话里读出来。零训练、零样本,开销节省全部来自掩码本身,精度损失随模型规模增大而收窄——作者反复强调,这些数字是<strong>下界</strong>而非上限。</div>
+</section>
+
+<!-- ================= s2 背景 ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">背景:长上下文解码为什么贵</h2>
+
+  <h3>每生成一个 token,都要读完整份 KV cache</h3>
+  <p>Transformer 解码时,每个步骤都要对<strong>所有</strong>前文 token 做注意力计算。这意味着即便用户只是问一个 100 万 token 对话里的某个细节,全局注意力层在生成回复的<b>每一个</b> token 时都得把整个上下文的 <abbr title="Key-Value Cache,键值缓存">KV cache</abbr> 从显存里读一遍。论文给了一个直观的量级:Qwen-3.5-397B-A17B 在 1M token 上下文下,每个序列每步要加载约 <strong>15 GB</strong> KV cache——与加载整个模型 17B 激活参数的带宽需求相当。而且这个读取<b>不随 batch 摊销</b>:每个序列都有自己的 KV cache,必须逐序列读取。</p>
+
+  <h3>注意力天然稀疏,但"哪些 token 重要"事先未知</h3>
+  <p>与这种穷举式读取形成对照的是:大量实证研究表明注意力权重其实高度集中在上下文的极小部分(Child et al. 2019;Zhang et al. 2023;Tang et al. 2024),而且稀疏模式每步都在漂移。难点在于——<strong>真实的注意力分数只有算完整个注意力矩阵才知道</strong>,想"先挑出重要的 token 再算注意力"在逻辑上是先有鸡还是先有蛋。已有工作绕过这个死结的两条路线,论文都指出了其软肋:</p>
+  <ul class="tight">
+    <li><b>静态启发式</b>(StreamingLLM 的 recency、H2O 的历史注意力幅度):规则固定,无法预见未来查询需要哪些 token,长上下文性能明显退化。</li>
+    <li><b>轻量扫描</b>(Quest、SparQ、Double Sparsity、DeepSeek 的 DSA 索引器等):每步对 KV cache 的一个廉价代理表示打分,只读最高分的子集。常数因子变小了,但每步复杂度仍是 <b>O(N)</b>——扫描本身还是要把整个上下文"过"一遍。</li>
+  </ul>
+
+  <h3>换一个问法:模型自己不是已经知道了吗?</h3>
+  <p>论文的切入点非常优雅:已有研究表明语言模型的隐藏状态里其实编码了未来 token 的信息(Pal et al. 2023;Wu et al. 2024),而 <abbr title="Chain-of-Thought,思维链:让模型先写出推理步骤再给答案的提示技术">CoT</abbr> 提示能把这些潜伏计算"表面化"为可解释的文本(Wei et al. 2022)。既然 CoT 已经把"想什么"暴露成了文本,<strong>为什么不把"看哪里"也暴露成文本?</strong></p>
+  <p>此前唯一做过类似尝试的 Self-Selected Attention Span(Jin et al. 2024)需要<strong>按任务逐一微调</strong>、手工设计上下文划分和标注语法,且只在 2K token 上下文内验证过。这篇论文证明:到了 2026 年的模型上,这件事<strong>一个固定的 task-agnostic prompt 就能零样本激发</strong>——覆盖 15 项长上下文任务、两个模型家族、最高 244K token 的上下文,无需任何参数更新。</p>
+
+  <div class="note"><b>关键区分:外在选择 vs 内在声明。</b>以往方法(包括轻量扫描)都是在模型"外面"用代理信号近似注意力掩码,每步付出 O(N) 的选择成本;DA 让模型在生成文本里声明注意力范围,引擎解析声明的成本是 O(1)。O(N) 的完整上下文读取只保留在模型<strong>主动声明</strong>的全局阶段,而不再是每步的固定开销。</div>
+</section>
+
+<!-- ================= s3 方法 ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Method</div>
+  <h2 class="sec">方法:Declarative Attention 协议</h2>
+
+  <h3>三种注意力模式</h3>
+  <p>DA 把生成过程切分为注意力范围稳定的连续片段,每段用预定义标签声明范围。三种模式的分工如下:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Declarative Attention 的三种模式(正文 Section 2)</caption>
+    <thead><tr><th>模式</th><th>上下文分段可见性</th><th>协议中的角色</th></tr></thead>
+    <tbody>
+      <tr><td>&lt;global&gt;(默认)</td><td>全部分段</td><td>导航:纵览全文,确定下一个要聚焦的分段,简述理由(不在这一步推理答案本身)</td></tr>
+      <tr><td>&lt;focus magic_chunks="K"&gt;</td><td>仅被点名的分段</td><td>提取:从指定分段里逐字取出需要的值(名称、数字、日期等)</td></tr>
+      <tr><td>&lt;local&gt;</td><td>一个分段都不看</td><td>综合:只基于问题 + 已提取的值 + 已有响应做规划与合成</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>无论哪种模式,三类内容<strong>始终可见</strong>:问题、DA 指令、以及模型自己已经生成的响应。模式之间唯一的区别是长上下文分段区域的可见范围。一个来自正文的完整例子(Acme 公司何时上市):</p>
+
+  <pre class="proto">&lt;<span class="tag">global</span>&gt;
+I need the founding year and the IPO year. The company history in Magic Chunk 2 should state the founding.
+&lt;/<span class="tag">global</span>&gt;
+&lt;<span class="tag">focus magic_chunks="2"</span>&gt;"Acme Corp was founded in 2003 in San Jose."&lt;/<span class="tag">focus</span>&gt;
+&lt;<span class="tag">global</span>&gt;
+The IPO year is still missing. Magic Chunk 7 covers Acme's financial milestones.
+&lt;/<span class="tag">global</span>&gt;
+&lt;<span class="tag">focus magic_chunks="7"</span>&gt;"Acme Corp went public on the NYSE in 2011."&lt;/<span class="tag">focus</span>&gt;
+&lt;<span class="tag">local</span>&gt;2011 - 2003 = 8 years.&lt;/<span class="tag">local</span>&gt;
+&lt;<span class="tag">answer</span>&gt;8 years&lt;/<span class="tag">answer</span>&gt;</pre>
+
+  <p>注意 <code>&lt;local&gt;</code> 段:模型做减法时上下文完全不可见,只有它自己先前"抄下来"的两个年份。<strong>DA 不限制每种模式怎么用、何时用、用几次</strong>——顺序、次数全部由模型自己决定,协议只提供语法和零样本引导。</p>
+
+  <h3>上下文交付:切成"magic chunk"的模拟工具调用</h3>
+  <p>要用 <code>&lt;focus&gt;</code>,模型得能"指名"上下文区域,所以长上下文要先切成可寻址分段。论文在两个层面都对齐了模型训练时见过的边界:</p>
+  <ul class="tight">
+    <li><b>分段(segmentation):</b>目标 2048 token、硬上限 2560 token。只在超过上限的单元上切,并按"段落空行 → 单换行 → 句末 → 子句末 → 词边界"的层级从粗到细找最粗的可用边界,因此切缝永远不会落在词中间(整段 base64 这种无空格串保持原子不切)。分段拼接起来精确还原原文,是无损划分。</li>
+    <li><b>格式(formatting):</b>每个分段以 <b>Magic Chunk N</b> 为头,包装进一段"模拟工具调用转录"——看起来就像模型此前用 <code>get_magic_chunk</code> 工具把文档一段段取回来的一样,但工具从未真正执行,所有内容在生成开始前就已就位。这样分段边界恰好落在模型后训练中无比熟悉的 user/assistant/tool 轮次特殊 token 上,模型对"第 N 段从哪到哪"的追踪远比任意新分隔符可靠。起名 "magic chunk" 也是有意为之:强调这是任意的检索切分,别和文档自己的章节结构混淆。</li>
+  </ul>
+
+  <h3>解码时干预:DA 状态机</h3>
+  <p>推理引擎旁运行一个 DA 状态机,从默认的 global 状态开始,流式读取模型输出:遇到开标签的闭括号"&gt;"(<code>&lt;focus magic_chunks="K"&gt;</code> 或 <code>&lt;local&gt;</code>)就切换模式,遇到对应闭标签就回到 global。注意 <code>&lt;global&gt;</code> 标签本身<b>不产生任何状态转换</b>——global 就是声明之间的默认态,这个标签纯粹是提示结构,帮模型把推理组织成"范围已声明"的连续片段。</p>
+  <p>零样本 prompt 里的三条软性要求(Appendix F)很能体现作者对失败模式的观察:(1)至少用一个 <code>&lt;focus&gt;</code>——"跳过聚焦直接猜"是最常见的失败;(2)以一个 <code>&lt;local&gt;</code> 收尾作为"承诺步骤",防止模型取了一堆值却忘了问题问的是哪个;(3)在 <code>&lt;local&gt;</code> 里别试图"回忆"没聚焦过的分段内容——那是在猜,需要值就回 <code>&lt;global&gt;</code> 重新定位。</p>
+
+  <div class="note"><b>适用范围与权衡:</b>DA 只作用于全局注意力层——Gemma-4 的 <abbr title="Sliding Window Attention,滑动窗口注意力:只看最近固定窗口内的 token">SWA</abbr> 层和 Qwen-3.5/3.6 的 <abbr title="Gated DeltaNet,门控 Delta 网络:线性注意力变体,每步状态是固定大小的递归表示">GDN</abbr> 层每步开销本来就不随上下文增长,掩码管不着也不必管。协议的本质权衡是<b>用更多解码步换更低的每步注意力成本</b>——划不划算取决于部署形态,这是第 4 节的主题。另一个限制:所有实验关闭了 thinking 模式,因为初步实验发现模型在 thinking 标签内无法遵守 DA 协议(第 8 节讨论了缓解方式)。</div>
+</section>
+
+<!-- ================= s4 系统 ================= -->
+<section id="s4">
+  <div class="sec-no">04 · System</div>
+  <h2 class="sec">系统实现:vLLM 集成与 roofline 账本</h2>
+
+  <h3>块对齐的原地掩码,FlashAttention 一行不改</h3>
+  <p>vLLM 把 KV cache 存在固定大小的小块里(通常 16–32 token),注意力内核按<b>整块</b>读取——掩码若只散落丢弃单个 token,内存读取量一个字节都不会少。所以 DA 状态机在<strong>块粒度</strong>上施加掩码:把要保留的 token 区间<b>向外取整</b>到块边界,保证模型声明的任何 token 绝不会被丢。代价只是每条保留区间两端至多多读一个块(几十个 token,对比 2048 token 的分段可以忽略)。最终产物就是一个普通的块列表,现有内核(FlashAttention、Triton paged-attention)<b>原样运行</b>,只是读得更少——与 Native Sparse Attention 的 block-sparse 原理同源。</p>
+  <p>工程接入方式很轻:DA 状态机通过 vLLM <b>attention metadata builder 上的钩子</b>实现,每个解码步重写请求的 KV-cache 块表,让内核只看到保留的块。<strong>不修改任何内核,不改调度器。</strong>Qwen-3.6 的全局层走 FlashAttention,Gemma-4 的混合注意力走 Triton paged-attention 内核,两个后端用同一套块表改写逻辑。</p>
+  <p>任何模式下都保持可见的三块区域(Appendix B):(1)<b>注意力锚</b>——prompt 前 16 个 token,用固定的短系统指令占位,保证上下文永远不会进入 sink;(2)<b>局部窗口</b>——从问题到 prompt 末尾,模型永远知道自己在答什么;(3)<b>已生成的响应</b>。<code>&lt;focus&gt;</code> 在此之上保留被点名的分段;<code>&lt;local&gt;</code> 只留这三块。</p>
+
+  <h3>DA 什么时候回本?roofline wall-time 给答案</h3>
+  <p>DA 用多 15–35% 的解码步换更低的每步注意力成本。在什么部署形态下这是净赚?论文用 <b>roofline wall-time</b> 来记账:每个操作按它自己的硬件天花板计费,把一个响应所有解码步的开销求和。这个量只依赖硬件目标,不依赖 batch size 等运行选择:</p>
+
+  <div class="math">$$T_{\text{roofline}} = \frac{\text{work}}{R \times u}$$</div>
+  <p>其中 work 是计算受限操作的 FLOPs 或内存受限操作的字节数,$R$ 是峰值算力/峰值带宽,$u$ 是实际达到的利用率。大 batch 下两类操作各就各位:</p>
+  <div class="math">$$T_{\text{FFN}} = \frac{\text{FLOPs}}{\text{Peak FLOPS} \times \text{MFU}}, \qquad T_{\text{attn}} = \frac{\text{KV bytes}}{\text{Peak BW} \times \text{MBU}}$$</div>
+
+  <p>关键的结构性差异:FFN 的权重加载随 batch 摊销,大 batch 下变成计算受限,墙钟时间只随<b>解码步数</b>增长;注意力的 KV 读取是<b>逐序列</b>的,始终内存受限,墙钟时间同时随<b>上下文长度和解码步数</b>增长。所以在优化过的大 batch、长上下文部署里,注意力项压倒 FFN 项——Qwen-3.5-397B-A17B 在 1M 上下文的例子中,单步注意力读取 15.4 GB(约 2.7 ms),而 17B 激活参数的 matmul 只需 34 GFLOPs(约 0.019 ms),差约 <strong>145 倍</strong>(在 MFU/MBU 合理波动范围内是 120–255 倍,结论不依赖具体取值)。DA 的每步节省恰好砸在解码开销最集中的地方。</p>
+
+  <div class="takeaway"><b>定位:</b>生产级部署已经走向 prefill/decode 分离(decode 按显存带宽瓶颈单独配池),roofline 分解在这样的形态下是写实而非理想化。DA 瞄准的正是"分离式、大 batch、长上下文"的解码池——下文的 0.71×/0.77× 墙钟估算也基于这个前提,不适用于低并发小部署。</div>
+</section>
+
+<!-- ================= s5 实验 ================= -->
+<section id="s5">
+  <div class="sec-no">05 · Experiments &amp; Main Results</div>
+  <h2 class="sec">实验设置与主结果</h2>
+
+  <h3>模型、任务与三臂对比</h3>
+  <p>六个模型两个家族:Gemma-4-{31B, 12B, E4B} 与 Qwen-3.6-27B、Qwen-3.5-{9B, 4B},原生 256K 输入(E4B 为 128K)。主对比用两个最大的模型。基准套件覆盖 15 个长上下文来源,按任务分为两类:<b>单跨度检索/推理</b>(大海捞针、单文档 QA 等)与<b>多跨度推理</b>(多文档 QA、对话历史、长依赖 QA 等),上下文从 6K 量级一直跨到平均 1M 的代码仓库:</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table1.png" alt="Table 1:15 个长上下文基准来源,按单跨度检索/推理与多跨度推理分两组">
+    <figcaption>
+      <b>Table 1:</b>The benchmark suite spans 15 long-context sources, from short documents to million-token code repositories. We group the sources into two categories, single-span retrieval/reasoning and multi-span reasoning, drawing on synthetic and original QA from RULER, LongBench v1/v2, LooGLE, and ZeroScrolls.
+      <span class="zh">中文解读:15 个来源中 11 个用原始 QA,其余 4 个用 Gemini-3-Flash 生成合成 QA(改善标注质量或扩展任务覆盖)。上下文长度差异巨大——RULER 针堆 9–11.5K,<abbr title="LongBench v2 代码仓库问答任务">LBv2/code_repo</abbr> 平均 1071K。每个来源固定种子抽最多 128 例,超长样本(超 244K)剔除,同一模型下三种方法用完全相同的样本,保证公平。</span>
+    </figcaption>
+  </figure></div>
+
+  <p>三个实验臂共享相同的最终答案规范(<code>&lt;answer&gt;</code> 标签),由同一个 LLM 裁判打分,这样可以干净地拆解两个因素:</p>
+  <ul class="tight">
+    <li><b>Vanilla:</b>原始上下文平铺 + 简短指令 + 完整因果注意力。Vanilla → DAnm 的差距 = <b>分块 prompt 格式</b>的影响。</li>
+    <li><b>DA-no-mask(DAnm):</b>完整 DA prompt 模板,但注意力不掩码。DAnm → DA 的差距 = <b>注意力掩码</b>的影响。</li>
+    <li><b>DA:</b>完整协议。</li>
+  </ul>
+
+  <h3>评分:LLM 裁判及其校验</h3>
+  <p>自由生成的答案没法用精确匹配,论文先用 Gemini-3-Flash 为每题生成严格的接受/拒绝评分细则,再用开动 thinking 的 Qwen-3.5-4B 当裁判。裁判靠谱吗?Appendix D.2 用分层抽样的 2,993 条响应做了校验——与前沿裁判 Gemini-3.1-Pro 的逐条判定一致率 <strong>98.53%</strong>(κ=0.940),逐格准确率相关性 Pearson r=0.992,分歧对称(McNemar p=0.65):</p>
+
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7:本地裁判与前沿裁判的逐格准确率散点,点几乎都在对角线上">
+    <figcaption>
+      <b>Figure 7:</b>Agreement between local and frontier LLM judges. Per-sample accuracies from the local Qwen-3.5-4B judge closely match those from the frontier Gemini-3.1-Pro judge across 15 long-context QA sources, two backbone models, and three inference methods.
+      <span class="zh">中文解读:横轴 Gemini-3.1-Pro、纵轴 Qwen-3.5-4B,每个点是"15 来源 × 2 骨干 × 3 方法"组合的准确率。所有点紧贴对角线,说明本地小裁判可以放心地承担全部主实验打分——这是整个评测体系的可信度基石。</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table9.png" alt="Table 9:15 个基准上本地裁判与前沿裁判的准确率逐项对比">
+    <figcaption>
+      <b>Table 9:</b>Judge agreement between local judge (Qwen-3.5-4B) and frontier judge (Gemini-3.1-Pro). Per-benchmark accuracies (%) from the two judges on a stratified validation sample of 2993 responses.
+      <span class="zh">中文解读:逐基准看,两裁判的准确率差大多在 ±1pp 内,最大的分歧也不过 −3.27pp(shortdep_cloze)与 +4.23pp(niah_single_2);总体 85.67% vs 85.80%,几乎重合。加权 kappa 0.940,支持用本地裁判完成全部主实验的准确率报告。</span>
+    </figcaption>
+  </figure></div>
+
+  <h3>主结果:省一半注意力,掉一个多点精度</h3>
+  <p>全部 15 项任务的结果汇总在 Table 2。两个要点先看总平均:Gemma-4-31B 上注意力读取降 <strong>52.0%</strong>(13.43M → 6.45M token/响应)、精度降 1.27pp;Qwen-3.6-27B 上降 <strong>31.1%</strong>(22.54M → 15.52M)、精度降 2.75pp。</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table2.png" alt="Table 2:主结果——15 项任务上 Vanilla/DAnm/DA 的准确率与注意力 token 数">
+    <figcaption>
+      <b>Table 2:</b>DA reduces attention cost with a 1–3pp average accuracy drop. Across 15 long-context tasks, DA reduces total average attended tokens by 52.0% on Gemma-4-31B and 31.1% on Qwen-3.6-27B, with average accuracy drops of 1.27pp and 2.75pp respectively. DAnm represents the DA ablation without custom attention masking.
+      <span class="zh">中文解读:表格按"单跨度检索/推理"与"多跨度推理"分两块,每格给出 Vanilla/DAnm/DA 三臂的准确率与注意力 token(背景色标出读取量的最好/居中/最差)。亮点:Gemma 在 15 项中 7 项持平或反超 vanilla(longdep_qa +3.1pp),Qwen 5 项(code_repo +5.6pp);绝对节省最大的正是最长上下文任务——code_repo 省 41.8M(Gemma)/52.0M(Qwen),dialogue_history 省 22.1M/39.1M。短板:多跨度类目的平均掉分比单跨度大(Gemma 2.28pp vs 0.78pp;Qwen 3.59pp vs 2.34pp),且 Qwen 在 qmsum 等五个来源上读取量反而超过 vanilla(其更长的生成部分抵消了每步节省)。</span>
+    </figcaption>
+  </figure></div>
+
+  <p>但总平均掩盖了机制层面的故事。Figure 2 把三臂拆成"准确率 / 解码步数 / 注意力 token"三个维度,每个都按各自模型的 vanilla 归一:</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2:三臂的相对准确率、相对解码步数、相对注意力 token">
+    <figcaption>
+      <b>Figure 2:</b>DA's efficiency comes from attention masking rather than shorter generation. Accuracy, decode steps, and attended tokens for Vanilla, DA, and DAnm on the two headline models, each normalized to that model's vanilla.
+      <span class="zh">中文解读:(a) 三臂准确率几乎持平(DA 掉 1–3pp)。(b) DA 和 DAnm 都比 vanilla 多跑约 15–35% 的解码步(Gemma 135%、Qwen 131% / 128%、116%)——这是零样本协议让模型"边导航边写"的副产品。(c) 尽管步数更多,DA 的注意力读取远低于 vanilla(Gemma 48%、Qwen 69%);而<b>不掩码的 DAnm 反而多读</b>(166%、129%),因为它的额外步数每步都是全量注意力。结论一目了然:<b>效率全部来自掩码,而不是生成变短</b>。</span>
+    </figcaption>
+  </figure>
+
+  <p>拆解两个影响因素的账本(DAnm 对比):分块 prompt 格式本身几乎无损——Gemma 上 DAnm 准确率与 vanilla 完全打平(87.01% vs 87.01%),Qwen 只差 0.69pp;但 DAnm 的注意力读取比 vanilla 高 66.2% / 28.8%。加上掩码后,相对 DAnm 砍掉 <strong>71.1%</strong>(Gemma)与 <strong>46.5%</strong>(Qwen)的读取,把"高于 vanilla 66.2%"翻转为"低于 vanilla 52.0%"。精度方面,相对 DAnm 的掉幅(−1.27pp / −2.06pp)构成了 DA 掉分的大头——也就是说,<b>掩码既是全部效率的来源,也是大部分精度代价的来源</b>,而格式近乎免费。</p>
+
+  <div class="takeaway"><b>主结果一句话:</b>chunked 格式 ≈ 免费;掩码 = 省一半读取、付 1–2pp 精度。在 RULER 检索类任务上模型都在天花板(96–100%),真正的考验在多跨度推理与超长上下文——这正是接下来两节要拆的。</div>
+</section>
+
+<!-- ================= s6 规模化 ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Scaling</div>
+  <h2 class="sec">规模化:模型越大越准,上下文越长越省</h2>
+
+  <h3>模型规模:精度差距单调收窄</h3>
+  <p>DA 对模型提出了两个复合要求:既要遵守协议(可解析的标签、合法的 chunk 引用、连贯的模式顺序),又要在信息受限下答对题——两者都吃通用能力。Figure 3 显示相对精度在两个家族内都随规模<b>单调上升</b>:Gemma 从 E4B 的 29% 升到 31B 的 99%,Qwen 从 3.5-4B 的 64% 升到 3.6-27B 的 97%。最小的 Gemma-4-E4B 崩到 29%,直接原因是协议遵守失败——它的 <code>&lt;focus&gt;</code> 解析成功率只有 58%(31B 上是 99%,见第 7 节 Figure 6):<b>是"不会用",而不是"用了答不对"</b>。</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3:六个模型上的相对精度与相对注意力 token">
+    <figcaption>
+      <b>Figure 3:</b>DA accuracy scales favorably with backbone size. Metrics are normalized to each model's vanilla baseline and the x-axis is total parameters.
+      <span class="zh">中文解读:(a) 相对精度随参数量爬升:E4B→12B→31B 为 29%→91%→99%,Qwen 4B→9B→27B 为 64%→89%→97%,DA 的收益需要骨干模型达到一个能力门槛。(b) 相对注意力读取没有明显规模趋势:Gemma 三档都在 46–48%,Qwen 在 50–69%——因为<b>每步掩码节省本身近似与规模无关</b>(六个模型中五个的每步注意力比例接近 0.5,最小的 E4B 为 0.65),总量的差异来自各模型自己选择的生成长短。唯一的例外 Gemma-4-12B(183%)是解码长度伪影:约 6% 的 DA 响应没能在 8K 生成预算内终止、撑大了总量;剔除这些响应后回落到 98%。Qwen-3.5-4B 也有较温和的同类效应(50%→38%),且其 vanilla 臂同样存在不终止现象——是小模型特质而非 DA 的问题。</span>
+    </figcaption>
+  </figure>
+
+  <h3>上下文长度:精度稳住,绝对节省猛涨</h3>
+  <p>把 15 个来源按上下文长度分桶池化(Gemma-4-31B,Figure 4):相对精度到 32K 都贴着 vanilla(差距约 1pp 内),之后温和下滑到最长桶的约 96%;关键对照是——<b>不掩码的 DAnm 曲线没有这个下滑</b>,说明长上下文端的精度代价来自掩码而非分块格式。绝对读取节省则随上下文<b>急剧增长</b>:短上下文约省 1M token/响应,最长桶(64–256K)约省 <strong>21M</strong>。每步掩码约省恒定比例(~50%),所以绝对节省 ∝ 上下文长度——<b>收益最大的地方恰是解码最贵的地方</b>。</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4:按上下文长度分桶的相对精度与绝对注意力 token 差值">
+    <figcaption>
+      <b>Figure 4:</b>DA holds accuracy near vanilla while its absolute token saving grows with context length. All 15 sources are pooled and binned by context length on Gemma-4-31B.
+      <span class="zh">中文解读:(a) 相对精度:DA(实线)在 32K 内与 vanilla 几乎重合,最长桶滑到约 96%;DAnm(虚线)没有下滑——长上下文精度代价归因于掩码。(b) 相对 vanilla 的绝对读取差:DA 从短桶约 −1M 一路扩大到最长桶约 −21M(负=节省),而 DAnm 的开销同向增长(正=多读)。</span>
+    </figcaption>
+  </figure>
+
+  <p>Figure 10 用"比例视角"呈现同一份数据:DA 在<b>每一个</b>上下文桶内都只读 vanilla 的 50–64%,比例几乎恒定——这正是"恒定比例节省 × 不断增长的总盘"的组合,解释了绝对值为何随长度线性放大。</p>
+
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10:相对注意力 token 比例随上下文长度几乎恒定">
+    <figcaption>
+      <b>Figure 10:</b>DA's per-step masking saves a roughly constant fraction of tokens across context length. The same Gemma-4-31B pooling as Figure 4b, normalized to vanilla rather than shown as an absolute delta.
+      <span class="zh">中文解读:DA(下线)在每个桶都稳定在 vanilla 的 50–64%;DAnm(上线)始终高于 vanilla。与 Figure 4b 的绝对视角合起来读:节省是一个稳定比例乘上一个随长度增长的总数,因此上下文越长,DA 的绝对收益越大。</span>
+    </figcaption>
+  </figure>
+
+  <h3>Qwen 侧:同样的每步节省,更依赖全局模式</h3>
+  <p>Qwen-3.6-27B 的对应结果(Appendix E)揭示了家族间一个有趣的差异——机制上两者每步节省相当,但 Qwen 在长上下文下把更多 token 花在不掩码的 <code>&lt;global&gt;</code> 模式里,总节省因此缩水:</p>
+
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8:Qwen 上按上下文长度的相对精度与相对注意力 token">
+    <figcaption>
+      <b>Figure 8:</b>On Qwen, DA's long-context accuracy and token savings erode more than on Gemma. Counterpart to Figure 4, on Qwen-3.6-27B.
+      <span class="zh">中文解读:Qwen 的长上下文精度下滑比 Gemma 略多(最长桶约 92%),token 节省在长上下文端收缩(DA 曲线向 vanilla 回升,DAnm 则飙到远高于 vanilla)。原因不是掩码失效,而是模式组合——见图 9。</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9:Qwen 的模式占比与每步节省">
+    <figcaption>
+      <b>Figure 9:</b>Qwen matches Gemma's per-token savings but shifts more into global mode at long context. Counterpart to Figure 5, on Qwen-3.6-27B.
+      <span class="zh">中文解读:(a) Qwen 的 global 模式 token 占比随上下文增长到最长桶约 55%(Gemma 约 45%);(b) 但每 token 节省与 Gemma 相当:focus/local 分别省 74–98% / 87–99%。也就是说,<b>掩码机制本身两家一样好,差别在模型自发选择的"导航开销"大小</b>——这是零样本激发的策略差异,作者认为可以用后训练优化(第 8 节)。</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>规模化一节的双重含义:</b>对"模型规模"这条轴,DA 的精度代价随规模收敛(29%→99%),大模型几乎是免费的午餐;对"上下文长度"这条轴,DA 的绝对节省随长度放大(−1M→−21M)。两条轴恰好都是业界正在Scaling 的方向——这是论文对 DA 前景最有力的一组论据。</div>
+</section>
+
+<!-- ================= s7 效率与模式分析 ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Efficiency &amp; Analysis</div>
+  <h2 class="sec">效率账本与模式级分析</h2>
+
+  <h3>roofline 墙钟时间:0.71× / 0.77×</h3>
+  <p>把注意力节省换算成单卡 B200、bf16、MFU 40%、MBU 70% 下的理论解码墙钟时间,每个解码步拆成三笔账:<b>matmul</b>(所有投影/FFN/输出头的矩阵乘,计算受限,只随步数增长)、<b>全局内存</b>(全局注意力层的 KV 读取——DA 唯一能压的项)、<b>局部内存</b>(高效层的固定每步读取:Gemma 的 SWA KV cache、Qwen 的 GDN 递归状态,与上下文无关):</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table3.png" alt="Table 3:优化部署下的解码墙钟时间分解">
+    <figcaption>
+      <b>Table 3:</b>Estimated decode wall-clock time on an optimized disaggregated inference setup. Per-response decode cost for each model and arm on a single B200 accelerator in bf16, summed over the generation and averaged across the 15 tasks, at MFU 40% for the compute-bound matmuls and MBU 70% for the memory-bound reads.
+      <span class="zh">中文解读:vanilla 下全局内存读取占解码时间的 73%(Gemma,196.5/269.1 ms)与 86%(Qwen,263.8/306.2 ms)——这就是 DA 的杠杆所在。DA 下:全局读取 1100 GB→528 GB(Gemma)、1477 GB→1017 GB(Qwen),总墙钟降到 <b>0.71×</b> 与 <b>0.77×</b>。注意 matmul 和局部内存反而略涨(步数多了 35%/31%),被全局读取的下降盖过。两家模型的"漏损"不同:Qwen 的 GDN 状态只有 78.45 MB(占 DA 注意力时间 5%),节省几乎无损穿透;Gemma 的 SWA 地板横跨 50 层、838.9 MB(占 42%),把总节省封了顶。</span>
+    </figcaption>
+  </figure></div>
+
+  <p>这份账本的每个输入都可以复核。两个模型的常数(Table 4)直接来自公开配置;两个随实验臂变化的量——解码步数 $D$ 与注意力 token 总量 $A$(Table 5)——从生成的响应里实测:</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table4.png" alt="Table 4:墙钟分解的逐模型常数">
+    <figcaption>
+      <b>Table 4:</b>Per-model constants for the wall-time decomposition. Active params P, global attention layers L_global, KV bytes per token b_kv, fixed per-step local read s_local, and the local mechanism, each following the published configuration in bf16.
+      <span class="zh">中文解读:每 token KV 字节 $b_{\text{kv}}$ 的公式是 $2 \times L_{\text{global}} \times n_{\text{kv}} \times d_{\text{head}} \times 2$(前一个 2 计 K 与 V,后一个 2 是 bf16 字节)。Gemma-4-31B:10 个全局层、81,920 B/token;Qwen-3.6-27B:16 个全局层、65,536 B/token。</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table5.png" alt="Table 5:实测的解码步数与注意力 token 总量">
+    <figcaption>
+      <b>Table 5:</b>Trace inputs (macro-averaged over the 15 tasks). Decode-step count D and attended-token total A, measured directly from the generated responses of each arm.
+      <span class="zh">中文解读:Gemma:vanilla 332 步 / 13.43M token → DA 448 步 / 6.45M(步数 +35%,读取 −52%);Qwen:573 / 22.54M → 752 / 15.52M(步数 +31%,读取 −31%)。这两个实测值代入三笔账公式即得 Table 3。</span>
+    </figcaption>
+  </figure></div>
+
+  <p>以 vanilla Gemma-4-31B 为例过一遍完整推导(Appendix C.8):</p>
+  <div class="math">$$T_{\text{matmul}} = \frac{2 \times 31\times 10^{9} \times 332}{2.25\,\text{PFLOPS} \times 0.40} \approx 22.9\,\text{ms}$$</div>
+  <div class="math">$$T_{\text{global}} = \frac{13.43\times 10^{6} \times 81{,}920\,\text{B}}{8\,\text{TB/s} \times 0.70} \approx 196.5\,\text{ms}$$</div>
+  <div class="math">$$T_{\text{local}} = \frac{332 \times 838.9\,\text{MB}}{8\,\text{TB/s} \times 0.70} \approx 49.7\,\text{ms}$$</div>
+  <p>三项相加 269.1 ms;把 DA 臂的 $D{=}448$、$A{=}6.45\text{M}$ 代入即得 192.3 ms。作者很诚实地点明:<strong>这是给定利用率下的理论天花板,不是实测墙钟</strong>——不含 prefill(分离式部署下在另一个池)、不含归一化/旋转位置编码等零碎、按 token 粒度计读取(实际块对齐内核在全局项上会多读几个百分点)。</p>
+
+  <h3>模式级分析:钱花在哪、省在哪</h3>
+  <p>DA 自己生成的 token 都花在哪种模式里?Gemma-4-31B 上 <code>&lt;global&gt;</code> 只占生成 token 的约 27%,<code>&lt;focus&gt;</code> + <code>&lt;local&gt;</code> 占 73%——而后两者才是廉价模式,每 token 平均只读 vanilla 步长的约 12% 与 6%:</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5:各模式的 token 占比与每 token 注意力节省">
+    <figcaption>
+      <b>Figure 5:</b>DA spends most tokens in cheap modes, with larger savings at longer contexts. Results on Gemma-4-31B. (a) Token share by mode across context-length buckets; &lt;focus&gt; and &lt;local&gt; account for about 73% of generated tokens, and &lt;global&gt;'s share rises at the longest contexts. (b) Per-token attention saved relative to vanilla.
+      <span class="zh">中文解读:(a) global 占比随上下文变长上升到最长桶约 45%,封顶了那里的总节省;(b) focus 每步省 76→98%、local 省 88→99%,且上下文越长省得越多——focus 的增幅尤其陡。这说明 DA 的收益天然随长上下文任务与长程任务的Scaling 放大。global 步贡献了 DA 超过 80% 的注意力读取,是未来优化的靶子(比如用"上下文内索引"代替全量 survey)。</span>
+    </figcaption>
+  </figure>
+
+  <h3>协议遵守度:能力门槛在哪</h3>
+  <p>DA 的可靠性取决于模型能否稳定吐出可解析的控制 token。Figure 6 给出两个指标:<code>&lt;focus&gt;</code> 解析成功率(能解析为合法 chunk 引用的比例)随规模在两个家族同步爬升——58%(E4B)→ 99%(31B),89%(Qwen-4B)→ 99%(27B);而每响应的 focus 尝试次数在 1.37–1.85 的窄带里波动、与规模无关:<b>强模型赢在解析更可靠,而不是调得更少</b>。尝试次数本身是零样本伪影——由模型自己选择怎么用协议,而非任务最优。</p>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6:focus 解析成功率与每响应 focus 尝试次数">
+    <figcaption>
+      <b>Figure 6:</b>DA focus adherence improves with model size. (a) Focus success rate, the fraction of focus calls that parse to a valid chunk reference, rises toward 100% as the backbone grows in both families; the smallest model (Gemma-4-E4B, 58%) is the clear outlier, consistent with its accuracy collapse in Figure 3. (b) Focus attempts per response show no clear trend with model size.
+      <span class="zh">中文解读:(a) 的 E4B 58% 与 Figure 3 的 29% 精度崩塌互为印证——小模型的崩塌大部分是"跟不上协议"而非"不会推理";(b) 尝试次数全员 1.4–1.9,说明规模改善的是遵守质量而非使用频度。</span>
+    </figcaption>
+  </figure>
+
+  <h3>诚实的失败案例:六种任务上的两种结构性失配</h3>
+  <p>论文没有回避失败场景(Appendix D.4)。15 个主基准之外有六类来源 DA 处理不好,作者把它们归为两种<b>与三模式分解的结构性失配</b>(而非机制弱点)——注意:即便在这六个来源上,DA 的<b>每步</b>注意力依然下降 39–67%:</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table10.png" alt="Table 10:DA 在 Gemma-4-31B 上的六类失败来源,按两种失败模式分组">
+    <figcaption>
+      <b>Table 10:</b>DA failure cases on Gemma-4-31B. The six sources where DA fails to preserve accuracy or fails to reduce attended tokens, grouped by the two structural failure modes. The cost is either accuracy (cluster 1: 84.2→58.8% mean) or attended-token inflation (cluster 2: 17.8→21.2 M/sample), even though per-step attention still falls on every source.
+      <span class="zh">中文解读:<b>第一类:证据被分段摧毁。</b>cwe 需要跨全部分段的全局计数,structured_data 的表格被切散——<code>&lt;focus&gt;</code> 只看被点名的分段,信息进不来,精度从 84.21 崩到 58.84(即便读取还降了)。<b>第二类:输出长度随文档增长。</b>fwe 词频枚举、summ_screen_fd 逐段摘要、book_sum_sort 全文排序、in_context_learning 逐例推理——输出单位随文档伸缩,解码步数撑爆总量(17.84M→21.20M)。作者的修法:第一类靠"结构感知分段"(保表格完整)与 map-reduce 式逐段扫描+脚手架累积;第二类把长输出路由进 <code>&lt;focus&gt;</code> 以保持每步有界,或干脆用 SFT/RLVR 教模型这两种分解策略。</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="note"><b>为什么这六个没进主基准?</b>它们要么被基准自带的 prompt 明令禁止中间推理("只给答案,不要输出其他文字"——直接中和 DA 依赖的零样本脚手架),要么属于上述结构性失配。这个筛选是公开声明的(Appendix D.4),编者认为透明度合格,但读者评估"52% 节省"的外推范围时应记住:输出随文档伸缩的任务不在覆盖内。</div>
+</section>
+
+<!-- ================= s8 讨论与点评 ================= -->
+<section id="s8">
+  <div class="sec-no">08 · Discussion</div>
+  <h2 class="sec">讨论、局限与编者点评</h2>
+
+  <h3>DA 在 2026 年的架构版图里还有多大空间?</h3>
+  <p>一个自然的质疑:各家都在激进压缩 KV cache(MLA、token 合并、索引器稀疏注意力),全局注意力的读取成本是否还会是解码的主项?论文在附录里做了一次截至 2026 年 8 月的架构普查,先看每上下文 token 的 KV 字节:</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table6.png" alt="Table 6:2026 年 8 月各架构每上下文 token 的 KV 字节,区分存储量与 O(N) 读取量">
+    <figcaption>
+      <b>Table 6:</b>KV bytes per context token, as of August 2026. Stored bytes are what a context token occupies across the global attention layers, and the O(N) read is what one decode step must read per context token.
+      <span class="zh">中文解读:全注意力模型"存储量 = 每步读取量",两者重合,跨度高达 13.8–254.0 KB/token(MiniMax-M2.7 以 62 层全注意力 + GQA 8 kv 头冠绝全场);索引器式稀疏设计则把两者撕开 6.6–33 倍——每步只对索引键做 O(N) 扫描(0.35–2.77 KB/token),另读固定 top-k。MiniMax-M3 是例外(20.7 KB):60 层里还有 3 层全注意力。这张表也定义了 DA 的用武之地:凡是 O(N) 读取仍是"大头"的架构,声明式掩码就有杠杆。</span>
+    </figcaption>
+  </figure></div>
+
+  <p>把同样的 roofline 分解推到 1M token 上下文(Table 7):全注意力组(Qwen-3.6-27B、Gemma-4-31B、Qwen3.8-Max、Kimi-K3、MiniMax-M3)的注意力占单步解码时间 94.11–99.37%;即便自带稀疏机制的索引器组(DeepSeek-V4-Pro/Flash、GLM-5.3-Flash)也占 56.49–97.50%——<b>每一行注意力都是主导项,而自带稀疏机制的模型恰恰是它主导得最少的</b>,说明 DA 式的干预方向与架构演进并不冲突。</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table7.png" alt="Table 7:1M token 上下文下各模型的 roofline 单步解码分解">
+    <figcaption>
+      <b>Table 7:</b>Roofline decode decomposition at a 1M-token context. One decode step on a single B200 at MFU 40% and MBU 70%, with each model charged at the KV dtype its vendor's serving recipe specifies.
+      <span class="zh">中文解读:全局读取在 1M 上下文下动辄十几毫秒,而 matmul 只有 0.014–0.232 ms——差两三个数量级。缩进行是"不加厂商配方时的 bf16 对照"(Qwen3.8-Max、Kimi-K3),换了精度也不改变分组区间。结论:在 1M 上下文,注意力读取仍是解码的主导成本,DA 声明的节省落在实处。</span>
+    </figcaption>
+  </figure></div>
+
+  <p>不过这个"主导份额"强烈依赖上下文长度(Table 8):同样的模型在 244K(本文实验的有效上限)下全注意力组降到 79.6–97.5%、索引器组 24–90%,到 128K 时索引器组已有三行跌破 50%。MFU/MBU 的取值倒是无关大局(扫遍 40–60% / 60–85% 的报告区间,1M 份额波动多在 3 分以内)——<b>上下文长度才是决定性变量,这也是论文把 1M 写进标题级结论的原因</b>。作者同时押注:窗口长度历史上随单 token 成本下降而持续变长,1M 已是前沿标配,聚合注意力成本不会消失。</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table8.png" alt="Table 8:注意力份额随上下文长度与利用率假设的变化">
+    <figcaption>
+      <b>Table 8:</b>Attention share against context length and against the utilization assumptions. The left block holds MFU and MBU fixed and varies N, and the right block holds N at 1M and takes the two corners of the reported utilization ranges.
+      <span class="zh">中文解读:左块固定利用率、变上下文:1M → 244K → 128K,各模型份额逐级下滑,索引器组掉得最快(如 DeepSeek-V4-Pro 66.55%→32.68%→20.30%)。右块固定 1M、扫利用率区间的两个角:全注意力组几乎不动,索引器组最大波动 14.4 分(DeepSeek-V4-Pro)。整张表说明结论"注意力主导"对利用率稳健、对上下文长度敏感。</span>
+    </figcaption>
+  </figure></div>
+
+  <h3>Agentic 场景:检索没有解决 DA 解决的问题</h3>
+  <p>有人会说:agent 通过工具调用增量取回上下文,不就没有"长上下文"问题了?论文的反驳很清晰:<b>检索决定什么进入上下文,DA 决定进入之后看哪里</b>——是两层正交的决策。检索甚至会让问题更糟:每次工具结果都留在上下文里陪跑整个 episode,而它通常只对发起它的那几步相关。随着轮次累积,agentic 上下文恰恰落在 DA 节省最大的区间(长上下文 + 每步只读局部)。而且 agentic 场景自带天然分段(工具调用、用户轮次、检索段落),不需要本文的"人造 magic chunk"。</p>
+
+  <h3>DA 是"系统 2"的稀疏注意力</h3>
+  <p>论文给 DA 一个很好的定位:已有稀疏方法从内部激活每步<b>推断</b>掩码,是"系统 1";DA 让模型用显式推理<b>决定</b>看哪里,是"系统 2"。这个表述带来三个实际推论:(1)策略可以用一句指令改变,无需重训;(2)随模型规模自动改进,协议一字不动;(3)可以像系统 2 推理本身一样用 RL 优化(奖励同时计准确率与注意力效率)。还有一个被作者反复强调的副产品——<b>注意力计划天然可审计</b>:驱动 KV 读取的那些 token 就是人能读的那些 token,对 AI 安全的 CoT 监督(supervision)是同一件事的两面。与最相近的 SSAS(按任务训练、2K 上下文、两个任务)相比,DA 证明了这一行为可以零样本、一个固定 prompt、15 个任务、244K 上下文地泛化。</p>
+
+  <h3>与现代推理技术的叠加</h3>
+  <ul class="tight">
+    <li><b>与轻量扫描稀疏注意力(如 DSA):</b>互补——扫描恰好可以服务 DA 昂贵的 global 步,声明则在其余模式里携带节省;DA 改块表不碰内核,集成很轻。</li>
+    <li><b>与投机解码(speculative decoding):</b>正交叠加——DA 压每步成本,投机解码把多步并成一次校验;校验照样只读被掩码的 KV。模式内掩码固定,起草在单一掩码下进行,只在罕见的模式切换处重置投机状态。</li>
+    <li><b>与 KV 卸载(offloading)与上下文压缩:</b>DA 在切换关注集之前就用明文"预告"了下一步要看哪——这正是预取(prefetch)需要的句柄:离焦分段可以溢出到主机内存,声明一出现就边解码边预取回来。现有压缩(如 Claude/OpenAI 的 compaction)是<b>破坏性</b>的(摘要替换原文、KV 丢弃、找回需重新 prefill);DA 不改序列、掩码可逆,离焦内容的缓存始终有效——作者由此提出"可逆上下文压缩"的愿景。</li>
+  </ul>
+
+  <h3>局限(作者自陈)与编者点评</h3>
+  <ul class="tight">
+    <li><b>零样本策略次优:</b>DA 多跑约 1/3 解码步,分解方式未必贴合任务形状;CoT 已被 SFT/RLVR 深度优化,DA 的模式选择策略同样可以被后训练调优——这是作者留给未来工作的最大空间。</li>
+    <li><b>人造分段:</b>固定上下文基准强迫用启发式切块;agentic 场景有天然分段,DA 可能更自然。</li>
+    <li><b>仅非思考模式:</b>模型在 thinking 内跟不上协议;但业界推理模型本来就训练了工具调用间的交错思考,把 DA 暴露成标准工具声明后有望进入"推理轨迹最长"的场景。</li>
+    <li><b>global 模式的成本:</b>global 步以全量注意力为代价、占 DA 读取的 80% 以上;作者提议导航时只看一份"上下文内索引"(每段一句话的描述),量级可比上下文本身小几个数量级。</li>
+  </ul>
+
+  <div class="takeaway"><b>编者点评:</b>这篇论文最打动人的不是 52% 这个数字,而是三件事的干净组合——(1)<b>零样本激发</b>把 SSAS 式行为从"每任务微调"推到"一个固定 prompt",这是 2026 年模型能力水位的直接证据;(2)<b>DAnm 消融</b>把"格式"与"掩码"两因素拆得干干净净,结论(格式免费、掩码既供血又付代价)可复核;(3)对效率声明保持<b>roofline 级别的诚实</b>:反复强调 0.71×/0.77× 是理论天花板而非实测,失败案例单列成表。保留意见也有:多跨度任务与 Qwen 长上下文端的精度/ verbosity 问题真实存在;MBU 70% 的取值偏乐观(作者自陈自家低 batch 内核只有 ~57%);六个排除来源意味着数字对"输出随文档伸缩"类任务不可外推。总体而言,"让模型自己声明注意力"是一条与架构稀疏化正交、且随规模与上下文长度双正向的新轴——zero-shot 结果只是下界,后训练(把协议当工具调用、RL 计入注意力成本)大概率还有可观的头部空间。</div>
+</section>
+
+<!-- ================= s9 术语速查 ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里带虚线下划线的缩写悬停即可见释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>DA</td><td>Declarative Attention</td><td>本文协议:模型在思维链中用标签声明注意力范围,引擎据此掩码 KV cache</td></tr>
+      <tr><td>DAnm</td><td>DA-no-mask</td><td>消融臂:用完整 DA prompt 但不施加注意力掩码,用于隔离掩码的贡献</td></tr>
+      <tr><td>KV cache</td><td>Key-Value Cache</td><td>推理时缓存的前文键/值张量;解码每步都要从中读取,是长上下文解码的带宽瓶颈</td></tr>
+      <tr><td>CoT</td><td>Chain-of-Thought</td><td>思维链:让模型先写出推理步骤再作答;DA 把"看哪里"也写进这条链</td></tr>
+      <tr><td>magic chunk</td><td>—</td><td>DA 对上下文分段的称呼(~2048 token/段),以模拟工具调用转录的形式交付</td></tr>
+      <tr><td>SWA</td><td>Sliding Window Attention</td><td>滑动窗口注意力:只看最近固定窗口,Gemma-4 的高效层用它(窗口 1024)</td></tr>
+      <tr><td>GDN</td><td>Gated DeltaNet</td><td>门控 Delta 网络:线性注意力变体,每步状态固定大小,Qwen-3.5/3.6 的高效层用它</td></tr>
+      <tr><td>MFU / MBU</td><td>Model FLOPs / Bandwidth Utilization</td><td>实际达到的峰值算力/带宽比例;roofline 账本取 FFN 40%、内存读取 70%</td></tr>
+      <tr><td>roofline wall-time</td><td>—</td><td>把每个操作按其自身硬件天花板计费的墙钟时间,只依赖硬件、不依赖 batch 配置</td></tr>
+      <tr><td>GQA / MLA</td><td>Grouped-Query / Multi-head Latent Attention</td><td>两类 KV 压缩注意力:共享 kv 头 / 低秩潜在缓存,降低每 token 字节但不改变读取结构</td></tr>
+      <tr><td>MoE</td><td>Mixture of Experts</td><td>稀疏专家层;只加载被路由到的专家,FFN 大 batch 下计算受限</td></tr>
+      <tr><td>NIAH</td><td>Needle In A Haystack</td><td>大海捞针检索任务;RULER 的 niah_* 系列,本文里模型基本全部打满</td></tr>
+      <tr><td>RULER / LBv1 / LBv2 / LooGLE / ZS</td><td>—</td><td>五个长上下文基准:RULER、LongBench v1/v2、LooGLE、ZeroScrolls,共提供本文 15 个来源</td></tr>
+      <tr><td>DSA</td><td>DeepSeek Sparse Attention</td><td>每步对轻量索引器打分、top-k 读取的稀疏注意力(V3.2 起);DA 的 global 步可与它互补</td></tr>
+      <tr><td>QSA / MSA</td><td>Qwen / MiniMax Sparse Attention</td><td>两家各自的块级稀疏选择机制(每层索引器 / 专用索引分支)</td></tr>
+      <tr><td>SSAS</td><td>Self-Selected Attention Span</td><td>此前工作:按任务微调模型让它自选注意力跨度,2K 上下文;DA 证明零样本可激发同类行为</td></tr>
+      <tr><td>NSA</td><td>Native Sparse Attention</td><td>可训练的块稀疏注意力;DA 的块对齐掩码与其 block-sparse 原理同源</td></tr>
+      <tr><td>vLLM</td><td>—</td><td>主流开源推理引擎(PagedAttention);DA 通过其 metadata builder 钩子集成,不改内核</td></tr>
+      <tr><td>attention sink</td><td>—</td><td>注意力把大量权重压在开头少数 token 上的现象;DA 用固定系统指令占住前 16 token</td></tr>
+      <tr><td>prefill / decode</td><td>—</td><td>推理两阶段:prefill 一次并行处理输入,decode 逐 token 生成;生产系统常分池部署</td></tr>
+      <tr><td>compaction</td><td>上下文压缩</td><td>对历史做摘要/清除以缩上下文;破坏性、需重 prefill;DA 掩码可逆,可支撑"可逆压缩"</td></tr>
+      <tr><td>SFT / RLVR</td><td>Supervised Fine-Tuning / RL with Verifiable Rewards</td><td>后训练两种手段;作者认为可用来教模型更优的 DA 模式选择策略</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2609.02737《Language Models Can Control Their Own Attention》(Declarative Attention)的人工精读笔记。图片以 300 DPI 摘自论文原文并等比缩放展示(未裁剪),Figure/Table 编号与原文一致(10 图 10 表);解读文字为编者观点,关键数字均与原文核对。<br>
+    原文:<a href="https://arxiv.org/abs/2609.02737">arXiv:2609.02737</a> · KAIST AI × Google DeepMind<br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好 · 顶栏章节跳转</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="MMLongEmbed 论文精读：多模态嵌入模型长上下文基准测试，图文配合中文解读">
+<meta name="keywords" content="多模态嵌入, 长上下文, 检索基准, MMLongEmbed, paper reading">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · MMLongEmbed：长上下文场景下的多模态嵌入模型基准">
+<meta property="og:description" content="MMLongEmbed 论文中文精读：4 个长上下文多模态检索任务、11 个模型评测、全部图表高清内嵌">
+<meta property="og:url" content="https://github.com/AmamiSora1228/MMLongEmbed">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · MMLongEmbed：长上下文多模态嵌入基准</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{width:100%; border:1px solid var(--border)}
+  /* 空表格壳仅承载标题:让表格宽度占满容器,caption 完整换行,避免缩成窄长条 */
+  .tbl-wrap .data caption{white-space:normal; line-height:1.75; overflow-wrap:break-word; word-break:break-word; max-width:100%}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">MMLongEmbed<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">观察</a>
+      <a class="jump" href="#s4">方法</a>
+      <a class="jump" href="#s5">系统</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">结论</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · Multimodal Embedding in Long Context</div>
+    <h1>MMLongEmbed：长上下文场景下的多模态嵌入模型基准</h1>
+    <div class="subtitle">多模态嵌入模型(MEM)的上下文窗口已扩展到 32K+ tokens，但"窗口大"不等于"读得懂"——本文构建了首个专门评测 MEM 长上下文能力的基准：4 个检索任务、8 个数据集、8,460 个查询，系统揭示了现役模型依赖表面特征匹配、细粒度信息保持随长度衰退等核心瓶颈。</div>
+    <div class="meta">
+      <span>作者:Haitian Wang、Ruoxi Sun、Quantong Qiu、Juntao Li 等(苏州大学 × 蚂蚁集团)</span>
+      <span>代码:<a href="https://github.com/AmamiSora1228/MMLongEmbed">github.com/AmamiSora1228/MMLongEmbed</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">多模态嵌入</span><span class="pill">长上下文</span><span class="pill">检索基准</span>
+      <span class="pill">Needle-In-A-Haystack</span><span class="pill">跨模态对齐</span><span class="pill">时序推理</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图表按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:基准长什么样、发现了什么</a></li>
+    <li><a href="#s2">背景与动机:为什么需要 MMLongEmbed</a></li>
+    <li><a href="#s3">核心观察:三个反直觉的结论</a></li>
+    <li><a href="#s4">方法:四个任务与干扰项构造</a></li>
+    <li><a href="#s5">系统:11 个模型与总体成绩</a></li>
+    <li><a href="#s6">实验:位置偏差、模态干扰与长度扩展</a></li>
+    <li><a href="#s7">结论与局限</a></li>
+    <li><a href="#s8">编者点评</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<!-- ============ 01 速览 ============ -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览:基准长什么样、发现了什么</h2>
+
+  <p><strong>多模态嵌入模型(MEM)</strong>把文本、文档图像、视频帧等异构模态映射进同一个向量空间,让"用文本检索图片/视频/文档"成为可能。近年来以 <abbr title="Multimodal Large Language Model,多模态大语言模型">MLLM</abbr> 为底座的新一代 MEM(如 Qwen3-VL-Embedding、GME)把上下文窗口推到了 32K tokens 以上,支撑起多模态 RAG、智能体工作流等真实应用。但作者指出一个尖锐的矛盾:<strong>上下文窗口的理论长度,并不等于模型在长上下文中的真实理解与表示能力</strong>——窗口"塞得下",不代表"读得懂"。</p>
+
+  <p>MMLongEmbed 正是为填补这一评测空白而提出的第一个系统性长上下文 MEM 基准:</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">规模</div><div class="v">8,460 <small>查询(query)</small></div></div>
+    <div class="item"><div class="k">候选文档</div><div class="v">20,880 <small>候选(candidate)</small></div></div>
+    <div class="item"><div class="k">上下文长度</div><div class="v">32K+ tokens <small>覆盖 256 → 32,768</small></div></div>
+    <div class="item"><div class="k">评测模型</div><div class="v">11 个 <small>10 开源 + 1 专有</small></div></div>
+    <div class="item"><div class="k">任务 / 数据集</div><div class="v">4 / 8 <small>合成 ×1 + 真实 ×3</small></div></div>
+  </div>
+
+  <p>四个评测任务横跨三种输入格式(纯文本、纯图像、图文交错):<strong>Visual Grounding</strong>(视觉锚点定位,合成 NIAH 任务)与三个真实任务——<strong>Multi-Source Reasoning</strong>(多源推理)、<strong>Logical Summarization</strong>(逻辑摘要)、<strong>Temporal Summarization</strong>(时序摘要)。八个数据集的统计见下表:</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table1.png" alt="Table 1 各任务的数据集来源、语料类型/模态、查询与候选数量">
+      <figcaption>
+        <b>Table 1:</b> Statistics of Tasks in MMLongEmbed. (原文表注)
+        <span class="zh">8 个数据集按合成/真实分为两个阵营:合成任务 Visual Grounding 来自 NeedleBench 与 MM-NIAH(网页图文),查询与候选各 2,160 条,每查询平均 25 个候选;真实任务里,Multi-Source Reasoning 用 MMDocRAG 与 HotpotQA,Logical Summarization 用 MMLongBench 与 GovReport,Temporal Summarization 用 YoukuDenseCaption 与 ActivityNet Captions,平均每查询候选数(C/Q)从 280 到 640 不等,且跨长度池保持一致。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <p>长度是基准确立的核心控制变量:合成任务把上下文切成 8 个长度区间(256 到 32K),真实任务切成 8K / 16K / 32K 三档。下图展示了全部候选的长度分布,四个任务的区间被清晰分离开来:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1 MMLongEmbed 中候选文档的长度分布">
+    <figcaption>
+      <b>Figure 1:</b> Length Distribution of Candidates in the MMLongEmbed Benchmark. (原文图注)
+      <span class="zh">横轴 token 数(对数刻度),纵轴频次:Multi-Source Reasoning 覆盖 8K–32K 三个真实长度池(蓝色),Temporal Summarization 分布在中长区间(橙色),Visual Grounding 由合成构造铺满 256–32K 八档(绿色),Logical Summarization 集中在更长区间(黄色)。长度分层让"上下文变长"本身成为一个可单独考察的变量。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <div class="takeaway"><b>三大核心发现(先睹为快):</b>
+    <ul class="tight">
+      <li><strong>规模与能力脱钩</strong>:模型变大、嵌入维度变高,长上下文表现几乎不涨——Qwen3 系列 8B 相对 2B 只提升约 1 分(53.41 vs 52.31),甚至在 MMDocRAG 的 Hard 子集上 8B(25.42)反而不如 2B(32.29)。</li>
+      <li><strong>细粒度检索随长度系统性衰退</strong>:大多数模型只有在 ≤2K tokens 时能稳定精确检索,之后持续恶化;而汇总类任务相对稳定——因为真实长文里有冗余、证据分散。</li>
+      <li><strong>深度理解是短板</strong>:一旦用"高相似度干扰项"封住表面特征匹配的捷径,模型成绩断崖式下跌;不同模型对跨模态冗余信息的鲁棒性也差异悬殊。</li>
+    </ul>
+  </div>
+
+  <div class="note"><b>一句话定位:</b>这是"长上下文 + 多模态嵌入"这个交叉口的第一个系统性基准——它不评测 MEM 的生成能力,而是评测检索/表示能力:给定一条(较短的)查询,从一堆(很长的)多模态候选里找出正确的那个。</div>
+</section>
+
+<!-- ============ 02 背景 ============ -->
+<section id="s2">
+  <div class="sec-no">02 · Motivation</div>
+  <h2 class="sec">背景与动机:为什么需要 MMLongEmbed</h2>
+
+  <h3>2.1 多模态嵌入模型的演进</h3>
+  <p>MEM 的发展大致经历了三代:第一代以 CLIP 为代表的<strong>对比式双塔</strong>架构,通过海量图文预训练建立共享语义空间;第二代由 <abbr title="Multimodal Large Language Model">MLLM</abbr> 驱动,如 E5-V、VLM2Vec、GME、MM-Embed,把视觉大模型当作骨干学出更通用灵活的嵌入空间;第三代开始引入<strong>推理驱动的表示学习</strong>(如 Embed-RL、MMEmb-R1),在表征学习阶段内嵌隐式推理。同时,上下文窗口一路扩到 32K、甚至 Qwen3-VL-Embedding 的文档级理解和 128K 的专有模型。</p>
+
+  <h3>2.2 现有基准的三个缺口</h3>
+  <p>与模型能力的狂奔相比,评测明显滞后:主流嵌入基准(MTEB/MMEB/MIEB 等)聚焦短输入与简单理解;少数面向长输入的基准(如 LongEmbed)又有三个结构性缺陷,MMLongEmbed 逐一对应解决:</p>
+
+  <ul class="tight">
+    <li><strong>① 上下文多样性不足</strong>:仅限纯文本,覆盖不了真实世界里的图文交错网页、文档页、视频帧 → MMLongEmbed 引入四种数据源(文档、网页、视频帧序列、长文本)与三种输入格式(纯图像、图文交错、纯文本)。</li>
+    <li><strong>② 缺乏长度分层设计</strong>:输入长度不是受控变量,无法系统分析"上下文扩大到什么程度、性能怎么变" → 长度分层池化,逐档独立评估。</li>
+    <li><strong>③ 任务难度不够</strong>:难度不显式控制,只是把可用数据全部塞进候选池"充数",很多任务靠表面特征匹配就能蒙对 → 构造高质量干扰项,合成任务用高相似度 needle 干扰制造细粒度歧义,真实任务用语义上"看起来很像"的干扰项逼模型超越表面匹配。</li>
+  </ul>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table5.png" alt="Table 5 各基准在数据来源与评测设计上的覆盖对比">
+      <figcaption>
+        <b>Table 5:</b> Comparison of MMLongEmbed with existing embedding benchmarks across two dimensions: data source coverage and evaluation design. (原文表注)
+        <span class="zh">七个维度的覆盖矩阵:LongEmbed 只覆盖文本且无长度分层/无硬干扰;MMEB 系列覆盖网页与文档但无长上下文;MMTEB/LMEB 只有文本;只有 MMLongEmbed 在网页、文档、视频、文本四类数据源和"长上下文 + 长度分层 + 硬干扰项"三项设计上全部打勾——这正是它的三个差异点。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="note"><b>为什么"硬干扰项"是关键设计:</b>检索评测的传统做法是"扩大候选池",但候选之间如果差异巨大,模型靠词面重叠、整体语义相似度这类浅层信号就能排序正确,测不出真实力。MMLongEmbed 的做法相反:让干扰项与正确答案高度相似——只在一个关键实体、一段关键证据、或时序结构上不同——从而专门考验"深层语义与结构依赖"。</div>
+</section>
+
+<!-- ============ 03 核心观察 ============ -->
+<section id="s3">
+  <div class="sec-no">03 · Key Findings</div>
+  <h2 class="sec">核心观察:三个反直觉的结论</h2>
+
+  <p>在详细展开方法之前,先固定住论文最重要的三个实证结论(全部来自 §5–§6,后文逐项给出证据):</p>
+
+  <h3>观察一:规模膨胀 ≠ 长上下文能力增强</h3>
+  <p>同一模型家族内,参数翻 2–4 倍只带来边际收益:Qwen3 8B vs 2B 为 53.41 vs 52.31,GME 7B vs 2B 只有 24.63 vs 23.10,甚至出现 8B 在细粒度 Hard 子集上不如 2B 的倒挂。配对 t 检验(Table 8)显示 Qwen3 家族的差异统计不显著(p=0.5375)。结论是:没有针对长上下文的专项优化,单纯堆规模与嵌入维度,解决不了长上下文里的细粒度判别问题。</p>
+
+  <h3>观察二:性能退化随"上下文长度"和"关键信息位置"系统性地变化</h3>
+  <p>把长度当成受控变量后可以看到清晰的规律:细粒度检索(Visual Grounding)在约 2K tokens 之后持续滑坡;目标信息位于序列中间时成绩最差(位置偏差,§6.1);而汇总类任务(Summarization)相对稳定——因为冗余高、证据分散,"整体的语义标签"仍然可得。</p>
+
+  <h3>观察三:现役 MEM 严重依赖表面特征匹配</h3>
+  <p>面对精心构造的高相似度干扰项,多数模型在 Easy 子集上的高分瞬间崩塌:Logical Summarization 从 80–90% 跌到 10–20%,Temporal Summarization 的 Hard 集同样惨烈。跨模态干扰鲁棒性也高度不均——有的模型对模态偏置敏感、有的被图文混合干扰"击穿"、只有少数模型(如 Rzen-v2-7B)保持稳定。</p>
+
+  <div class="takeaway"><b>一句话概括论文主旨:</b>现在的 MEM 是"宽泛的相关性匹配器",而不是"细粒度的语义/结构理解器";长上下文评测的缺口,恰好把这一真相暴露了出来。</div>
+</section>
+
+<!-- ============ 04 方法 ============ -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">方法:四个任务与干扰项构造</h2>
+
+  <h3>4.1 查询与语料设置:长度分层池化 + 统一 token 计数</h3>
+  <p>基准采用<strong>严格长度分层的池化机制</strong>:所有查询相对较短,候选多模态文档显著更长;查询-候选对被按候选长度分入不同池子(合成任务 8 档,真实任务 8K/16K/32K 三档),每个长度区间独立评测。同时严格控制候选密度——同一任务内,所有长度池的平均候选数/查询(C/Q)保持一致,只允许跨任务不同(见表 1)。</p>
+
+  <p>由于不同模型的视觉 token 化差异很大,论文沿用并修订了 MMLongBench 的统一多模态 token 计数方案作为标准化基线:文本用 Qwen3 tokenizer 计算;图像用 16×16 patch 嵌入 + 2×2 空间合并,等效每个视觉 token 覆盖 32×32 像素,一张 $H\times W$ 图像的视觉 token 数为:</p>
+
+  <div class="math">$$N_{\text{image}} = \left\lceil \frac{H}{32} \right\rceil \times \left\lceil \frac{W}{32} \right\rceil \tag{1}$$</div>
+
+  <p>总上下文长度 $L$ 是所有模态 token 之和(文本 token 总和 $\textstyle N_{\text{text}}$ 与 $K$ 张图像的视觉 token 之和):</p>
+
+  <div class="math">$$L = N_{\text{text}} + \sum_{i=1}^{K} N_{\text{image}}^{(i)} \tag{2}$$</div>
+
+  <div class="note"><b>为什么统一 token 计数:</b>不同模型对同一张图的 token 化差异可能高达数倍(Qwen2.5-VL 系列的纯视觉压缩、与 InternVL 的动态 token 等)。若按模型各自口径分段,同一"长度池"对不同模型就不是同一难度;统一方案保证长度是一个公平、可比较的控制变量。</div>
+
+  <h3>4.2 数据构造总览</h3>
+  <p>四类任务的构造管线统一见 Figure 2:<strong>上面半部分</strong>是合成任务 Visual Grounding——needle(目标实例)按不同的"插入深度(depth)"与"上下文长度(length)"注入干草堆,每个 深度×长度 配置独立评测,形成一张"池矩阵";<strong>下面半部分</strong>是三个真实任务——先把多模态上下文按长度分池,再分别构造 Easy 池(未扰动)与 Hard 池(针对性干扰):多源推理用"上下文替换"删除关键证据,逻辑摘要用"证据破坏"替换大段文本,时序摘要把视频事件段打乱重排;右侧展示了检索打分示例(Top-1 命中 0.575,Top-2 干扰 0.361)。</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2 MMLongEmbed 数据构造管线总览">
+    <figcaption>
+      <b>Figure 2:</b> Overview of the MMLongEmbed data construction pipeline. (原文图注)
+      <span class="zh">左上:合成任务按 [深度等级 × 长度区间] 注入 needle 构造池矩阵;下方:真实任务按候选长度分池(8K/16K/32K),Hard 池通过三种破坏机制(删证据、换文本、打乱事件序列)生成,且与 Easy 池严格等长,防止模型用长度当捷径。注意图中 "Temporal Summary"/"Logical Summary" 为缩写,全称分别为 Temporal/Logical Summarization。</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.3 任务一:Visual Grounding(合成 · 视觉锚点定位)</h3>
+  <p>这是多模态版的"大海捞针(NIAH)":从 NeedleBench 与 MM-NIAH 分别筛选 25 个文本与图像查询-锚点对,锚点(docx needle)被嵌入从 OBELICS 采样的图文交错"干草堆"里。上下文长度横跨 256–32,768 tokens 共八档,插入深度离散化为 6 级(0%–100%);每个 长度×深度 配置配一个 25 篇候选文档的专属语料。最关键的设计是<strong>锚点之间高度相似</strong>:</p>
+
+  <ul class="tight">
+    <li><strong>文本锚点与干扰项</strong>共享几乎相同的句法结构与词面重叠,只在核心实体上不同。例如目标锚点 "The first band to play on the <em>Moon</em> was the Virtual Rocket Band.",干扰锚点 "…on <em>Venus</em>…";查询 "第一支在月球演出的乐队是哪支?"——靠词面重叠的模型必然在两者间摇摆。</li>
+    <li><strong>视觉锚点与干扰项</strong>用生成模型合成现实中不存在、训练集里不可能泄漏的独特物体/场景,再放进随机背景图与"视觉上类似的干扰图"中,迫使模型依赖零样本细粒度视觉对齐,而非粗粒度场景识别。</li>
+  </ul>
+
+  <div class="takeaway"><b>评测意图:</b>这一任务把"细粒度实例级判别"与"位置/长度"两个变量正交化,是整篇论文最锋利的手术刀——它直接量化:模型在长序列里到底还记得住多少"精确到实体"的信息。</div>
+
+  <h3>4.4 任务二:Multi-Source Reasoning(真实 · 多源推理)</h3>
+  <p>基于 HotpotQA 与 MMDocRAG,评估模型跨多个证据片段(2–5 段)捕获结构化证据链的能力。先用"强链接锚点"过滤太泛的查询(判定提示词见表 12),原始上下文 ≤8K;再用语义无关但行文自然的文本把上下文扩张到 16K/32K,同时<strong>保持关键证据的相对位置不变</strong>。</p>
+
+  <p>Hard 干扰项通过<strong>破坏推理链</strong>生成:从扩张后的候选中删掉关键证据跨度(第一段/最后一段/中间随机段),并用严格等长的连贯文本替换——既打破推理链,又消除长度线索。Easy 池则是把其他文档填充到统一长度的未损坏版本。下表给出 HotpotQA 的具体案例构造:</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table11.png" alt="Table 11 Multi-Source Reasoning HotpotQA 查询与正/负例">
+      <figcaption>
+        <b>Table 11:</b> Multi-source reasoning case design for HotpotQA. (原文表注省略,完整见原图)
+        <span class="zh">查询:"Nathan Chapman 为 Taylor Swift 制作的第三张专辑(2010 年底发行)是哪张?" 正样本保留完整推理节点链 [制作人→序数→时间→实体];Hard 干扰项把发行时间从 2010 换成 2008,破坏[时间]节点,制造"时序-序数矛盾";Easy 干扰项直接换到航空领域的 ABC 发动机,删除[实体/领域]节点。两个难度区分的是"链级不一致"与"无关负例"。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table12.png" alt="Table 12 用于过滤查询的系统提示词">
+      <figcaption>
+        <b>Table 12:</b> System prompt for the Senior Data Auditor… (原文表注)
+        <span class="zh">数据构造的第一道闸门:让 LLM 扮演"高级数据审计员",判定查询是否含能唯一锁定目标文档的"强链接锚点"(具体的专有名词、唯一事件、独特数据、稀有组合),拒绝泛化信号(如 "AI"、"the study"),并要求"在 1000 万文档里检索,≥95% 命中同一篇"才放行——防止查询本身就能被词面匹配解掉。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>4.5 任务三:Logical Summarization(真实 · 逻辑摘要)</h3>
+  <p>基于 GovReport(文本)与 MMLongBench(文档图像),评测"把摘要与长文档全局语义对齐"的能力,只保留需要宏级文档理解而非局部摘抄的子集。Hard 变体的构造是:把大段连续跨度(前 25% / 后 25% / 中间 50%)替换为查询无关内容——关键在<strong>替换来源</strong>:文本用 BM25 全局索引检索与摘要高度相似但事实不同的文档,动态抽取其段落;多模态则用同一源文档的扩展版收割"未见过的连续图像页"做文档内替换。这样注入的噪声词法重叠高、行文流畅、视觉格式统一——<strong>局部语法连贯,全局语义断裂</strong>,模型无法靠局部匹配偷分。</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table10.png" alt="Table 10 Logical Summarization GovReport 查询与正/负例">
+      <figcaption>
+        <b>Table 10:</b> Logical case design. (原文表注)
+        <span class="zh">查询是 GAO 关于阿富汗/伊拉克军队露天焚烧坑的完整审计摘要;正样本覆盖全部三个审计维度(合规、替代方案、健康监测);三个干扰项各只覆盖一个子主题(仅合规违规、仅承包商物流、仅空气污染背景),但都与查询词面高度重叠——模型若只看局部关键词密度,很容易把 Partial 干扰项排到 Ground Truth 前面。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>4.6 任务四:Temporal Summarization(真实 · 时序摘要)</h3>
+  <p>基于 YoukuDenseCaption(中文)与 ActivityNet Captions,评测视频长程时序结构理解:所有视频统一降采样到 1 FPS 构成标准时序帧序列,检索单位是"整段候选视频"(有序帧序列)。任务形式化见 Figure 5:一条描述事件序列的文本查询(如"先…然后…最后…"),要求从候选视频中检索出最相关的一个;查询由 Qwen2.5-32B-Instruct 把拼接字幕重写为带显式过渡词的连贯序列(提示词见表 13),中文标注用同一模型零样本直译成英文(见表 14)。</p>
+
+  <p>Hard 干扰项的核心创新是<strong>事件级时间扰动</strong>:不搞朴素的逐帧打乱,而是先把视频在语义边界处分段,再做宏结构变换(整段<strong>时序反转</strong>、<strong>块级置换</strong>)——保留事件级语义单元,破坏全局叙事与时序;配合 0.5 秒防重叠滤镜保证事件边界清晰。Easy 池用其他未扰动视频。</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5 时序摘要任务形式化:查询、Easy/Hard 候选示例">
+    <figcaption>
+      <b>Figure 5:</b> Task formulation for Temporal Summarization. (原文图注)
+      <span class="zh">上半部分(Easy):负样本来自<strong>不同视频</strong>——整体场景不同,靠全局语义就能区分;下半部分(Hard):负样本来自<strong>同一视频</strong>、帧内容几乎相同,只是时间重叠部分被打乱顺序——必须做细粒度时序推理才能区分。"easy8k/16k/32k" 与 "hard8k/16k/32k" 构成每个数据集 6 个子任务。</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table13.png" alt="Table 13 视频字幕时序重写提示词">
+      <figcaption>
+        <b>Table 13:</b> System prompt for the Expert Video Caption Editor… (原文表注)
+        <span class="zh">把原始字幕重写为显式强调时间顺序(First/Then/Finally)的版本,同时硬性约束:不得添加原文本不存在的任何事件、对象或细节——保证查询里的时序信息全部来自视频本身,而不是 LLM 的脑补。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table14.png" alt="Table 14 中文转英文严格直译提示词">
+      <figcaption>
+        <b>Table 14:</b> System prompt for the Professional Translator… (原文表注)
+        <span class="zh">YoukuDenseCaption 是中文标注,直接用现成翻译会引入文本层面的人为特征;该提示词用贪婪解码零样本直译,禁止增删与改写,确保评测反映的是真实视觉-语义对齐而非文本伪影。</span>
+      </figcaption>
+    </figure>
+  </div>
+</section><!-- ============ 05 系统 ============ -->
+<section id="s5">
+  <div class="sec-no">05 · Models & Overall Results</div>
+  <h2 class="sec">系统:11 个模型与总体成绩</h2>
+
+  <h3>5.1 评测模型</h3>
+  <p>论文评测 11 个上下文窗口 ≥32K 的 MEM:10 个开源模型(2B–8B,嵌入维度 1536–4096)+ 1 个专有模型 Doubao-Seed-1.6(上下文 128K,参数未公开)。覆盖三代技术路线:早期对比式模态对齐模型、通用多模态嵌入模型、最新推理驱动嵌入模型。为防止超长输入的视觉 token 化差异导致 OOM,统一采用<strong>中间截断</strong>策略(保留序列首尾,截掉中间)。</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table2.png" alt="Table 2 11 个评测模型的长度/参数量/嵌入维度">
+      <figcaption>
+        <b>Table 2:</b> Detailed model configurations. (原文表注)
+        <span class="zh">注意右下角:Doubao-Seed-1.6 的窗口达 131,072 tokens,像"外来冠军"一样参与同场竞技。10 个开源模型全部 32,768 窗口;Qwen3-VL 系列维度最高(8B 达 4096),GME 最低,Embed-RL 与 VLM2Vec 为 1536。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table7.png" alt="Table 7 模型版本号与 HuggingFace 链接">
+      <figcaption>
+        <b>Table 7:</b> Detailed information of models evaluated in MMLongEmbed. (原文表注)
+        <span class="zh">可复现性列表:Qwen3-VL-Embedding-2B/8B、GME-Qwen2-VL-2B/7B-Instruct、RzenEmbed-v2-7B(360)、Ops-MM-embedding-v1-2B/7B(OpenSearch AI)、Embed-RL-2B/4B、VLM2Vec-Qwen2VL-2B(TIGER-Lab),以及专有的 Doubao seed1.6-embedding-1215。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>5.2 总体表现(Precision@1)</h3>
+  <p>主结果表按 14 个子集(4 任务 × Easy/Hard + 任务内数据集)给出每个模型的 Precision@1。读这张表前先建立两个坐标:HARD 列(灰底)是"封住表面匹配后"的成绩,EASY 列是"常规检索"成绩;纵向看模型家族,横向看难度衰减。</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table3.png" alt="Table 3 各模型在 14 个子集上的 Precision@1">
+      <figcaption>
+        <b>Table 3:</b> Precision@1 performance comparison of evaluated MEMs on the MMLongEmbed benchmark. (原文表注)
+        <span class="zh">① 平均分冠军是 Rzen-v2-7B(58.61),其后 Qwen3-VL-8B(53.41)、Ops-MM-v1-7B(53.90)、Doubao-Seed-1.6(52.11)胶着;② Hard 列普遍比 Easy 低 20–60 分,尤以 Summarization 系最惨(GovReport Hard 几乎全是 8–28 分);③ GME 家族与 VLM2Vec 在 MMDocRAG/HotpotQA 上接近失能(0.42–25),而它们在 Visual Grounding 的 NeedleBench 上并不差——不同任务暴露的能力维度完全不同。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <p>此外论文还报告了 Recall@k / MRR@k / nDCG@k 等补充指标(见表 6):</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table6.png" alt="Table 6 各模型 P@1/R@k/MRR@k/nDCG@k">
+      <figcaption>
+        <b>Table 6:</b> Supplementary retrieval metrics on MMLongEmbed. (原文表注)
+        <span class="zh">只以 P@1 论会低估某些模型:Embed-RL 的 R@10 高达 86.71/87.16(接近榜首),说明它"相关的内容都捞得回来,但排不到第一"——高相似度干扰下的精确排序是它的短板;GME 家族与 VLM2Vec 则各项全面垫底。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>5.3 规模效应:统计检验</h3>
+  <p>用配对 t 检验(10,000 次 bootstrap 重采样估计 95% CI)比较每个家族最大/最小变体在查询级 P@1 上的差异:</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table8.png" alt="Table 8 配对 t 检验结果">
+      <figcaption>
+        <b>Table 8:</b> Statistical comparison of model-scale effects within each model family. (原文表注)
+        <span class="zh">一眼看三件事:① Qwen3 家族差异 +0.33、p=0.5375、Cohen's d=0.007——统计上完全不显著;② Ops-MM 的 +5.72 是唯一"有点分量"的家族改进(d=0.113);③ 四个家族的效果量 d 全部 ≤0.113,属于极小效应——"加大模型"在长上下文嵌入上的收益,基本可以忽略。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="note"><b>阅读提示:</b>这里的 P@1 是查询级微平均,与主表 Table 3 的宏平均(14 个子集等权)数值略有出入——两种口径都站得住,别当成数据矛盾。</div>
+
+  <h3>5.4 Easy 任务上的难度阶梯</h3>
+  <p>把 Easy 各任务放在一起比较,难度呈清晰阶梯:<strong>Visual Grounding 最难</strong>——实例级细节判别是大多数模型的长上下文短板;Multi-Source Reasoning 中等——HotpotQA 明显强于多模态的 MMDocRAG,说明<strong>跨模态对齐</strong>才是瓶颈,推理本身倒还凑合;Summarization 类最易——不少模型视频场景也能到 80%+,因为汇总类查询允许全局语义匹配,不需要严格保住细粒度证据。</p>
+</section>
+
+<!-- ============ 06 实验 ============ -->
+<section id="s6">
+  <div class="sec-no">06 · Empirical Analysis</div>
+  <h2 class="sec">实验:位置偏差、模态干扰与长度扩展</h2>
+
+  <p>这一节进入论文的分析核心。三个小节分别解剖:细粒度信息丢失与位置偏差(§6.1)、异构跨模态干扰鲁棒性(§6.2)、真实任务随上下文长度扩展的性能动态(§6.3)。为图表清晰起见,正文聚焦 8 个代表性模型,全部 11 个模型的结果见附录(Figures 6、Table 15、Table 16)。</p>
+
+  <h3>6.1 位置偏差与细粒度保持</h3>
+  <p>Visual Grounding 的 长度×深度 热力图(图 3)把"长度退化"和"位置敏感"两个因素分离开。每个热力图的横轴是 8 档上下文长度(0.25K–32K),纵轴是 6 级插入深度(0%–100%),颜色深浅 = Precision@5(越亮越高)。</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3 8 个模型在 Visual Grounding 上的长度×深度热力图">
+    <figcaption>
+      <b>Figure 3:</b> Precision@5 on the Visual Grounding task across varying insertion depths and context lengths. (原文图注)
+      <span class="zh">第一行从左到右:Rzen-v2-7B、Qwen3-VL-8B、Doubao-Seed-1.6、Qwen3-VL-2B;第二行:Ops-MM-v1-2B、GME-Qwen2-VL-7B、Embed-RL-2B、Embed-RL-4B。两个普适规律肉眼可见:① 几乎每张图左侧(≤2K)都亮、右侧(16K/32K)都暗——细粒度检索在 2K 之后持续退化;② 每张图中间深度(40%–80%)都有一条明显的"暗带",首尾(0% 与 100%)反而亮——目标放中间就丢,放开头结尾就能找回。</span>
+    </figcaption>
+  </figure>
+
+  <p>两个瓶颈由此确立:<strong>① 中间位置信息丢失 + 边界偏好</strong>:目标证据不在序列开头/结尾时,检索成绩显著下滑——序列各位置的表示与检索是不均匀的,现役模型无法在长序列中均匀保留信息;<strong>② 细粒度保持随长度迅速退化</strong>:大多数模型只在 ≤2K tokens 时维持稳定精确检索,之后持续恶化,且跨多个模型家族普遍存在——不是某个架构或规模的专利。</p>
+
+  <p>论文用线性混合效应模型(LMM,以 needle 实例为随机截距)对位置偏差做了统计检验(Table 9):</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table9.png" alt="Table 9 六个插入深度上的 LMM 检验">
+      <figcaption>
+        <b>Table 9:</b> Statistical analysis of positional bias on Visual Grounding. (原文表注)
+        <span class="zh">六列深度均值从序列开头排到结尾,几乎所有模型的中间深度(第 2–5 档)都明显低于两端;全部模型的深度主效应 Wald χ²(5) 与二次项 χ²(1) 都极其显著(p&lt;0.0001)——"位置偏差"不是噪声,是统计上确凿的系统性现象。Embed-RL-2B 的中间档跌到 53.7–58.7,而首尾 90.6,落差最大。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="takeaway"><b>含义:</b>位置偏差说明现役 MEM 在长序列上并没有真正做到"内容寻址"——更像"端点记忆"。这对真实场景(证据总在文档中段)是硬伤。</div>
+
+  <h3>6.2 跨模态干扰鲁棒性</h3>
+  <p>合成任务中,把背景干扰按模态分成三类——纯文本干扰、纯图像干扰、混合模态干扰,观察模型对"异构背景噪声"的鲁棒性。结果显示模型可被明确分成三类(Table 4):</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table4.png" alt="Table 4 按模态干扰模式分组的模型表现">
+      <figcaption>
+        <b>Table 4:</b> Performance of MEMs under heterogeneous background interference in Visual Grounding. (原文表注)
+        <span class="zh">三组模式的判读:第 1 类<strong>模态偏置模型</strong>(Doubao、Qwen3-VL 系、Ops-MM-v1-2B、GME-7B)——Text/Mix/Image 三列成绩波动悬殊,σ 高达 6–13(Doubao 文本 75.83 vs 图像 85.14);第 2 类<strong>跨模态干扰敏感模型</strong>(Embed-RL 系)——混合模态干扰(61.94/62.43)反而低于单一模态(65+ 与 73+),图文混在一起就"犯晕";第 3 类<strong>模态鲁棒模型</strong>——Rzen-v2-7B 三列 82.7–86.9,σ 仅 2.29。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <p>附录 Table 15 给出全部 11 个模型的完整分档(新增 VLM2Vec 归入第 1 类、Ops-MM-v1-7B 归入第 3 类),并给出了均值和样本标准差的正式定义:</p>
+
+  <div class="math">$$\mu = \frac{1}{N}\sum_{i=1}^{N} x_i, \qquad \sigma = \sqrt{\frac{1}{N-1}\sum_{i=1}^{N}(x_i - \mu)^2} \tag{3,4}$$</div>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table15.png" alt="Table 15 全模型分组结果">
+      <figcaption>
+        <b>Table 15:</b> Performance of MEMs under heterogeneous background interference in Visual Grounding. (原文表注)
+        <span class="zh">完整名单:模态偏置类新增 VLM2Vec(σ=13.69,最大的列间波动);模态鲁棒类新增 Ops-MM-v1-7B(82.5/83.54/89.51,σ=3.83)。有意思的是同一家族的两个尺寸可能进不同类别——7B 的 Ops 稳健、2B 的 Ops 偏置,说明训练充分度比单纯规模更影响模态平衡。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>6.3 上下文长度扩展下的性能动态</h3>
+  <p>真实任务的共同规律(图 4):不像合成任务那样在某个长度"突然崩溃",而是<strong>渐进式退化</strong>——真实语料里显著证据密度更高,任务成败不那么依赖完美细粒度保持。</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4 8K/16K/32K 长度下 Easy/Hard 的表现对比">
+    <figcaption>
+      <b>Figure 4:</b> Quantitative comparison of model performance across context lengths (8K, 16K, 32K). (原文图注)
+      <span class="zh">上行 Easy、下行 Hard;左起:Multi-Source Reasoning、Logical Summarization、Temporal Summarization、总体平均。① Multi-Source Reasoning:长短两端都缓降,Hard 下降更快;② Logical Summarization:Easy 呈非单调——16K 反升(更多显著证据帮助汇总)、32K 回落;③ Temporal Summarization:Easy 平稳,Hard 断崖——同一模型 Easy 七八十分、Hard 二三十分;④ 总平均里 Hard 曲线整体沉底。</span>
+    </figcaption>
+  </figure>
+
+  <p>附录 Table 16 给出图 4 背后全部模型的逐项数值(每个模型 × 3 任务 × Easy/Hard × 3 长度 = 18 个分数,含整体平均):</p>
+
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table16.png" alt="Table 16 EASY/HARD 分长度分数明细">
+      <figcaption>
+        <b>Table 16:</b> Score variations of different models across tasks under diverse context lengths. (原文表注)
+        <span class="zh">几个值得放大的细节:① 多源推理里 Doubao-Seed-1.6 Easy 从 61.25(8K)崩到 23.44(32K),说明"窗口 128K"不等于"32K 照样能用";② 逻辑摘要 Easy 的非单调性几乎全员可见(16K 普遍高于 8K);③ 时序摘要 Hard 是全场最惨烈战场——GME-2B 在 32K Hard 只剩 5.47,Embed-RL 系也全线个位数。</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>6.4 Hard 任务上的共性失败模式</h3>
+  <ul class="tight">
+    <li><strong>Summarization 类最脆</strong>:干扰项"保留部分语义、打乱全局结构"时降幅最大——模型靠全局语义匹配吃饭的证据。</li>
+    <li><strong>Multi-Source Reasoning 相对稳</strong>:高相似度干扰下仍能粗粒度抓到证据链,但对链条完整性与逻辑一致性评估有限。</li>
+    <li><strong>Temporal Summarization 独立失效</strong>:时序一被打乱成绩跳水——对长程事件结构不敏感,顺序无关的浅层视觉相似度是它们的依据。</li>
+  </ul>
+
+  <p>附录 Figure 6 给出全部 11 个模型在 Visual Grounding 上的完整长度×深度热力图(主文图 3 的宏观补充):</p>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6 全部 11 个模型的热力图">
+    <figcaption>
+      <b>Figure 6:</b> Complete visualization of model performance w.r.t. insertion depth and context length in the visual grounding task across all evaluated models. (原文图注)
+      <span class="zh">与图 3 相比补上了 VLM2Vec 与 Ops-MM-v1-7B。可以发现 VLM2Vec 的热图几乎全暗(细粒度视觉判别整体失能),而 Ops-MM 7B 明显比 2B 亮——技术路线与训练差异在热图上的投影,比总平均分清晰得多。</span>
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ============ 07 结论 ============ -->
+<section id="s7">
+  <div class="sec-no">07 · Conclusion</div>
+  <h2 class="sec">结论与局限</h2>
+
+  <h3>结论</h3>
+  <p>作者总结:MMLongEmbed 的评测揭示出"有效信息利用"与"表示能力"之间的巨大鸿沟——现役 MEM 严重依赖表面特征匹配,难以捕捉深层语义与长程结构依赖。具体而言:细粒度信息保持随上下文增长显著退化;汇总类任务表现相对稳定,但一旦进入基于干扰项的细粒度判别场景就急剧下滑;而单纯扩大上下文窗口、模型规模或嵌入维度,都无法解决这些问题——需要根本性的长上下文语义建模革新。</p>
+
+  <h3>局限</h3>
+  <ul class="tight">
+    <li>评测上限 32K tokens,基准设计不直接可扩展到任意更长输入;</li>
+    <li>只覆盖文本-图像模态,不含音频、连续 3D 空间数据等;</li>
+    <li>全部数据集为英文,多语言长上下文多模态理解无法评估。</li>
+  </ul>
+</section>
+
+<!-- ============ 08 编者点评 ============ -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">编者点评</h2>
+
+  <h3>亮点</h3>
+  <ul class="tight">
+    <li><strong>填补空缺且方法论扎实</strong>:首个把"长上下文"+"多模态嵌入"两个变量一起系统化的基准;长度分层、C/Q 恒定、等长替换、统一 token 计数……每个环节都在消除一个已知的评测捷径,工程细节非常严谨。</li>
+    <li><strong>定量的诊断超出榜单本身</strong>:LMM 统计检验、bootstrap 置信区间、Cohen's d——把"8B 没比 2B 强"从观感变成统计结论;位置偏差、模态鲁棒性分型都是可复用的分析范式。</li>
+    <li><strong>干扰项设计有想象力</strong>:事件级时序扰动(语义分段+块置换)明显比朴素的帧打乱更能测出"是否理解时序";BM25 检索"以假乱真"的文本注入也值得后续基准借鉴。</li>
+  </ul>
+
+  <h3>可商榷之处</h3>
+  <ul class="tight">
+    <li><strong>真实任务的长度采样有限</strong>:真实任务只有 8K/16K/32K 三档,长度动力学的"解析度"不如合成任务;且 8K 起点已高于许多实际检索场景。</li>
+    <li><strong>"Hard"的构成混杂</strong>:每个任务"Hard=删/换/扰动证据"的具体机制不同,跨任务比较 Hard 分差时需要小心,差异可能部分来自任务定义而非模型能力。</li>
+    <li><strong>专有模型与开源模型不同权</strong>:Doubao-Seed-1.6 的 128K 窗口 + 未知参数量,使模型对比中的"长度公平性"带有一定不确定性(虽已用统一 token 计数缓解)。</li>
+    <li><strong>视频模态被压缩为 1 FPS 帧序列</strong>:长程时序的评测其实是在"帧级表示"上做的,音频、运动信息天然被排除——这也与作者自己声明的局限一致。</li>
+  </ul>
+
+  <div class="takeaway"><b>读完最值得带走的一句话:</b>长上下文多模态嵌入的真正瓶颈不在"窗口能塞多长",而在"塞进去之后,细粒度信息在表示里还剩多少、位于什么位置、以及面对高相似度干扰时能否被精确地取出来"——MMLongEmbed 把这三个问题变成了可测的指标。</div>
+
+  <div class="note"><b>后续方向联想:</b>推理驱动的表示学习(Embed-RL 一脉)与更强的模态平衡训练,是论文数据里两个明显的突破口;把位置偏差/长度分层直接并入训练目标(如证据中间位置的重加权),可能是基准带来的下一个工程命题。</div>
+</section>
+
+<!-- ============ 09 术语速查 ============ -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>MEM</td><td>Multimodal Embedding Model</td><td>把文本/图像/视频等映射进统一向量空间、支持跨模态检索的嵌入模型</td></tr>
+      <tr><td>MLLM</td><td>Multimodal Large Language Model</td><td>多模态大语言模型,能同时处理文本与视觉输入的 LLM</td></tr>
+      <tr><td>NIAH</td><td>Needle-In-A-Haystack</td><td>"大海捞针"式评测:把一条目标信息埋进长上下文,考验能否找回(MM-NIAH 是其多模态版)</td></tr>
+      <tr><td>MEM/NIAH</td><td>—</td><td>受检索增强生成(RAG)影响构造的检索任务口径</td></tr>
+      <tr><td>C/Q</td><td>Candidates per Query</td><td>每条查询平均对应的候选文档数,跨长度池保持恒定</td></tr>
+      <tr><td>P@1 / R@k / MRR@k / nDCG@k</td><td>Precision / Recall / Mean Reciprocal Rank / nDCG</td><td>检索排序的标准评估指标(首命准、召回率、倒数排名、折损累计增益)</td></tr>
+      <tr><td>RAG</td><td>Retrieval-Augmented Generation</td><td>检索增强生成:先从外部语料检索证据再让模型生成</td></tr>
+      <tr><td>LMM</td><td>Linear Mixed-effects Model</td><td>线性混合效应模型,同时包含固定效应与随机效应(此处以 needle 实例为随机截距)</td></tr>
+      <tr><td>BM25</td><td>Best Matching 25</td><td>经典稀疏检索打分函数,此处用来从同主题文档里"以假乱真"地挑替换段落</td></tr>
+      <tr><td>OOM</td><td>Out Of Memory</td><td>显存溢出;评测时对超长输入做"中间截断"以防 OOM</td></tr>
+      <tr><td>1 FPS</td><td>1 frame per second</td><td>视频降采样到每秒 1 帧,构成标准时序帧序列</td></tr>
+      <tr><td>Hard / Easy Pool</td><td>—</td><td>含高相似度干扰项的困难子集 / 未扰动的常规子集</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为《MMLongEmbed: Benchmarking Multimodal Embedding Models in Long-Context Scenarios》(Soochow University × Ant Group)的人工精读笔记。图片以 300 DPI 摘自论文原文并按比例缩放展示(未裁剪),表格数据按原文重建;解读为编者观点。<br>
+    原文代码仓库:<a href="https://github.com/AmamiSora1228/MMLongEmbed">github.com/AmamiSora1228/MMLongEmbed</a><br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

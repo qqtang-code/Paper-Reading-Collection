@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="论文中文精读页:图文配合,全部图表高清内嵌">
+<meta name="keywords" content="论文精读, 论文解读, paper reading, FreeToken, MoE, 边缘推理">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · FreeToken: 边缘原生的 MoE 服务系统">
+<meta property="og:description" content="FreeToken 论文中文精读:带宽自适应执行,让 8GB 笔记本也能跑 35B、单卡工作站跑 753B MoE 模型">
+<meta property="og:url" content="https://flashml.ai/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · FreeToken: 边缘原生的 MoE 服务系统</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶栏:章节跳转 + 深色模式开关 -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">FreeToken<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">挑战</a>
+      <a class="jump" href="#s4">方法</a>
+      <a class="jump" href="#s5">实现</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">关联</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2608.16157</div>
+    <h1>FreeToken: 边缘原生的 MoE 服务系统<br>Bandwidth-Adaptive Execution(带宽自适应执行)</h1>
+    <div class="subtitle">把个人电脑当作一个统一的弹性推理平台:让 8GB 显存的笔记本跑 35B 模型、游戏台式机跑 284B 模型、单张工作站 GPU 跑 753B GLM-5.2,而且速度快到能支撑真实 agent(<abbr title="智能体式工作负载:多轮、工具调用、上下文反复编辑">agentic</abbr>)工作负载。</div>
+    <div class="meta">
+      <span>作者:Shuo Yang, Xiaoze Fan, Melissa Pan, Haocheng Xi, Zhe Wang, Shanlin Sun, Kurt Keutzer, Song Han, Matei Zaharia, Chenfeng Xu, Ion Stoica(UC Berkeley / UT Austin 等;并列一作,通信作者 Chenfeng Xu &amp; Ion Stoica)</span>
+      <span>论文:<a href="https://arxiv.org/abs/2608.16157" target="_blank" rel="noopener">arXiv:2608.16157</a></span>
+      <span>代码:<a href="https://github.com/FlashML-org/FreeToken" target="_blank" rel="noopener">github.com/FlashML-org/FreeToken</a></span>
+      <span>下载:<a href="https://flashml.ai" target="_blank" rel="noopener">flashml.ai</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">边缘推理 Edge Inference</span><span class="pill">MoE 服务</span><span class="pill">Expert Offloading</span>
+      <span class="pill">CPU-GPU 混合执行</span><span class="pill">Agentic Workloads</span><span class="pill">KV / 状态缓存</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图文按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览</a>— 论文在解决什么问题、核心答案、关键数字</li>
+    <li><a href="#s2">背景与目标</a>— 能力差距已追上,但"可用性差距"还在:为什么边缘是一大块被浪费的算力 + 成本-能力前沿图(Figure 1)</li>
+    <li><a href="#s3">三大挑战</a>— prefill 的双重代价、decode 的缓存缺失与 CPU 带宽瓶颈、边缘资源的动态性</li>
+    <li><a href="#s4">系统设计</a>— 两级专家内存层次 + 总览图(Figure 2);prefill 流水线、语义感知状态缓存、q* 带宽自适应策略(公式)、弹性内存管理</li>
+    <li><a href="#s5">实现</a>— CUDA Graph 兼容的 LRU 缓存、图内驻留的 CPU 执行、FTW 权重格式与平台适配</li>
+    <li><a href="#s6">实验</a>— 测试平台(Table 1)、端到端吞吐与 <abbr title="Time To First Token:首 token 延迟">TTFT</abbr>(Figure 3)、机制归因(Figure 4)、跨硬件扩展(Figure 5)</li>
+    <li><a href="#s7">相关工作</a>— 专家卸载/混合执行/分层内存三条线的定位</li>
+    <li><a href="#s8">点评</a>— 亮点、值得注意之处、局限与后续问题</li>
+    <li><a href="#s9">术语速查</a>— 阅读中随时回看</li>
+  </ol>
+</nav>
+
+<!-- ===== 01 速览 ===== -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览</h2>
+  <p class="lead"><abbr title="Mixture-of-Experts,混合专家:层内数百专家、每 token 只路由少数几个,计算稀疏">MoE</abbr>(混合专家)模型天生适合边缘:每个 token 只经过几百个专家中的少数几个。但"计算"省下来了,<strong>"权重"并没有省</strong>——完整专家池仍可能超出显存几个数量级。FreeToken 的核心主张是:<strong>不要把边缘硬件当成"迷你 GPU",而要当成"一个统一的弹性推理平台"</strong>,把 GPU、CPU、内存、<abbr title="PCI Express:连接 CPU 与 GPU 的串行总线,其带宽决定专家权重搬运速率">PCIe</abbr> 互联按运行时真实可用的带宽与容量,持续重新映射。</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">核心机制①</div><div class="v">带宽自适应执行<small>prefill 用全层双缓冲把专家搬运藏在计算后面;decode 用 q* 策略把缓存缺失按实测带宽分给 PCIe 填充与 CPU 就地执行</small></div></div>
+    <div class="item"><div class="k">核心机制②</div><div class="v">语义感知缓存<small>状态检查点锚定在 agent 框架真正会编辑的语义边界(think/tool call/turn);专家缓存用全层共享 <abbr title="Least Recently Used:最久未用先淘汰的缓存替换策略">LRU</abbr> 跟随路由局部性</small></div></div>
+    <div class="item"><div class="k">核心机制③</div><div class="v">弹性边缘资源管理<small>调度安全点动态重建 GPU 专家缓存;权重直接落盘到最终宿主布局,启动免 GPU 预热</small></div></div>
+    <div class="item"><div class="k">关键数字</div><div class="v">39.3 → 14.9 tok/s<small>8GB RTX 4060 笔记本跑 35B;单卡 RTX PRO 6000 跑 753B GLM-5.2(llama.cpp 的 2 倍)</small></div></div>
+  </div>
+
+  <div class="takeaway"><b>一句话总结:</b>MoE 让"计算"能塞进消费级显卡后,本地推理的瓶颈不再是"模型放不放得下",而是"系统把整台机器编排得好不好"。FreeToken 用两个实测带宽($B_P$、$B_H$)导出一个闭式比率,把剩余的缓存缺失同时交给 PCIe 搬运和 CPU 计算,既保住精确性,又把链路带宽用满——从而把 35B~753B 的开源推理从数据中心带回了用户已有的机器。</div>
+  <p class="muted" style="font-size:13px">文内符号: $B_P$ = 实测 PCIe 专家搬运带宽,$B_H$ = 实测 CPU 侧专家处理带宽,$q^*$ = 每步缺失专家中走"缓存填充"的个数 —— 正文所有公式都围绕它们。</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: 成本-能力前沿与各硬件档位的 agentic 解码速度">
+    <figcaption>
+      <b>Figure 1:</b> FreeToken serves the models on the cost–capability Pareto frontier, at interactive speed on consumer hardware.(a) Blended API list price (9:1 input:output mix, following the token economics measured on real coding-agent traces) versus Code Arena Elo for representative hosted models. Blue squares mark models FreeToken serves, tagged with the consumer GPU class that serves them; the frontier segment from DeepSeek-V4-Flash to GLM-5.2 is exactly this set.(b) Mean decode throughput on real agentic workloads for the strongest model each hardware tier holds, against actively maintained edge engines. The dashed line marks the median decode speed of Codex in production traces (33 tok/s); × marks configurations an engine cannot serve.
+      <span class="zh">中文解读:左图(a)横轴是宿主 API 的混合价格(9:1 输入:输出),纵轴是 Code Arena 网页开发 Elo——越往下越便宜、越靠右越强,因此"又便宜又能打"的模型在右下方;蓝方块是 FreeToken 能在消费级 GPU 上原生跑起来的模型,它们恰好组成从 DeepSeek-V4-Flash 到 GLM-5.2 的前沿段:35B 级 → 4060 笔记本,284B 级 → 5090 台式机,753B 级 → RTX PRO 6000。右图(b)纵轴是解码速度,虚线是生产环境中 Codex 的中位解码速度 33 tok/s:FreeToken 在每个硬件档位都能超过或接近它,而其他引擎很多配置直接打 ×(跑不了)。这张图的论点:过去"便宜=弱"的假设被打破了——免费本地跑的模型就落在付费 API 的能力前沿上。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <p>支撑这一主张的基础设施现实:Steam 月活超过 2 亿,其中约 72% 的系统带独立 NVIDIA GPU——上亿台"有能力但闲置"的机器。论文认为稀缺的不是硬件,而是<strong>把异构消费机当成统一平台、自动把 GPU/CPU/内存/互联映射到最强可运行配置的服务系统</strong>。</p>
+</section>
+
+<!-- ===== 02 背景与目标 ===== -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">背景与目标</h2>
+  <p>开源模型的<strong>能力差距</strong>正在快速追上闭源(Kimi-K3、GLM-5.2、DeepSeek-V4-Flash-0731 等);但<strong>访问差距</strong>没有缩小:前沿模型仍依赖价值数百万美元的数据中心级 GPU。对个人用户与小团队,持续调用 API 的成本是沉重的。而 MoE 为此开了一条新路。</p>
+
+  <div class="note"><b>MoE 的双刃剑:</b>以 DeepSeek-V4-Flash 为例——284B 参数,43 层 MoE 层,每层 256 个路由专家中每 token 只激活 6 个,活跃参数仅 13B;按部署精度,这个活跃足迹能装进 RTX 5090 的 32GB 显存。<strong>但稀疏只省"每 token 计算",不省"完整专家池的内存"</strong>:完整权重仍可能超出显存一大截,必须把不活跃的专家放在内存/磁盘里随用随取。于是 MoE 同时给出了机会(计算可行)和系统挑战(高效服务很难)。</div>
+
+  <p>现有边缘引擎(llama.cpp、KTransformers、Ollama)只解决了碎片,在三个维度上达不到边缘服务的理论能力:</p>
+  <ul class="tight">
+    <li><strong>prefill 摧毁稀疏性</strong>:一条长 prompt 里所有 token 路由的并集几乎覆盖每层全部专家,专家工作集变"稠密"。尤其是 agent 的工具调用场景,上下文不断增长、频繁触发 prefill;现有系统既不隐藏专家搬运,也不跨轮次复用状态。</li>
+    <li><strong>decode 是相反的困境</strong>:每个 token 只激活少数专家,但缓存缺失导致专家反复搬运/驱逐/在内存中执行;现有系统没有服务这些缺失的原则性策略——静态放置跟不上 token 级路由变化,预取只能降缺失率,却决定不了"不可避免的缺失该分给 PCIe 搬运还是 CPU 执行"。</li>
+    <li><strong>边缘资源太多样、太动态</strong>:GPU 容量、PCIe 带宽、内存带宽、CPU 能力、可用显存千差万别,而且没有一台机器是专门跑模型的——浏览器、游戏都在抢资源,内存/算力预算随时间波动。</li>
+  </ul>
+
+  <div class="takeaway"><b>目标设定:</b>不做固定卸载策略,而是<strong>持续</strong>地把计算和模型状态映射到"实际可用"的资源上。三大挑战对应三大机制(§3.1/3.2/3.3),本节图表先给出全景。</div>
+</section>
+
+<!-- ===== 03 三大挑战 ===== -->
+<section id="s3">
+  <div class="sec-no">03 · Challenges</div>
+  <h2 class="sec">挑战:为什么现有边缘引擎跑不动 agentic MoE</h2>
+
+  <h3>挑战一:prefill = 专家搬运 + 重复计算,双重代价</h3>
+  <p><strong>专家搬运每次 prefill 都加几秒。</strong>decode 每 token 只碰 k 个专家,但 prefill 是几千个 token × 每层,路由并集会激活几乎全部专家——一次 prefill 基本要把整个专家池从 CPU 内存流过 CPU-GPU 互联。以 FP4 部署的 DeepSeek-V4-Flash 为例:约 140GB 专家权重,在 PCIe 5.0 ×16(约 60GB/s)的 RTX 5090 上要搬约 2 秒,RTX 4090/3090 的 PCIe 4.0 ×16(约 25GB/s)要 5 秒,笔记本常见的 ×8 链路要 10 秒以上。按需取专家的引擎,这几秒全是 GPU 空转。</p>
+  <p><strong>agent 工具调用会频繁触发"重新 prefill"。</strong>混合注意力架构(全注意力 + 滑窗注意力如 DSV4-Flash / GPT-OSS,或循环层如 Qwen3.6 的 gated DeltaNet、Kimi-K3 的 Delta Attention)把过去上下文压缩成单个状态或近期窗口;每个状态占用相当于几百个 token 的 KV 内存,引擎只能保存少量检查点。而 agent 每轮几乎都会改上下文:删旧工具输出、掐掉 thinking 段。改动位置之后的检查点全部失效,只能回退到最近的有效检查点——因为检查点稀疏,常常要重 prefill 几千个 token。消费级 GPU 扛不住这种重复:RTX 5090 的稠密 BF16 算力只有 H100 的约 1/5、B200 的约 1/10,每次冗余重 prefill 都占 GPU 几十秒。</p>
+
+  <h3>挑战二:decode = 缓存缺失怎么服务,由两块实测带宽决定</h3>
+  <p>现有系统拖慢的三个根因:</p>
+  <ul class="tight">
+    <li><strong>静态放置错过路由流量</strong>:llama.cpp 在加载时把 MoE 张量分到设备,KTransformers 加载时把"热"专家钉在 GPU 其余走 CPU——但路由每个 token 都在变,prefill 时刻冻结的放置只能接住一小部分路由流量,大部分专家评估落到 CPU,GPU 和 PCIe 双双闲置(§5.3 量化)。</li>
+    <li><strong>消费级 CPU 独自扛不动 decode</strong>:小 batch 下专家执行是内存带宽受限的;消费平台 CPU 接双通道内存,DDR4 约 50GB/s、DDR5 约 80–90GB/s,而一张 4090/5090 从片内显存能抽 1–1.8TB/s。纯 CPU 专家路径无论多少核,都被带宽卡死。</li>
+    <li><strong>正确的分工是硬件相关的</strong>:缺失专家可以 PCIe 搬过来在 GPU 算,也可以就地 CPU 算——都不是普适最优。RTX 4060 笔记本(LPDDR5)和 RTX 5090 台式机(DDR5)就站在"内存带宽 vs PCIe 带宽"天平的两端;最优混合比例读规格表读不出来,必须在真实机器上定量决定。</li>
+  </ul>
+
+  <h3>挑战三:边缘没有"专用"资源,连启动都慢</h3>
+  <ul class="tight">
+    <li><strong>显存预算和分配频繁变化</strong>:GPU 要与桌面合成器、浏览器、游戏共享,几百 MB 到几 GB 随时被抢;agent 会话跨轮累积上下文,KV 需求增长而专家工作集基本不变——第一轮选定的 KV/专家分配,很多轮之后就是错的。必须能运行时调整总量和拆分,不重启引擎。</li>
+    <li><strong>启动又慢又频繁</strong>:DeepSeek-V4-Flash 的 FP4 池约 140GB 从 7GB/s 的 NVMe 读出就要约 20 秒,还没算预热;边缘用户随用随开、随关随走,换模型又重启——必须启动快。</li>
+  </ul>
+
+  <div class="note"><b>三个挑战的内在联系:</b>§2.1→§3.1(prefill 双缓冲 + 语义状态缓存)、§2.2→§3.2(q* 策略 + 语义感知专家缓存)、§2.3→§3.3(弹性内存)。读完 §3 你会看到,FreToken 把"测出来的两个带宽"当作运行时调度信号,而不是把带宽当成固定瓶颈。</div>
+</section><!-- ===== 04 系统设计 ===== -->
+<section id="s4">
+  <div class="sec-no">04 · Design</div>
+  <h2 class="sec">FreeToken 设计:两级专家内存层次 + 三大机制</h2>
+  <p>系统围绕一个<strong>两级专家内存层次</strong>组织:CPU 内存里的专家池(完整路由专家权重,始终作为"真相来源" source of truth)+ GPU 上单一弹性的<strong>全层共享专家缓存</strong>(每个槽位 = 一个"层-专家"对所需的所有张量,驻留、查找、执行都以逻辑 (layer, expert) 标识进行,而不是张量分片)。非专家权重常驻 GPU。</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: FreeToken 系统总览(prefill 双缓冲 + decode 带宽自适应)">
+    <figcaption>
+      <b>Figure 2:</b> FreeToken overview. (1) Prefill: expert loading is double-buffered at full-layer granularity, streaming layer l+1 over PCIe while the GPU computes layer l; recurrent-state checkpoints are anchored at special-token boundaries, so a context edit resumes from the nearest surviving anchor and re-prefills only the new suffix. (2) Decode: most routed experts hit the shared LRU expert cache (here 8 of 12, following temporal locality). The m=4 misses are divided by q*=m·BP/BH between cache fills over PCIe (one expert) and in-place CPU execution (three), using bandwidths profiled on the deployed machine; the GPU and CPU partial outputs merge exactly. The host-resident expert pool remains the source of truth throughout.
+      <span class="zh">中文解读:上半部分(1)展示 prefill:PCIe 加载层 l+1 的同时 GPU 算层 l(l 与 l+1 两个全层缓冲轮换);右侧是"语义锚点"——状态检查点(▲)钉在 special token 边界(thinking / response / tool call / tool output / answer)上,编辑后(✂ 删除块)从最近的幸存锚点恢复,只重 prefill 新后缀。下半部分(2)展示 decode:GPU 端 router 选 top-12 专家,其中 8 个因时间局部性在 LRU 缓存中命中;4 个缺失(m=4)按 q* = m·B_P/B_H 分配——本机实测 B_P:B_H ≈ 1:4,所以 1 个走 PCIe 填充(进缓存,将来可复用),3 个在 CPU 就地计算;GPU 部分输出 y_GPU 与 CPU 部分输出 y_CPU 精确相加合并成层输出 y。整张图强调:决策全部按"这台机器实测的带宽"来做,且输出合并是 exact 的、无近似。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <h3>机制① prefill:全层双缓冲 + 语义感知状态缓存</h3>
+  <p><strong>全层双缓冲把搬运藏在计算后面。</strong>因为 prefill 每层几乎激活全部专家(§2.1),FreeToken 不做按需取专家,而是从全局槽位池申请两个"全层缓冲":GPU 用缓冲 A 算第 l 层的路由专家时,专用传输流同时把第 l+1 层的完整专家集灌进缓冲 B——<strong>整层传输不需要等路由结果</strong>,权重搬运在后台连续进行,缓冲再轮换。缓冲与 decode 缓存共享同一个槽位池,没有独立的 prefill 缓存、没有阶段交接,prefill 存活下来的条目直接给延迟敏感的 decode 阶段;槽位池腾不出两个整层时,回退到按需加载,绝不超订显存。</p>
+  <p><strong>语义锚点让循环状态跨编辑生存。</strong>混合注意力模型除了 KV cache 还有第二类前缀资源:循环层的"演进状态"。全注意力 KV 用 <abbr title="Radix 前缀树:按共享前缀复用 KV/状态,天然支持跨请求前缀复用">radix</abbr> 前缀树管理(同 SGLang 等);循环状态无法部分复用,靠 prefill/decode 时打检查点。FreeToken 维护一个小型的<strong>语义感知状态缓存</strong>:把检查点挂在前缀树节点上,新请求到来时从"编辑后仍然幸存的最近检查点"恢复。检查点预算花在特殊 token 边界——thinking 段、tool call、tool output、轮次边界——因为这些正是 agent 框架实际修改的位置:OpenClaw 剥掉所有非最新 assistant 轮的 thinking 块,OpenCode 把超出保护窗口的工具输出换成占位符,SWE-agent 只保留最后 n 条观察。框架保留到编辑块为止的精确前缀,所以锚在这些边界的检查点比任意位置的更可能幸存;全注意力层复用 KV 到编辑点、循环层从锚点恢复,只有真正的新后缀被重 prefill。检查点槽位与 KV 池相互独立,LRU 回收。</p>
+
+  <h3>机制② decode:语义感知专家缓存 + q* 带宽自适应策略</h3>
+  <p>decode 时,GPU 上的 router 与缓存查找识别已在缓存中的活跃专家集合 H(直接在 GPU 执行);剩下的 m 个"唯一缺失专家" M 是难点。</p>
+  <p><strong>语义感知专家缓存跟随模型的实际计算。</strong>跨步解码的路由有强时间局部性:同一层连续 token 反复路由到重叠/近期用过的专家(跨模型族被测量证实,Liang et al. 2025)。FreeToken 不用加载时的通用放置,而是维护一个<strong>全层共享的 <abbr title="Least Recently Used:最久未用先淘汰的缓存替换策略">LRU</abbr> 驻留空间</strong>:命中刷新 recency、填充吸收新选中专家、驱逐最久未被模型需求的专家——稀缺显存持续跟踪当前生成的工作集。缓存消不掉所有缺失(冷启动、工作集突变、容量不足),这些残余缺失交给带宽自适应执行。</p>
+  <p><strong>两块实测带宽决定缺失怎么服务。</strong>把 m 个缺失专家分成缓存填充集 F 与 CPU 执行集 C(M = F ∪ C,q = |F|):F 的专家搬进缓存槽、在 GPU 执行、之后留在显存复用;C 的专家直接在 CPU 常驻池里执行、不改驻留状态。两条路并发:缓存填充按满速 PCIe 走,CPU 只吃链路饱和后剩下的宿主带宽,把"残余带宽"变成当前 token 的进度,不挂起缓存更新。</p>
+  <p>最优拆分来自"残余带宽"论证。设单个专家字节数为 $S$。专家 DMA 与 CPU 执行读同一宿主内存子系统,PCIe 饱和后剩余带宽为:</p>
+  <div class="math">$$B_R = \max(B_H - B_P,\ 0)$$</div>
+  <p>两支路的执行时间分别为:</p>
+  <div class="math">$$T_{\text{fill}}(q) \approx \frac{qS}{B_P},\qquad T_{\text{cpu}}(m-q) \approx \frac{(m-q)S}{B_H - B_P}$$</div>
+  <p>让两条并发支路平衡(层暴露延迟 = 两者之较慢者),得到:</p>
+  <div class="math">$$\frac{q}{m-q} \approx \frac{B_P}{B_H - B_P} \quad\Longrightarrow\quad q^{*} \approx m \cdot \frac{B_P}{B_H}$$</div>
+  <p>这个单一公式覆盖所有硬件平衡:当 $B_H$ 逼近 $B_P$ 时 $q^*$ 逼近总缺失数 m,系统退化回"纯按需缓存填充",连独立执行分支都不需要。实践中四舍五入取整,具体选哪些专家进 F 交给缓存替换策略负责,<strong>且总是至少保留一次填充</strong>,让缓存即使在 CPU 扛大头时也在持续预热;两个带宽参数在部署时于目标硬件上实测。</p>
+  <div class="note"><b>执行顺序与精确性:</b>CPU 支路先启动,随后 GPU 走缺失路径(缓存更新 → F 的批量拷贝 → 对合并集 G = H ∪ F 的分组评估),CPU worker 并发处理 C;层暴露延迟就是两条并发支路中较慢者——正是公式平衡的量。GPU 与 CPU 各自算部分和再合并,保留精确 MoE 输出,<strong>无算法近似</strong>。整套逐层控制流(缺失检测、集合定长、victim 选择、CPU 支路)被静态捕获进 <abbr title="CUDA Graph:把一串 kernel 捕获为静态图整体重放,省去逐次 launch 与同步">CUDA Graph</abbr>,§4.1 讲这套"图兼容"机制。</div>
+
+  <h3>机制③ 弹性内存管理:显存只影响性能,不影响正确性</h3>
+  <p>因为 CPU 常驻专家池是真相来源,GPU 内存的任何变化只动性能、不动正确性。两大机制:</p>
+  <ul class="tight">
+    <li><strong>运行时缓存重配置</strong>:非专家权重与运行时状态分配后,剩余预算在 KV 页与完整专家槽之间划分;划分不在启动时钉死,任何调度安全点都可以用修订后的预算重建 GPU 专家缓存,不重启引擎、不重载 CPU 池,动态重建已捕获的执行路径。</li>
+    <li><strong>快速引擎启动</strong>:启动=从磁盘读专家池 + 传统上还要预热 GPU。FreeToken 前者缩短、后者按构造消除:权重直接读到最终宿主布局、<strong>填满后才 pin 内存</strong>(先 pin 空缓冲会为覆盖而 fault-in + 归零数 GB 页面);预热没必要——首个请求以冷缓存开始,缺失走 §3.2 的普通 decode 路径,缓存靠正常服务热起来。</li>
+  </ul>
+</section>
+
+<!-- ===== 05 实现 ===== -->
+<section id="s5">
+  <div class="sec-no">05 · Implementation</div>
+  <h2 class="sec">实现:把"动态"装进"静态"的 CUDA Graph</h2>
+  <p>FreeToken 沿用 SGLang/vLLM 的 GPU 中心架构(paged KV + radix 前缀复用),并接入 FlashInfer、Flash Linear Attention 等社区 kernel 库。之上两层实现:图兼容的专家缓存(§4.1)与存储/平台机制(§4.2)。</p>
+
+  <h3>CUDA-Graph 兼容的 LRU 缓存</h3>
+  <p>专家缓存本质上是动态的——缺失的专家、取的数量、驱逐的槽位每一步都在变,若由主机控制控制流,每层 MoE 都要付一次昂贵的设备同步。FreeToken 把所有路由相关控制<strong>留在 GPU 上</strong>,用<strong>静态捕获图内的数据</strong>表示动态行为:定形 work buffer + 设备端有效计数。</p>
+  <ul class="tight">
+    <li><strong>设备端缓存控制</strong>:每个 MoE 层一个 GPU kernel 完成:去重路由专家 → 对照驻留表分类 → 按带宽推导取数 q → 选驱逐 victim → 把逻辑路由 ID 改写成物理槽位 ID(或打上"CPU 执行"标记)。Victim 选择避免"每驱逐一个槽扫一遍全缓存"的经典 LRU 陷阱:单趟 kernel 一次性找出 K 个最久未用候选槽,缺失路径按需吃前 q ≤ K 个——victim 发现永远只花一趟,与缺失数无关。生成的拷贝工作清单驱动单次融合传输;专家 bank 共享同一逻辑 ID→槽位映射(§4.2),一份设备端源/目标索引清单可一次定形 launch 应用到所有 bank;有效计数屏蔽未用工作。结果:kernel launch 次数少、PCIe 利用高、路由相关决策开销移出主机。</li>
+    <li><strong>图内驻留的 CPU 执行</strong>:CPU 支路也捕获进同一张图。每个支持的 decode batch 尺寸准备稳定 pin 的 I/O 缓冲与持久任务描述符;device→host 拷贝、host-function 提交节点、并发 GPU 路径、同步节点、host→device 结果拷贝全部一起捕获。重放 = 完整异构步骤,不再需要逐 token 的 Python 调度。worker 是 pin 到物理核的持久 C++ 池,用架构特定 SIMD + kernel 内反量化消费专家权重,保持带宽受限;返回 gate 加权、逐 token 的部分输出。</li>
+  </ul>
+
+  <h3>专家存储与平台适配</h3>
+  <ul class="tight">
+    <li><strong>专家 bank 与 FTW 格式</strong>:把模型特有 checkpoint 布局归一化成少量专家 bank,每个 bank 以展平的"层-专家"ID(lE+e)为前导维;不同 bank 中同 ID 的行合起来 = 一个完整专家,GPU kernel 与 CPU 执行器共享同一逻辑专家身份。FTW(FreeToken Weight)格式提前把专家权重按运行时 bank 布局合并好;引擎启动时跳过张量发现与重打包,直接并行 direct I/O 读对齐块进精确尺寸的宿主 bank,填满后才 pin。</li>
+    <li><strong>平台适配</strong>:加载时按专家表示/GPU 架构/CUDA 环境选 GPU kernel;CPU 执行器分发到可用 SIMD 实现与物理核布局。当完整专家池无法 pin/注册 DMA(某些 OS 与驱动限制),回退到<strong>纯 CPU MoE 后端</strong>:专家权重留在可分页宿主存储、全部路由专家 CPU 执行、非专家层留在 GPU,只有激活尺寸的输入、路由元数据、聚合输出跨 CPU-GPU 边界——用峰值传输带宽换"快速路径建不起来也能部署"。</li>
+  </ul>
+</section>
+
+<!-- ===== 06 实验 ===== -->
+<section id="s6">
+  <div class="sec-no">06 · Evaluation</div>
+  <h2 class="sec">实验:4 个真实 agent 工作负载 × 6 台机器 × 4 个基线</h2>
+
+  <h3>设置</h3>
+  <p><strong>硬件</strong>:六台独显系统(Table 1)——五台消费机 + 一台工作站(RTX PRO 6000 Blackwell,96GB)。3090/4090/5090 是租的双路服务器,CPU 远超边缘主机,因此所有服务与带宽测量都限 6 个 CPU 线程并 pin 到 GPU 的 NUMA node;如此封顶后服务器给出 56.7–77.3GB/s 宿主带宽,与两台真边缘机自然全线程的水平同量级(台式机 16 核 53.8、笔记本 14 核 47.5);台式机与笔记本不加限制,验证模拟的真实性。所有带宽在部署张量形状上实测,不取自规格表。</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: 六台测试系统与其带宽参数">
+    <figcaption>
+      <b>Table 1:</b> Test systems. B<sub>P</sub> is the measured host-to-device expert-transfer bandwidth over PCIe; B<sub>H</sub> is the measured effective bandwidth of the CPU-side MoE expert kernel. On the three rented servers the CPU-thread and DRAM columns give container quotas.
+      <span class="zh">中文解读:B_P = 实测 PCIe 专家搬运带宽,B_H = 实测 CPU 侧专家 kernel 有效带宽。注意三台"服务器"是限核限带宽模拟出来的边缘主机;真实边缘机是 5090 desktop(Ryzen 9950X3D, DDR5)与 4060 laptop(LPDDR5)。B_P:B_H 从 5090 服务器的 52.7:77.3 ≈ 1:1.5 到 4060 笔记本的 11.8:47.5 ≈ 1:4,横跨整个天平——这正解释了为什么"固定一种分流策略"行不通、q* 必须在真机上测。PRO 6000 有大内存(512GiB DDR5)与高 B_H(178GB/s),支撑 753B 级演示。</span>
+    </figcaption>
+  </figure></div>
+
+  <p><strong>模型</strong>:两个主力——DeepSeek-V4-Flash(284B/13B active,官方 checkpoint 原生 MXFP4 量化专家)与 Qwen3.6-35B-A3B(BF16,8GB 笔记本用官方 NVFP4 版);跨硬件研究加 GLM-5.2(753B/40B active,NVFP4,433GB checkpoint)。<strong>工作负载</strong>:W1 数学推理(AIME,长 CoT、无工具、单轮、decode 主导);W2 编码 agent(SWE-bench 任务经 OpenCode 框架 + 真实工具执行,三轮脚本化用户轮);W3 编码 agent 原生协议(同一任务经 Claude Code 的 Anthropic 兼容端点,会并发起子 agent,会话长到 56–65k token);W4 邮件/日历 agent(OpenClaw 默认配置跑十三轮,禁用其 120s 空闲看门狗以便慢引擎也可测,约 24.5k token 系统上下文底)。编码任务必须产出参考 gold patch,W4 必须完成全部十三轮。<strong>基线</strong>:llama.cpp / Ollama / KTransformers / MoE-Infinity(仅其支持的配置),权重格式逐位对齐(MXFP4 块 bit-exact)。<strong>指标</strong>:每请求平均 decode 吞吐与平均 TTFT;agent 轨迹各引擎不同,不比墙钟总时长。</p>
+
+  <h3>端到端主结果(RTX 5090)</h3>
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: RTX 5090 上两模型四工作负载的解码吞吐与 TTFT">
+    <figcaption>
+      <b>Figure 3:</b> End-to-end serving on the RTX 5090 across four workloads (1. AIME, 2. OpenCode+SWE, 3. Claude Code+SWE, 4. OpenClaw+Email/Cal) and two models (Qwen3.6-35B-A3B BF16 and DeepSeek-V4-Flash MXFP4). Top: decode TPS; bottom: mean TTFT (log scale). × marks configurations an engine cannot serve (Ollama and MoE-Infinity lack DSV4 support; MoE-Infinity provides no usable server for multi-turn agents).
+      <span class="zh">中文解读:上方解码速度——Qwen3.6 上 FreeToken 维持 77–83 tok/s,是各工作负载最强基线(多为 llama.cpp)的 1.8–2.3 倍;DSV4-Flash 上 22–25 tok/s,1.5–1.9 倍。且随负载越 agentic,FreeToken 速率越稳:相对单轮 W1 的衰减在 12% 以内;而最吃上下文的基线 KTransformers(DSV4)到 W2 已丢 31%——单流 benchmark 会高估基线的 agentic 表现。MoE-Infinity 只跑得动 W1(8.8 tok/s),长 prompt 会被其逐专家 prefill 上限中止。下方 TTFT(对数轴):FreeToken 在六个多轮格子里拿下五个最低均值(唯一例外 Qwen3.6×W3 归 KTransformers 的 GPU-prefill 臂),W1 的短 prompt 单轮归 llama.cpp。尾部差距比均值更大:FreeToken 最差一轮也 &lt; 44s,而每个基线至少在某处超过 150s(llama.cpp 232s、Ollama 179s、KTransformers 946s)——超过了 OpenClaw 120s 看门狗与 Claude Code 默认请求超时,真实 agent 客户端会直接放弃请求,所以尾部 TTFT 是"可用性边界"而非延迟统计量。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <h3>归因与跨硬件</h3>
+  <p>三个分析把端到端收益归因到机制,并检验泛化性:</p>
+  <p><strong>流水线 prefill(Figure 4a)。</strong>全层双缓冲让 prefill 传输受限:开重叠后,每个 8,192-token chunk 1.19–1.22s 完成——正是按 52.7GB/s 把 64.4GB 专家池流一遍的时间,即 PCIe 5.0 ×16 的实用上限,专家计算完全藏在传输后面,16k token 时吞吐到 6.7k tok/s。关掉第二个缓冲,传输与计算串行,4k/8k/16k 分别损失 19%/25%/26%,惩罚随 prompt 变长而增大。</p>
+  <p><strong>专家局部性(Figure 4b)。</strong>decode 路由的短程局部性足够强,让"逐个缺失走 LRU"击败"prefill 时刻选的放置"。把四个工作负载的同一路由轨迹回放给三种放置策略、等缓存容量:在 RTX 5090 容量(Qwen3.6 专家池的 37%、DSV4-Flash 的 11%)下,FreeToken 全局 LRU 的 decode 专家读取缺失率为 16% / 39%,KTransformers 的 prefill 更新放置为 41% / 59%,llama.cpp 的路由盲静态拆分高达 62% / 89%。除满池外的一切容量下,排序都成立。</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: prefill 吞吐(左)与解码缺失率 vs 缓存容量(右)">
+    <figcaption>
+      <b>Figure 4:</b> (a) Prefill TPS versus prompt length (RTX 5090, Qwen3.6-35B BF16), with and without FreeToken's pipelined full-layer loading. (b) Decode-time expert miss rate versus cache size (as a percentage of the expert pool) under the three engines' placement policies, replayed on identical routing traces; lines are means over W1–W4, bands the min–max range.
+      <span class="zh">中文解读:左图(a)prefill 吞吐随 prompt 长度变化:1k→16k token,FreeToken(实线)基本贴着传输上限,2k 以后明显甩开"关闭重叠"版本与 KTransformers/llama.cpp/Ollama;4k 起差距拉开到 2–3 倍,印证"整层双缓冲把搬运藏进计算"的价值。右图(b)两条子图分别是 Qwen3.6 与 DSV4-Flash 的 decode 专家缺失率 vs 缓存容量(占专家池百分比,带 min–max 带状):三条策略曲线从下到上永远是 FreeToken(LRU)&lt; KTransformers(Prefill Update)&lt; llama.cpp(Static),容量越小差距越大——静态放置接不住路由流量,LRU 跟随工作集。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <p><strong>跨硬件服务(Figure 5)。</strong>W2 在五台消费机上都重复:FreeToken 领先最强基线 1.3×(3090/4090)、1.9×(5090 服务器)、2.1×(5090 台式机)、1.8×(4060 笔记本);8GB PCIe ×8 的笔记本上 NVFP4 版维持 39.3 tok/s,达到 4090 的 92%。两个 5090 列共享同一 GPU 硅片、只差宿主:从多通道服务器换到双通道消费台式机,FreeToken 只掉 4% 解码率,而 llama.cpp 因 CPU 常驻专家在双通道 DDR5 上挨饿只剩 80%——这正是"动态分工跟随实测带宽"的威力。前沿档:单张 RTX PRO 6000 上,FreeToken 服务 GLM-5.2 达 14.9 tok/s 对 llama.cpp 的 7.3(2.0×),专家权重逐位相同、平均 TTFT 相当(7.5 vs 7.8s);KTransformers 在这台机器上根本没有可服务的路径:它的 GLM-5.2 方法要 753GB–1.5TB 宿主专家,而机器只有 512GiB 内存,且其 CPU kernel 读不了 GLM-5.2 的 NVFP4 布局。</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: 编码 agent 解码吞吐跨消费级 GPU">
+    <figcaption>
+      <b>Figure 5:</b> Coding-agent decode TPS across consumer GPUs (SWE issues via the OpenCode harness), Qwen3.6-35B-A3B. 4060 laptop using NVFP4, the other Qwen3.6 columns BF16. The RTX PRO 6000 column is a separate demonstration: GLM-5.2 (753B-A40B, NVFP4) on the math workload; Ollama is not run there. × marks configurations an engine cannot serve.
+      <span class="zh">中文解读:横轴六根柱:4060 笔记本(8GB,最弱)→ 3090 → 4090 → 5090 服务器 → 5090 台式机 → RTX PRO 6000(跑 GLM-5.2,单独演示)。FreeToken 在每根柱都最高:台式机档 50+ tok/s,4060 笔记本也到 ~39 tok/s 超过 33 tok/s 的生产 Codex 中位线;llama.cpp 与 KTransformers 在 4060 笔记本上直接打 ×(跑不了),4090 以后才陆续能跑。也就是最需要它的机器上,基线反而缺席。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <div class="takeaway"><b>实验小结:</b>①相同显存容量下,LRU 跟随路由 vs 静态放置,缺失率从 6 成/9 成降到 1 成多/4 成;②"分层服务缺失"让 FreeToken 在宿主带宽从 47 到 77GB/s 的整条光谱上都领先;③agentic 负载下吞吐稳定(TTFT 尾部 &lt; 44s)与基线纷纷超时形成鲜明对比;④前端演示把"能跑什么模型"从 35B 推到 284B 再到 753B。</div>
+</section>
+
+<!-- ===== 07 相关工作 ===== -->
+<section id="s7">
+  <div class="sec-no">07 · Related Work</div>
+  <h2 class="sec">相关工作:三条线,FreeToken 站在交叉点</h2>
+  <p><strong>专家卸载与缓存(全池驻留宿主 + GPU 子集缓存)</strong>:EdgeMoE 开创为设备端设计;Mixtral-offloading 把 LRU 专家缓存与投机预取结合;MoE-Infinity 用请求级激活模式引导预取缓存;ProMoE/ExpertFlow/FineMoE 打磨预测器;HOBBIT 取降精度复制品、SiDA/SMoE 替换或跳过低分专家(拿精度换带宽)、Pre-gated MoE 改造 router。<strong>这些系统的差别只在"预测得多准",不在"缺失怎么服务"——每个缺失归根到底都是一次 PCIe 传输</strong>,预测再准,解码延迟仍被链路卡死,宿主算力闲置。FreeToken 保持路由计算精确、模型不动,改的是"残余缺失怎么服务"而非"预测得多好"。</p>
+  <p><strong>混合 CPU-GPU 执行(把 CPU 当算力而非仓库)</strong>:稠密侧 FlexGen/DeepSpeed-Inference 按层流式搬权重,PowerInfer 按激活统计切神经元(需 ReLU 族稀疏 + 预测器);llama.cpp/Ollama 加载时静态整层指配。MoE 侧 Fiddler 首次把缺失专家当作"可以在 CPU 算的活"而非"待搬的数据";KTransformers 用 AMX 优化 kernel 让 CPU 上逛执行变快;HybriMoE 每步调度模拟重平衡 CPU/GPU 队列;SMoE 用贪心双指针启发式平衡加载与 CPU 时间。这条线的问题:分工要么启动时钉死(KTransformers 即使 PCIe 空闲、容量够也不动),要么宿主启发式重算、调度开销与逐层同步无法装进 CUDA Graph;而且大多按单次短 prompt 设计评估,<strong>没有跨请求前缀复用——而这正是多轮 agent 每轮工具调用重进 prefill 要的东西</strong>。FreeToken 则从两块实测带宽导出闭式比率(便宜到足以驻留设备端、进捕获图),嵌进服务运行时而非单请求 harness。</p>
+  <p><strong>服务基础设施与分层内存</strong>:地基是 vLLM/SGLang 与 FlashInfer。内存侧:SGLang HiCache 把 KV 分级到 GPU/宿主/远程存储,保多轮会话的前缀复用;WiSP 按边际延迟价值在专家权重与 KV 间切显存;eLLM 运行时重平衡弹性内存池;FluxMoE 给专家做分页以优先 KV 容量。<strong>这些管理器搬的是被动字节</strong>:页或专家不在,只能取;WiSP 自己的分析也发现单流解码无论如何预测都 PCIe 受限——分配解决不了这个天花板。专家权重多一个自由度:<strong>缺失专家还能"就地算"</strong>。FreeToken 两把杠杆都拉:把分层内存哲学用在专家池上,用统一的 prefill/decode 弹性能全专家缓存,再加带宽自适应的 CPU 协同执行。贡献是"集成式运行时 + 协调缓存/搬运/CPU 执行的实测带宽模型"。</p>
+</section>
+
+<!-- ===== 08 点评 ===== -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">点评:为什么 FreeToken 值得注意,以及该带着什么眼光读它</h2>
+
+  <h3>亮点</h3>
+  <ul class="tight">
+    <li><strong>把"瓶颈"变成"信号"的视角</strong>:别处把带宽当约束绕开,FreeToken 把两块实测带宽直接放进调度公式。q* = m·B_P/B_H 简单到可以驻留 GPU、装进 CUDA Graph,却统一覆盖"全填充"到"全 CPU"的整条硬件光谱。</li>
+    <li><strong>不牺牲正确性</strong>:与 HOBBIT/SiDA/SMoE 等降精度/舍专家的方案不同,输出合并是 exact 的,模型零改动——这让它作为"通用引擎"的兼容面更大。</li>
+    <li><strong>system 层面的完整性</strong>:从权重格式(FTW)、启动布局、CUDA Graph 内动态缓存,到运行时弹性重建,再到 agent 语义(锚点放哪、编辑后怎么恢复),是一个"整栈"设计而不是拼盘 demo;支持 20+ MoE 模型。</li>
+    <li><strong>评估真实</strong>:4 个真实 agent harness/W1–W4、真实工具执行、gold patch 验收、权重 bit-exact 对齐;还诚实报道了"租的服务器封到 6 线程+NUMA 绑定来模拟边缘"的方法,并用真机验证。</li>
+  </ul>
+
+  <h3>值得带着的问题</h3>
+  <ul class="tight">
+    <li><strong>表格即数据</strong>:Table 1 明确承认,三台"消费机"其实是限核限带宽的服务器。真正的 5090 台式机只有 1 台,4060 笔记本 1 台;跨机器普遍性主要靠"封顶模拟 + 部署带宽实测"支撑。</li>
+    <li><strong>范围</strong>:主对比在两个模型上做透(GL-5.2 是单机演示);"20+ MoE 模型"是支持面声明,不是全部上测。CPU 支路依赖宿主内存带宽,如果同时跑浏览器/游戏,残余带宽假设会变——论文把资源动态给了运行时重建,但 q* 的 B_H 是部署时 profiling 的一次性参数,是否需在线重测没有细谈。</li>
+    <li><strong>未讲的部分</strong>:多请求并发与连续 batching(所有指标按 per-request 均);batch 尺寸扩展;CUDA Graph 捕获对"分支与同步都在图内"的图大小/重捕获成本;以及与 WiSP(同主题、同 arXiv 站的带宽感知专家分页)的关系只停在文字对比。</li>
+  </ul>
+
+  <h3>定位判断</h3>
+  <p>它在"把 MoE 当稀疏计算"的学术路线(MoE-Infinity 等)与"把 CPU 当第二执行引擎"的工程路线(KTransformers 等)之间,补上了<strong>第三个坐标:按实测带宽动态划分缺失服务</strong>,并且用 agentic 而不是单轮 benchmark 来验收。对做边缘推理、MoE serving、agent 基础设施的人来说,这篇的核心可迁移点有两个:①"语义边界即缓存锚点"——任何会做上下文编辑的前端,都在告诉你它会在哪里截断;②"残余带宽是免费算力"——PCIe 饱和后 CPU 不是闲着,而是该吃那些搬不动但算得动的专家。</p>
+
+  <div class="note"><b>一句话定位:</b>如果 KTransformers 证明了"CPU 能算 MoE 专家",FreeToken 证明的是"CPU 该算多少、PCIe 该搬多少——应该由这台机器实测的带宽说了算,而且能装进一张静态 CUDA Graph 里实时算"。</div>
+</section>
+
+<!-- ===== 09 术语速查 ===== -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>混合专家:每层数百专家,每 token 只路由少数几个,计算稀疏</td></tr>
+      <tr><td>B<sub>P</sub></td><td>PCIe expert-transfer bandwidth</td><td>实测的宿主→GPU 专家搬运带宽,决定填充支路速率</td></tr>
+      <tr><td>B<sub>H</sub></td><td>Host expert-processing bandwidth</td><td>实测的 CPU 侧专家 kernel 有效带宽,决定 CPU 支路速率</td></tr>
+      <tr><td>TTFT</td><td>Time To First Token</td><td>发出请求到收到第一个 token 的延迟,agent 工具轮里决定感受</td></tr>
+      <tr><td>KV cache</td><td>Key-Value cache</td><td>注意力层的键值缓存;边缘场景常超显存,是内存管理的对象</td></tr>
+      <tr><td>LRU</td><td>Least Recently Used</td><td>最久未用先淘汰的缓存替换策略;FreeToken 用它跟随路由局部性</td></tr>
+      <tr><td>CUDA Graph</td><td>—</td><td>把一串 kernel 捕获为静态图、整体重放,省去逐次 launch 与同步开销</td></tr>
+      <tr><td>FTW</td><td>FreeToken Weight</td><td>FreeToken 的权重格式:按运行时 bank 布局预合并,启动免重打包</td></tr>
+      <tr><td>MXFP4 / NVFP4</td><td>4-bit float formats</td><td>4-bit 浮点量化格式,DSV4-Flash 原生 MXFP4、部分新模型 NVFP4</td></tr>
+      <tr><td>radix prefix tree</td><td>—</td><td>按前缀共享 KV/状态的树结构,天然支持跨请求前缀复用</td></tr>
+      <tr><td>agentic workload</td><td>—</td><td>智能体式负载:多轮、工具调用、上下文持续编辑,TTFT 敏感</td></tr>
+      <tr><td>gated DeltaNet / Delta Attention</td><td>—</td><td>循环式注意力变体:把前缀压成一个演进状态,需检查点才能复用</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">其中 B<sub>P</sub> / B<sub>H</sub> / q* 是全文的"数学心脏":q* = m·B_P/B_H 决定每个解码步的缺失专家里,几个搬上 GPU、几个留在 CPU 算。</p>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2608.16157《FreeToken: Efficient Edge-Native MoE Serving with Bandwidth-Adaptive Execution》的人工精读笔记。图片以 300 DPI 摘自论文原文并按比例缩放展示(未裁剪),表格按原文数据重建;解读为编者观点。<br>
+    原文:arXiv:2608.16157 · 代码:github.com/FlashML-org/FreeToken · 下载:flashml.ai<br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

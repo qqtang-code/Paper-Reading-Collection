@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ReSET(arXiv:2606.13233)中文论文精读:步骤感知温度缩放的 NVFP4 推理优化,含全部图表高清解读">
+<meta name="keywords" content="ReSET,NVFP4,量化推理,LRM,温度缩放,CUDA,论文精读">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ReSET 论文精读:面向延迟敏感 NVFP4 推理的步骤感知温度缩放">
+<meta property="og:description" content="arXiv:2606.13233 中文精读:全部 8 图 + 16 表高清内嵌,图文配合讲解">
+<meta property="og:url" content="https://qqtang-code.github.io/ReSET-Project-Page/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>ReSET 论文精读:面向延迟敏感 NVFP4 推理的步骤感知温度缩放</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.85; font-size:16px;
+    transition:background .25s ease,color .25s ease;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* ---------- 顶部常驻导航栏 ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border); transition:background .25s ease;
+  }
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{
+    border:1px solid var(--border); background:var(--card); color:var(--ink);
+    border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+  }
+  .theme-toggle:hover{border-color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  /* ---------- hero ---------- */
+  header.hero{
+    background:linear-gradient(135deg,#1f2c52 0%, #2f5bd9 60%, #3f7de0 100%);
+    color:#fff; padding:60px 0 52px; margin:0;
+  }
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  header.hero .meta a:hover{text-decoration:underline}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  /* ---------- toc ---------- */
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc h2{margin:0 0 12px; font-size:18px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px;
+         border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em;
+          text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* ---------- 术语缩略词 ---------- */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+  .term{background:var(--hl-yellow); border-radius:4px; padding:0 3px}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .tag{display:inline-block; background:var(--accent-soft); color:var(--accent); font-size:12.5px;
+       font-weight:700; border-radius:6px; padding:1px 9px; margin-right:8px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* ---------- 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$) ---------- */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* ---------- 图片:等比缩放 + 点击看原图 ---------- */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{
+    display:block; margin:0 auto; max-width:100%; height:auto;
+    border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in;
+  }
+  figure.fig figcaption{
+    margin:10px 0 0; padding:10px 16px; background:var(--card);
+    border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+    font-size:13.5px; color:var(--muted);
+  }
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* ---------- lightbox 全图查看 ---------- */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  /* ---------- 表格 ---------- */
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px;
+                     padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px;
+                font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{
+    position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+    background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+    box-shadow:var(--shadow); display:none;
+  }
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    section{break-inside:auto}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">ReSET<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">观察</a>
+      <a class="jump" href="#s4">方法</a>
+      <a class="jump" href="#s5">系统</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">补充</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2606.13233</div>
+    <h1>ReSET:面向延迟敏感 NVFP4 推理的<br>步骤感知温度缩放</h1>
+    <div class="subtitle">一篇从"量化后推理精度掉点"与"小 batch 解码延迟失控"两个痛点出发,同时给出解码算法修复与专用 CUDA 核的论文——算法与系统两手抓。</div>
+    <div class="meta">
+      <span>作者:Sihwa Lee*, Janghwan Lee*(共一), Jungwook Choi(通讯)· 汉阳大学</span>
+      <span>合作:Xenoscube Korean Inc.</span>
+      <span>论文:<a href="https://arxiv.org/abs/2606.13233">arXiv:2606.13233 [cs.LG]</a></span>
+      <span>代码:<a href="https://github.com/aiha-lab/ReSET">github.com/aiha-lab/ReSET</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">NVFP4 4-bit 量化</span>
+      <span class="pill">推理模型 LRM</span>
+      <span class="pill">步骤级熵</span>
+      <span class="pill">温度缩放</span>
+      <span class="pill">CUDA-core GEMV</span>
+      <span class="pill">B200 / Blackwell</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" id="s9nav">
+  <h2>阅读导航(图文按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:问题、方案与关键数字</a></li>
+    <li><a href="#s2">背景:为什么 NVFP4 适合但不好用</a></li>
+    <li><a href="#s3">观察:量化错误到底错在哪(配 Fig 2/3/8)</a></li>
+    <li><a href="#s4">方法:ReSET 的温度策略(配 Fig 4/7、Tab 8)</a></li>
+    <li><a href="#s5">系统:CUDA-core 小 M 内核(配 Fig 5、Tab 3/14)</a></li>
+    <li><a href="#s6">实验:精度与延迟的完整证据(配 Tab 1–6/9/10/13、Fig 6)</a></li>
+    <li><a href="#s7">补充分析:困惑度、与 GPTQ 叠加(配 Tab 11/12、15/16)</a></li>
+    <li><a href="#s8">局限与点评</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav><!-- ================= 1 速览 ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览:问题、方案与关键数字</h2>
+  <p class="lead">大推理模型(<abbr title="Large Reasoning Model,靠生成长思维链解题的大模型">LRM</abbr>)靠生成超长思维链(<abbr title="Chain-of-Thought,思维链">CoT</abbr>)提升准确率,代价是推理成本极高(单题平均生成约 1.2 万 token,可到 6.4 万)。NVFP4 是英伟达 Blackwell 上原生支持的 4-bit 微缩放浮点格式,标称峰值吞吐是 BF16 的约 4 倍、权重体积约 1/4,是"低延迟推理服务"最诱人的杠杆——但直接用,两道坎:</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">障碍一 · 精度</div><div class="v">推理精度掉点<small>量化扰动在长推理轨迹中累积,符号性 token(数字、运算符)的微小采样错误会逐级放大,最终答案错误</small></div></div>
+    <div class="item"><div class="k">障碍二 · 延迟</div><div class="v">峰值吞吐兑现不了<small>NVFP4 靠 Tensor Core 拿 4× 吞吐,但 tile 在 token 维固定 M=128;真实服务的 SLO 只允许 M≤8,导致 &lt;1% 利用率</small></div></div>
+    <div class="item"><div class="k">方案 A · ReSET</div><div class="v">步骤感知温度缩放<small>不碰权重、不重训,解码期用"步骤级熵"自适应调节采样温度,每 token 开销 ~1.5%</small></div></div>
+    <div class="item"><div class="k">方案 B · 专用内核</div><div class="v">CUDA-core 小 M GEMV<small>针对 M=1–8 解码形态的 NVFP4 反量化 + 半精度 FMA 内核,作者称是首个公开实现</small></div></div>
+  </div>
+
+  <div class="note">
+    <b>一句话概括:</b>ReSET 发现"token 级熵"这个传统控制信号被所在推理步骤的不确定性主导、不可靠,因此把阈值判断改到"步骤级";再补一个与真实解码形态匹配的小 batch 内核,让 NVFP4 的 4× 优势在真正重要的延迟敏感场景里落地。
+  </div>
+
+  <h3>最有分量的三个数字</h3>
+  <ul class="tight">
+    <li><b>精度:</b>AIME-120 上相对 NVFP4 基线最高 <b>+2.6 分</b>(Qwen3-32B +3.1、R1-Qwen-7B +4.2),在 5 个模型、3 个 benchmark 上的平均分全部超过 4 种 <abbr title="Post-Training Quantization,训练后量化">PTQ</abbr> 基线(RTN / BRQ / 4-6 / MR-GPTQ)。</li>
+    <li><b>内核:</b>M=1–8 时投影延迟比 vLLM-CUTLASS 快 <b>1.57–2.49×</b>;端到端(已含采样开销)在 Qwen3-32B 上比 BF16 快 <b>1.97×</b>。</li>
+    <li><b>成本:</b>ReSET 采样器每生成一个 token 仅约 +100µs(Qwen3-32B),约为一个解码步的 1.5%;超参(w、$T_{\text{low}}$、$T_{\text{high}}$)都不敏感,$\tau_0$ 用 5 道题即可标定。</li>
+  </ul>
+</section>
+
+<!-- ================= 2 背景 ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">背景:为什么 NVFP4 适合但不好用</h2>
+
+  <h3>2.1 NVFP4 到底是什么格式</h3>
+  <p>NVFP4 属于"微缩放 FP4"格式家族:元素本身只有 4-bit(E2M1),靠<b>共享的缩放因子</b>恢复动态范围。和同家族的 MXFP4 相比,NVFP4 的块更细(16 元素一块)、块缩放用 FP8(E4M3)并额外叠加 FP32 全局缩放——低精度 <abbr title="权重与激活均为 4-bit">W4A4</abbr> 下量级校准更稳,这决定了它是英伟达在 B200 上主推的格式:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 7:MXFP4 与 NVFP4 两种微缩放 FP4 格式的配置对比(原文附录 A)</caption>
+    <thead><tr><th>Format</th><th>Element Type</th><th>Block Scale</th><th>Global Scale</th><th>Block Size</th></tr></thead>
+    <tbody>
+      <tr><td>MXFP4</td><td>FP4 (E2M1)</td><td>FP8 (E8M0)</td><td>–</td><td>32</td></tr>
+      <tr><td>NVFP4</td><td>FP4 (E2M1)</td><td>FP8 (E4M3)</td><td>FP32</td><td>16</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">元素都是 E2M1 的 FP4;MXFP4 块大(32)且块缩放为纯指数格式(E8M0),元数据更紧凑;NVFP4 块小(16)+ 全局 FP32 缩放,精度控制更细,代价是略微多一点的缩放开销。</p>
+
+  <p>关于量化精度,论文点了一个重要的反直觉事实:现有 NVFP4 PTQ 方法(旋转、通道缩放、动态块缩放等)全都在压<b>权重量化误差</b>,但 NVFP4 在组大小 16 下权重误差本来就小,这些方法与推理准确率并不干净地相关——<b>与其继续优化误差,不如直接看解码过程本身</b>。这正是 ReSET 的出发点。</p>
+
+  <h3>2.2 延迟崩塌:4× 优势为什么在最需要的地方消失</h3>
+  <p>推理模型的成本维度是<b>每 token 解码延迟</b>而非聚合吞吐:R1 在 AIME 上平均生成约 12K token(最多 64K),<abbr title="Time Per Output Token,每生成一个 token 的耗时">TPOT</abbr> 直接卡 <abbr title="Service Level Objective,服务质量目标,如延迟上界">SLO</abbr>;再加上 <abbr title="KV cache,缓存历史键值对以加速解码">KV-cache</abbr> 压力、prefill 与 decode 互相干扰、生成停顿,<b>SLO 能容忍的解码 batch 只有 M≤8</b>(B200 上)。而 NVFP4 的 4× 峰值吞吐要靠 Blackwell 的 <code>tcgen05.mma</code> 指令兑现,该指令的 tile 沿 token 维固定为 <b>M=128</b>。下图是这两件事的实证(<b>点击图片可看 300 DPI 原图</b>):</p>
+
+  <figure class="fig" id="fig1">
+    <img src="figs/fig1.png" alt="Figure 1: Qwen3-32B 在单张 B200 上 batch 规模受限。(a) TPOT;(b) Tensor Core 利用率">
+    <figcaption>
+      <b>Figure 1:</b>Limited batch-size scaling in Qwen3-32B on a single B200.(a) TPOT at 32K context;(b) Tensor Core utilization of NVFP4 decode GEMMs.
+      <span class="zh">左图:32K 上下文下,TPOT 随解码 batch 增长——代表性 SLO(虚线区)在中等的 batch 就被突破,SLO 可行域被压在 M≤8。右图:在这个区域,NVFP4 解码 GEMM 的 Tensor Core 利用率<b>不到 1%</b>。M=8 时逻辑激活被 pad 成 128 行,只有 6.25% 的行有效。之前的研究大多跑在大 batch 吞吐场景,把这个崩塌藏起来了——本文聚焦的正是 SLO 可行域。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <div class="takeaway">
+    <b>核心矛盾:</b>NVFP4 是"吞吐利器",但 LRM 的成本主导维度是"小 batch 解码延迟"。于是全文两条主线展开:<b>解码策略修精度(§3–4)、专用内核修延迟(§5)</b>。
+  </div>
+</section>
+
+<!-- ================= 3 观察 ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Observations</div>
+  <h2 class="sec">观察:量化错误到底错在哪</h2>
+  <p>作者用 R1-Qwen-14B 在 90 道 AIME(2022–2024)题上生成的 <b>150 万 token</b> 做分析。第一步先把 token 按熵分类:低熵 = 数字、运算符这类"局部没得选"的符号决策;高熵 = "Alternatively" 这类语义灵活的分支点。下图(a)(b)两列就是这两类 token 的典型面孔,而(c)(d)(e)揭示了量化真正做错事的方式:</p>
+
+  <figure class="fig" id="fig2">
+    <img src="figs/fig2.png" alt="Figure 2: 低/高熵 token 示例、BF16 与 NVFP4 推理对比、符号位置的概率分布、熵条件温度控制的效果">
+    <figcaption>
+      <b>Figure 2:</b>Example of (a) low- and (b) high-entropy tokens. Example reasoning under (c) BF16 and (d) NVFP4 on R1-Qwen-7B. (e) Next-token probability distribution at the symbolic position in (d). (f) Effect of entropy-conditioned temperature control accuracy (R1-Qwen-7B, AIME 2022-2024).
+      <span class="zh"><b>三个要点:</b>① (a)(b)低熵 token 是"符号",高熵 token 是"分支点";② (c)(d)同一道题,BF16 一路算到 x=73 正确收尾,NVFP4 在某个符号位置采错("three"→"four"),后续推理全部跑偏;③ (e)最关键——量化后正确 token 仍是 top-1,但某个非 top-1 的备选拿到了足够概率质量被偶发采到。<b>错误来自采样层,不是分布主峰翻转</b>。</span>
+    </figcaption>
+  </figure>
+
+  <h3>3.1 一个直觉修法:低熵位置降温——但只救回一半</h3>
+  <p>既然错在低熵符号 token 的偶发误采样,最直接的办法就是对<abbr title="token 分布的熵,衡量该位置的不确定性">这些位置</abbr>"降温",把分布压尖。用固定阈值 $\tau_0$(取全体 token 熵的 80 分位,约 0.6)把 token 分成两组:低熵组用低温 $T_{\text{low}}$,高熵组用 $T_{\text{high}}$(公式(1))。结果就是上图 (f) 的曲线:</p>
+  <div class="math">$$T_t = \begin{cases} T_{\text{low}}, & \text{if } H_t < \tau_0 \\ T_{\text{high}}, & \text{if } H_t \geq \tau_0 \end{cases} \tag{1}$$</div>
+  <p>降 $T_{\text{low}}$(往左看曲线)稳定带来收益,但只能<b>部分</b>恢复准确率;而改 $T_{\text{high}}$ 收益很有限。这说明"低熵 token"这个干预目标找对了,但<b>token 级熵不是正确的控制信号</b>——用固定阈值看单个 token 的熵,会漏判。</p>
+
+  <h3>3.2 关键发现:token 级熵被所在步骤的不确定性主导</h3>
+  <p>为什么会漏判?作者发现粒度错位:现有熵感知解码在 <b>token 级</b>考虑不确定性,但推理中真正波动的不确定性活在 <b>步骤级</b>。所谓"推理步骤",指一段连贯的中间推理单元(实现上用双换行符 \n\n 切分),步骤熵 = 步内 token 熵的平均。下图是全篇最重要的诊断:</p>
+
+  <figure class="fig" id="fig3">
+    <img src="figs/fig3.png" alt="Figure 3: 步骤级熵动态。(a) 步骤熵轨迹;(b) 步骤熵与 token 熵的关系;(c)(d) 低/高熵步骤中的 token 熵分布">
+    <figcaption>
+      <b>Figure 3:</b>Step-level entropy dynamics. (a) Step-wise entropy trajectory. Relationship between step entropy and token entropy for (b) low- and high-entropy groups. Token entropy distributions in representative (c) low- and (d) high-entropy steps.
+      <span class="zh"><b>三点发现:</b>
+      ① (a) 单条轨迹里步骤熵剧烈波动:Step 45≈0.3、Step 70≈0.9——模型在"笃定"与"犹豫"间反复横跳;
+      ② (b) 低/高熵两组 token 的平均 token 熵,都紧紧贴着所在步骤的步骤熵走(slope≈0.86/1.10):同一个符号 token,落在高不确定步骤里,绝对熵就被整体抬高;
+      ③ (c)(d) 后果:低熵步骤里符号 token 在全局阈值之下,固定阈值能正确识别;高熵步骤里符号 token 被抬过 $\tau_0$,被误判为"分支点",跳过本该做的降温——该修的地方漏掉了。</span>
+    </figcaption>
+  </figure>
+
+  <h3>3.3 量化的双向熵效应:既"膨胀"又"塌缩"</h3>
+  <p>再往下挖一层,量化对熵的影响其实是双方向的(附录 B.2 的专门分析):<b>低熵符号 token 的熵被系统性抬高</b>(高不确定步骤里抬得更多)——这就是采样错误变多的直接原因;而<b>极高熵 token($H_t$≥2.0)在高不确定步骤里熵反而下降</b>,典型如 "Alternatively" 这类话语连接词的概率质量被量化压到更少的几个续写上,分支多样性被吃掉。这两个效应合起来,给后面的温度策略提供了完整依据:$T_{\text{low}}$ 压掉"假不确定性",$T_{\text{high}}$ 还回"被压缩的多样性":</p>
+
+  <figure class="fig" id="fig8">
+    <img src="figs/fig8.png" alt="Figure 8: 量化下的熵偏移(左)不同 token 熵区间的均值熵偏移;(右)代表性高熵 token 熵升/降概率">
+    <figcaption>
+      <b>Figure 8:</b>Entropy shift under quantization. (left) Mean entropy shift $\Delta H$=H<sup>PTQ</sup> − H<sup>FP16</sup> across token entropy bins under low- and high-uncertainty steps. (right) Probability of entropy increase or decrease for representative high-entropy tokens under PTQ.
+      <span class="zh">左图:低熵区间的 $\Delta H$ 系统性为正(熵膨胀),且高不确定步骤下抬得更高;极高熵区间($H_t$≥2.0)的 $\Delta H$ 在高不确定步骤下转为负(熵塌缩)。右图:以 "Alternatively" 为代表的高熵话语 token,在量化后更常出现熵缩减。这解释了为什么第 4 节的 $T_{\text{high}}$ 必须高于默认温度。</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway">
+    <b>诊断结论:</b>符号 token 的信号本身没错,错的是没有<b>相对当前步骤</b>来读取它——必须从 token 级熵升级到步骤级(步骤相对)熵。
+  </div>
+</section>
+
+<!-- ================= 4 方法 ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">方法:ReSET 的温度策略</h2>
+  <p>ReSET = <b>Re</b>asoning <b>S</b>tep <b>E</b>ntropy-based <b>T</b>emperature scaling,两个组件:步骤感知阈值(SAT,§4.1)与在线步骤熵估计器(HSE,§4.2)。下面用原文 Figure 4 把整个判定流程走一遍:</p>
+
+  <figure class="fig" id="fig4">
+    <img src="figs/fig4.png" alt="Figure 4: (a) ReSET 在 R1-Qwen-14B AIME-120 轨迹上的温度分配;(b) 各在线步骤熵估计器相对离线 oracle 的 MAE">
+    <figcaption>
+      <b>Figure 4:</b>(a) ReSET temperature assignment on an R1-Qwen-14B AIME-120 trace. (b) Mean absolute error of online step-entropy estimators against the offline oracle of Sec. 3.3.
+      <span class="zh">(a) 完整展示 ReSET 的判定链:❶ 估计步骤熵 $\hat{H}_{\text{step}}$ &gt; 全局均值 $\bar{H}$ → 判为高熵步骤;❷ 阈值改为 $\tau$ ← $\hat{H}_{\text{step}}$;❸ 单个 token 熵 $H_t$ &lt; $\tau$ → 判为低熵 token;❹ 分配低温 T ← $T_{\text{low}}$。图中符号 "7" 越过了全局 $\tau_0$ 但仍低于本步 $\hat{H}_{\text{step}}$,被 SAT 正确识别并降温——这正是固定阈值漏掉的情形。</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.1 步骤感知阈值(Step-aware Threshold, SAT)</h3>
+  <p>固定阈值只在一种情况下失手:高不确定步骤。因此把阈值改为"<b>全局运行均值 $\bar{H}$</b> 对比 <b>在线步骤熵估计 $\hat{H}_{\text{step}}(t)$</b>"的择一选择:</p>
+  <div class="math">$$\tau_t = \begin{cases} \tau_0, & \text{if } \hat{H}_{\text{step}}(t) \leq \bar{H} \; (\text{confident step}) \\ \hat{H}_{\text{step}}(t), & \text{if } \hat{H}_{\text{step}}(t) > \bar{H} \; (\text{uncertain step}) \end{cases} \tag{2}$$</div>
+  <ul class="tight">
+    <li><b>笃定步骤:</b>退回全局阈值 $\tau_0$——"结构化的低熵符号"继续按全局标准识别。</li>
+    <li><b>不确定步骤:</b>$\tau_t$ = $\hat{H}_{\text{step}}(t)$,规则变成<b>步骤相对</b>:只要某 token 的熵低于"本步骤典型 token"的熵就降温,不管全局阈值划在哪(Figure 4a 里的 "7" 就是例子)。</li>
+    <li>不引入任何新的可扫超参数:$\tau_t$ 完全由已在跟踪的量决定。</li>
+  </ul>
+  <p>为什么笃定步骤不能也走"步骤相对"路线?因为在笃定步骤里 $\hat{H}_{\text{step}}$ 退化得极小,相对阈值会反过来误伤正常符号 token——论文在附录里专门用下图说明了这个"退回分支"的必要性:</p>
+
+  <figure class="fig" id="fig7">
+    <img src="figs/fig7.png" alt="Figure 7: 只用 H_step 会误判低熵 token 的示意图">
+    <figcaption>
+      <b>Figure 7:</b>Using H<sub>step</sub> only can misclassify low-entropy tokens.
+      <span class="zh">如果全程用步骤相对阈值($\tau$ = $\hat{H}_{\text{step}}$),在笃定步骤中 $\hat{H}_{\text{step}}$ 退化得很小,典型符号 token 的熵可能高于它,被误标为"高熵"而不降温。所以 SAT 在笃定步骤必须回退到全局 $\tau_0$,二者缺一不可。</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.2 在线步骤熵估计(Online Step-Entropy Estimation, HSE)</h3>
+  <p>SAT 在每个解码位置都需要 $\hat{H}_{\text{step}}(t)$,但第 3 节的离线定义要平均"还没生成的 token",不满足自回归的因果性。难点在于步内有两种相反的偏差-方差权衡:步中后段,<b>步内运行平均</b>偏差最低(而且图 4b 显示它稳定优于 EMA——说明"步边界"比"时间近因"信息量大);步开头 w 个位置,样本太少且常是"步开场"话语 token,<b>用最近 w 个 token 的滑动窗口</b>初始化,容忍一点跨步偏差换方差。混合估计器:</p>
+  <div class="math">$$\hat{H}_{\text{step}}(t) = \begin{cases} \frac{1}{|W_t|} \sum_{i \in W_t} H_i, & \text{if } t - t_0 < w \; (\text{initialization}) \\ \frac{1}{t - t_0 + 1} \sum_{i=t_0}^{t} H_i, & \text{if } t - t_0 \geq w \; (\text{within-step}) \end{cases} \tag{3}$$</div>
+  <p>图 4b 的横轴正是这几条曲线的对比:窗口初始化(Init)在步前段显著降低方差,步内平均(Causal)在后期偏差最低,EMA 两者都不占优。</p>
+
+  <h3>4.3 温度与校准</h3>
+  <ul class="tight">
+    <li>$T_{\text{base}}$=0.6(模型推荐),$T_{\text{low}}$ &lt; 0.6 &lt; $T_{\text{high}}$=1.0。<b>$T_{\text{high}}$ 的必要性</b>来自第 3.3 节的熵塌缩(Figure 8):量化压缩了不确定步骤里高熵 token 的多样性,需要高于默认的温度还回去;经验上 $T_{\text{high}}$=1.0 一致最好(实验节 Table 10)。</li>
+    <li>$T_{\text{low}}$ 在留出校准集上按(模型,任务)选择(实验节 Table 13);$\tau_0$ 取校准集 token 熵的 80 分位——而且这个阈值<b>只需要 5 道 NuminaMath 题</b>就能标定,各模型取值如下:</li>
+  </ul>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 8:各模型的全局熵阈值 $\tau$(80 分位,附录 B.5:用 NuminaMath-1.5 随机抽 5 题生成响应后统计)</caption>
+    <thead><tr><th>Model</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th></tr></thead>
+    <tbody>
+      <tr><td>$\tau$</td><td>0.6446</td><td>0.6488</td><td>0.5505</td><td>0.4863</td><td>0.5363</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">$\tau_0$ ≈ 0.5–0.65:Qwen3 系列的熵分位略低,与模型自身输出习惯相关;部署时无需任务级数据即可标定。</p>
+
+  <p>每 token 的计算量:一次熵归约 + 两次标量更新($\hat{H}_{\text{step}}$、$\bar{H}$)+ 一次分支——相比完整解码步可忽略,具体开销计入第 6 节的端到端测量。</p>
+
+  <div class="note">
+    <b>直觉类比:</b>固定阈值像"全公司统一报销标准";ReSET 像"按部门平均工资定标准"——在大家都很有钱(高不确定)的部门,一个中等的开销也得按本部门标准审。量化把"本应确定的符号"变得不确定时,按步骤内部的标准去甄别才能不漏判。
+  </div>
+</section><!-- ================= 5 系统 ================= -->
+<section id="s5">
+  <div class="sec-no">05 · System</div>
+  <h2 class="sec">系统侧:CUDA-core 小 M 解码内核</h2>
+
+  <h3>5.1 为什么 Tensor Core 在小 M 下低效(配 Figure 5a)</h3>
+  <p>第 2.2 节已经看到&lt;1% 的利用率,机制在这里:Blackwell 的 NVFP4 GEMM 路径(vLLM / CUTLASS / MR-GPTQ)都走 <code>tcgen05.mma</code>,tile 沿 token 维固定 M=128。看 figure 5a:逻辑激活 X∈ℝ<sup>M×K</sup> 无论 M 是多少都要被填充(pad)成 128×K,只有 M 行输出是真正有用的——M=8 时 6.25% 的 tile 是有效行,其余全是"浪费输出"。吞吐导向的框架靠上千的大 batch 把填充摊薄,但 SLO 可行域里优势归零。</p>
+
+  <figure class="fig" id="fig5">
+    <img src="figs/fig5.png" alt="Figure 5: (a) Tensor Core 固定 M=128 tile 的浪费;(b) CUDA-core 内核的三个设计选择">
+    <figcaption>
+      <b>Figure 5:</b>CUDA-core NVFP4 kernel design for small-M decoding. (a) Tensor-Core GEMM underutilization from the required 128-row M tile. (b) CUDA-core design choices.
+      <span class="zh">(a) 左:逻辑形状 M×K → 被填充为 128×K → 输出 128×N,浪费面积一目了然(BLOCK_M=128 / Wasted Output / Padded)。(b) 右:三个设计选择——① 多 token CTA 融合:一个线程块服务多个解码 token,权重瓦片只流式加载一次;② 每线程多累加器:两条权重行 + 两条独立 hfma2 累加链提供指令级并行;③ 纯寄存器反量化:K 迭代里 CVT/MUL/FMA 重叠,不经过共享内存。</span>
+    </figcaption>
+  </figure>
+
+  <p>CUDA-core 路径可以在线程级灵活暴露 M,不需要固定 tile——但现有框架并没有 NVFP4 的 CUDA-core 实现,这个空白正是本文要填的。要攻克的难点有三个:(C1) 复用流式加载的权重瓦片——所有 token 共享同一个 W,逐个 token 处理会把同一块权重反复从 HBM 拉取;(C2) 足够的并行线程与独立累加链——朴素映射会让 half2 FMA 沿 K 串成一条依赖链,小 M 下 CUDA core 空转;(C3) FP4 解包 + 共享缩放反量化既不能落地到中间 buffer,也不能在内层 K 循环里插同步。</p>
+
+  <h3>5.2 三个设计选择如何逐一解决 C1–C3</h3>
+  <ul class="tight">
+    <li><b>多 token <abbr title="Cooperative Thread Array,协作线程数组,即一个线程块">CTA</abbr> 融合(C1):</b>把多个活跃解码 token 合进同一个线程块,权重瓦片只从 HBM 读一次,在 CTA 内被多个 token 的点积复用;又不把 M 撑到 128。对"小但不为 1"的 batch(如 M=4/8)尤其有用。</li>
+    <li><b>多累加器线程(C2):</b>每个线程拥有两条权重行、两条独立累加链,调度器交错两条 hfma2 流,隐藏转换/缩放/FMA 延迟——权衡点是 <abbr title="Instruction-Level Parallelism,指令级并行">ILP</abbr> 与寄存器压力的平衡。</li>
+    <li><b>纯寄存器反量化(C3):</b>解包出的 FP16 对、缩放、部分累加全留寄存器,直接进 hfma2;跨 K 瓦片做软件流水(载入、转换、缩放、累加重叠)。不写共享内存、无同步,正好躲过小 M 场景"固定开销摊不薄"的坑。</li>
+  </ul>
+  <p>运行时调度:M=1–2 恒用 CUDA-core 核;M≥128 走自研 Tensor-Core GEMM;中间形状按 (M, shape) 实测延迟二选一。因为 vLLM 按 batch 大小抓 CUDA graph,选择在抓图时固定,回放零分支开销。</p>
+
+  <h3>5.3 两个关键量化收益</h3>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 3:Qwen3-32B 上 M=1 时各层投影流水线延迟(µs,↓)。Q:激活量化;R:旋转。</caption>
+    <thead><tr><th>Layer Type</th><th colspan="2">vLLM</th><th colspan="2">MR-GPTQ</th><th colspan="2">Ours</th></tr>
+    <tr><th></th><th>Q</th><th>GEMM</th><th>Q+R</th><th>GEMM</th><th>Q</th><th>GEMV</th></tr></thead>
+    <tbody>
+      <tr><td>QKV</td><td>1.81</td><td>13.41</td><td>4.65</td><td>11.84</td><td>1.65</td><td>6.62</td></tr>
+      <tr><td>Out</td><td>2.04</td><td>12.40</td><td>4.87</td><td>11.90</td><td>1.81</td><td>7.73</td></tr>
+      <tr><td>Gate-Up</td><td>1.83</td><td>25.89</td><td>4.55</td><td>25.90</td><td>1.67</td><td>13.25</td></tr>
+      <tr><td>Down</td><td>2.80</td><td>33.26</td><td>5.08</td><td>33.87</td><td>1.79</td><td>15.00</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">旋转融合激活量化(Q+R)在 M=1 时每层要 4.55–5.08µs,约为普通激活量化(Q)的 2.3 倍;本文流水线吃非交错缩放布局,激活量化保持在 1.65–1.81µs,投影主体 GEMM→GEMV 后延迟砍半以上。</p>
+
+  <p><b>第一,量化开销是被减少而不是被增加。</b>MR-GPTQ 这类旋转方案的代价是解码步里每层多花 2.3× 的激活量化时间;ReSET 体系里 CUDA-core 核吃非交错缩放布局、ReSET 采样器本身又不做旋转,所以从系统层面直接省掉了这笔开销(Table 3)。<b>第二,M=1 的投影延迟全面优于 vLLM(Table 4,见下节)</b>。设计选择的贡献量在附录 C 里做了消融——C1(CTA 融合)随 M 增大越来越重要,C2(多累加器)在 M=1 也有效:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 14:CUDA-core 小 M 内核消融(Qwen3-32B down_proj,N=5120,K=25600,µs,B200 + CUDA-graph 回放)</caption>
+    <thead><tr><th>Config</th><th>M=1</th><th>M=4</th><th>M=8</th></tr></thead>
+    <tbody>
+      <tr class="hl"><td>Ours: full kernel (C1+C2+C3)</td><td>15.0</td><td>27.5</td><td>58.3</td></tr>
+      <tr><td>without C1 (no CTA fusion)</td><td>15.3</td><td>35.9</td><td>70.9</td></tr>
+      <tr><td>without C2 (single-row threading)</td><td>16.8</td><td>32.4</td><td>64.6</td></tr>
+      <tr><td>without C1 and C2</td><td>18.7</td><td>39.4</td><td>76.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">C1 在 M=8 时把 70.9µs 拉回 58.3µs(权重瓦片复用);C2 在 M=1 时也有 1.8µs 的收益(ILP);两者都去掉则 M=8 慢 1.31×。C3 因会改变内核流水结构(共享内存分配、同步位置、流水深度)而不做单独消融。</p>
+</section>
+
+<!-- ================= 6 实验 ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">实验:精度与延迟的完整证据</h2>
+
+  <h3>6.1 设置</h3>
+  <ul class="tight">
+    <li>模型:5 个推理模型——R1-Distill-Qwen-7B/14B、Qwen3-8B/14B/32B,均从公开 BF16 权重用 NVIDIA ModelOpt 量化为<b>真 NVFP4 W4A4</b>(E2M1 元素、E4M3 块缩放、组大小 16),KV cache 保持 BF16;所有基线共享同一权重格式与路径、同硬件逐项对比。</li>
+    <li>评测:AIME-120(AIME 2022–2025 合并)、GPQA-Diamond、LiveCodeBench;8 个随机种子平均;top-p=0.95、max_tokens=32K。</li>
+    <li>基线:RTN、BRQ(块旋转)、4/6(Four-Over-Six,自适应块缩放)、MR-GPTQ,均按默认 T=0.6 解码;ReSET 加在 RTN 之上。</li>
+  </ul>
+
+  <h3>6.2 精度:ReSET 主导 PTQ 前沿(配 Table 1)</h3>
+  <p>主结果是下表:三个 benchmark × 五种方法 × 五个模型,ReSET 在<b>每一个</b> benchmark 的平均分上都排第一,且是唯一在每个任务上都超过 RTN 基线的方法:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 1:与 NVFP4 PTQ 方法在推理 benchmark 上的对比(加粗行为 ReSET)</caption>
+    <thead><tr><th>Task</th><th>Method</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="6">AIME-120</td><td>BF16 Baseline</td><td>45.7</td><td>57.4</td><td>70.4</td><td>76.1</td><td>75.8</td><td>65.1</td></tr>
+      <tr><td>RTN</td><td>39.6</td><td>52.4</td><td>62.5</td><td>70.4</td><td>74.4</td><td>59.9</td></tr>
+      <tr><td>BRQ</td><td>41.4</td><td>49.8</td><td>53.8</td><td>66.9</td><td>73.0</td><td>57.0</td></tr>
+      <tr><td>4/6</td><td>41.1</td><td>53.1</td><td>64.0</td><td>70.1</td><td>74.8</td><td>60.6</td></tr>
+      <tr><td>MR-GPTQ</td><td>39.6</td><td>50.6</td><td>65.2</td><td>71.0</td><td>73.3</td><td>60.0</td></tr>
+      <tr class="hl"><td>ReSET</td><td>43.8</td><td>54.0</td><td>64.9</td><td>72.1</td><td>77.5</td><td>62.5</td></tr>
+      <tr><td rowspan="6">GPQA-Diamond</td><td>BF16 Baseline</td><td>48.3</td><td>58.4</td><td>54.4</td><td>61.3</td><td>64.1</td><td>57.3</td></tr>
+      <tr><td>RTN</td><td>47.1</td><td>53.7</td><td>50.7</td><td>57.4</td><td>62.8</td><td>54.3</td></tr>
+      <tr><td>BRQ</td><td>45.5</td><td>56.7</td><td>53.5</td><td>58.2</td><td>60.8</td><td>55.0</td></tr>
+      <tr><td>4/6</td><td>44.6</td><td>55.4</td><td>51.9</td><td>57.6</td><td>64.6</td><td>54.8</td></tr>
+      <tr><td>MR-GPTQ</td><td>43.4</td><td>57.4</td><td>52.4</td><td>60.9</td><td>60.6</td><td>54.9</td></tr>
+      <tr class="hl"><td>ReSET</td><td>46.0</td><td>57.6</td><td>53.2</td><td>58.5</td><td>62.9</td><td>55.6</td></tr>
+      <tr><td rowspan="6">LiveCodeBench</td><td>BF16 Baseline</td><td>28.2</td><td>38.5</td><td>43.2</td><td>46.5</td><td>49.9</td><td>41.3</td></tr>
+      <tr><td>RTN</td><td>29.5</td><td>37.1</td><td>36.4</td><td>46.7</td><td>46.5</td><td>39.2</td></tr>
+      <tr><td>BRQ</td><td>27.6</td><td>37.7</td><td>36.2</td><td>39.0</td><td>45.1</td><td>37.1</td></tr>
+      <tr><td>4/6</td><td>27.0</td><td>36.4</td><td>35.8</td><td>45.3</td><td>45.7</td><td>38.0</td></tr>
+      <tr><td>MR-GPTQ</td><td>27.2</td><td>34.9</td><td>42.9</td><td>47.2</td><td>45.1</td><td>39.5</td></tr>
+      <tr class="hl"><td>ReSET</td><td>28.4</td><td>37.9</td><td>42.1</td><td>46.1</td><td>46.7</td><td>40.2</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>几个值得注意的细节:<b>①</b> 先进 PTQ(BRQ、4/6、MR-GPTQ)在大模型上并不稳定超过朴素 RTN(如 AIME-120 上 MR-GPTQ 只在 Qwen3 系列略好、R1 系列反而不如 RTN),佐证了"NVFP4 下再压权重误差收益甚微"的判断;<b>②</b> ReSET 的最大增益在 AIME-120:AIME 平均 +2.6(Qwen3-32B +3.1、R1-Qwen-7B +4.2),而且 Qwen3-32B 的 77.5 <b>反超了 BF16 基线</b>(75.8)——温度策略不仅补偿量化损失,还顺带改善了采样;<b>③</b> GPQA / LiveCodeBench 的绝对提升相对温和(平均 +1.3 / +1.0),但仍是全基线最优。</p>
+
+  <h3>6.3 打败 token 级启发式(配 Table 2、Table 5、Table 6)</h3>
+  <p><b>先看阈值机制本身的贡献。</b>在相同解码设置下对比三种阈值策略:固定阈值(公式 1)、滑动窗口阈值、ReSET——差异只在"熵阈值怎么定":</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 2:不同温度缩放方法在 AIME-120 上的对比(AIME-120,↑)</caption>
+    <thead><tr><th>Method</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr><td>BF16</td><td>45.7</td><td>57.4</td><td>70.4</td><td>76.1</td><td>75.8</td><td>65.1</td></tr>
+      <tr><td>NVFP4</td><td>39.6</td><td>52.4</td><td>62.5</td><td>70.4</td><td>74.4</td><td>59.9</td></tr>
+      <tr><td>Fixed Threshold</td><td>41.8</td><td>53.2</td><td>63.3</td><td>70.3</td><td>75.8</td><td>60.9</td></tr>
+      <tr><td>Sliding Window</td><td>42.6</td><td>51.3</td><td>63.3</td><td>70.6</td><td>76.4</td><td>60.8</td></tr>
+      <tr class="hl"><td>ReSET</td><td>43.8</td><td>54.0</td><td>64.9</td><td>72.1</td><td>77.5</td><td>62.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">固定阈值与滑动窗口对 NVFP4 的提升不稳定(Fixed Threshold 在 Qwen3-14B 上反而 -0.1),ReSET 在每个模型上都是最优——验证"步骤相对熵"才是有效信号。</p>
+
+  <p><b>再看"截断式采样"是否也能替代。</b>有人会问:直接把 top-p 或 min-p 参数扫一遍不就行了?下表是 T=0.6 固定下扫描的结果——top-p 平均只从 59.9 微动到 60.3 封顶,min-p 系列<b>全面低于基线</b>(58.2–59.4):</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 5:与截断式采样方法的对比(AIME-120)</caption>
+    <thead><tr><th>Method</th><th>T</th><th>Top-p</th><th>Min-p</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr><td>NVFP4 Baseline</td><td>0.6</td><td>0.95</td><td>0.0</td><td>39.6</td><td>52.4</td><td>62.5</td><td>70.4</td><td>74.4</td><td>59.9</td></tr>
+      <tr><td rowspan="5">NVFP4 +<br>Top-p Sweep</td><td rowspan="5">0.6</td><td>0.80</td><td rowspan="5">0.0</td><td>41.0</td><td>49.5</td><td>61.0</td><td>70.1</td><td>74.3</td><td>59.2</td></tr>
+      <tr><td>0.85</td><td>39.7</td><td>50.6</td><td>63.3</td><td>70.2</td><td>74.5</td><td>59.7</td></tr>
+      <tr><td>0.90</td><td>40.2</td><td>52.4</td><td>63.0</td><td>71.2</td><td>74.5</td><td>60.3</td></tr>
+      <tr><td>0.99</td><td>38.4</td><td>53.9</td><td>63.6</td><td>69.6</td><td>75.2</td><td>60.1</td></tr>
+      <tr><td>1.00</td><td>40.1</td><td>52.6</td><td>63.9</td><td>70.7</td><td>73.6</td><td>60.2</td></tr>
+      <tr><td rowspan="4">NVFP4 +<br>Min-p Sweep</td><td rowspan="4">0.6</td><td rowspan="4">0.95</td><td>0.01</td><td>39.8</td><td>52.4</td><td>61.2</td><td>68.7</td><td>74.8</td><td>59.4</td></tr>
+      <tr><td>0.03</td><td>40.3</td><td>49.7</td><td>60.6</td><td>70.0</td><td>74.5</td><td>59.0</td></tr>
+      <tr><td>0.05</td><td>38.7</td><td>50.2</td><td>58.5</td><td>70.2</td><td>73.3</td><td>58.2</td></tr>
+      <tr><td>0.10</td><td>41.0</td><td>51.2</td><td>57.6</td><td>69.8</td><td>73.3</td><td>58.6</td></tr>
+      <tr class="hl"><td>ReSET</td><td>ReSET</td><td>0.95</td><td>0.0</td><td>43.8</td><td>54.0</td><td>64.9</td><td>72.1</td><td>77.5</td><td>62.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">ReSET 把表 5 的 T=0.6 固定条件放开为自适应温度,全面超过所有截断组合——证明问题在"熵控制"而非"分布截断"。</p>
+
+  <p><b>最后验证"选择性降温"而非"一刀切"。</b>既然低不确定步骤也要管,那对这些步骤里的<b>所有</b> token 一律用 $T_{\text{low}}$ 会不会更好?答案是否定的(Table 6):</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 6:低熵步骤策略消融(AIME-120):对低不确定步骤全体 token 降温 vs ReSET 只对步内低于 $\tau_0$ 的 token 降温</caption>
+    <thead><tr><th>Policy</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr><td>All $T_{\text{low}}$</td><td>40.6</td><td>51.2</td><td>65.1</td><td>72.0</td><td>74.1</td><td>60.6</td></tr>
+      <tr class="hl"><td>ReSET</td><td>43.8</td><td>54.0</td><td>64.9</td><td>72.1</td><td>77.5</td><td>62.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">均匀降温(60.6)比 NVFP4 基线(59.9)只好 0.7 分,而选择性降温(62.5)好 2.6 分:低不确定步骤里并非所有 token 都严格确定,一刀切会压掉合法备选。</p>
+</section>
+<!-- 6.4 延迟 + 6.5 超参 + 第7章 补充 + 第8章 点评 + 第9章 术语 + footer + 脚本 -->
+<section id="s6">
+  <h3>6.4 延迟:从内核到端到端(配 Table 4、Figure 6)</h3>
+  <p><b>内核级。</b>先是 M=1 的逐投影对比(Table 4):12 种投影形状全部快于 vLLM-CUTLASS,1.57–2.49×,最大增益出现在 Qwen3-8B 的 down-projection(N=4096, K=12288)。K 越大的层(如 Gate-Up/Down)加速越明显,因为它们更受"填充浪费 + 权重流式加载"的影响:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 4:Qwen3 各投影在 M=1 的内核延迟(µs,↓)。行依次为 QKV、Out、Gate/Up、Down。</caption>
+    <thead><tr><th>Qwen3</th><th>N</th><th>K</th><th>vLLM</th><th>Ours</th><th>Speedup</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4">8B</td><td>6144</td><td>4096</td><td>8.69</td><td>4.28</td><td><b>2.03×</b></td></tr>
+      <tr><td>4096</td><td>4096</td><td>7.69</td><td>3.75</td><td><b>2.05×</b></td></tr>
+      <tr><td>12288</td><td>4096</td><td>11.45</td><td>6.40</td><td><b>1.79×</b></td></tr>
+      <tr><td>4096</td><td>12288</td><td>16.61</td><td>6.66</td><td><b>2.49×</b></td></tr>
+      <tr><td rowspan="4">14B</td><td>7168</td><td>5120</td><td>10.79</td><td>5.53</td><td><b>1.95×</b></td></tr>
+      <tr><td>5120</td><td>5120</td><td>9.08</td><td>4.64</td><td><b>1.96×</b></td></tr>
+      <tr><td>17408</td><td>5120</td><td>14.93</td><td>9.49</td><td><b>1.57×</b></td></tr>
+      <tr><td>5120</td><td>17408</td><td>23.77</td><td>10.35</td><td><b>2.30×</b></td></tr>
+      <tr><td rowspan="4">32B</td><td>10240</td><td>5120</td><td>13.41</td><td>6.62</td><td><b>2.03×</b></td></tr>
+      <tr><td>5120</td><td>8192</td><td>12.40</td><td>7.73</td><td><b>1.60×</b></td></tr>
+      <tr><td>25600</td><td>5120</td><td>25.89</td><td>13.25</td><td><b>1.96×</b></td></tr>
+      <tr><td>5120</td><td>25600</td><td>33.26</td><td>15.00</td><td><b>2.22×</b></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><b>端到端。</b>下面这张图把内核收益放进完整服务流看:B200 上、512 token 输入、输出最长 32K,对比 BF16、vLLM-CUTLASS、vLLM-FlashInfer 与本文方案(Batch=1 和 8):</p>
+
+  <figure class="fig" id="fig6">
+    <img src="figs/fig6.png" alt="Figure 6: Qwen3-8B 与 Qwen3-32B 相对 BF16 的端到端加速比(512 token 输入)">
+    <figcaption>
+      <b>Figure 6:</b>E2E speedup over BF16 for (a) Qwen3-8B and (b) Qwen3-32B with 512-token inputs.
+      <span class="zh">横轴输出长度(1K–32K),纵轴相对 BF16 的延迟加速比(1.0×–2.0×),分 Batch=1 / Batch=8 两列;三条线对比 BF16、vLLM-CUTLASS、vLLM-FlashInfer 与 Ours。<b>读数:</b>Qwen3-8B 在 B=1、输出 8K 时 1.69× over BF16、1.22× over 最强 NVFP4 基线;Qwen3-32B 达 1.97×(B=1)、1.85×(B=8)。且这些数字已包含 ReSET 采样器每 token ~100µs(约 1.5%)的完整开销——说明采样策略几乎没有侵蚀内核带来的延迟收益。</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.5 超参鲁棒性(配 Table 9/10/13)</h3>
+  <p>最后是三个超参的敏感性证据,结论一句话:<b>都不敏感</b>。窗口大小 w 从 16 到 128,平均分只波动 1.1 分(w=32 最优,过大窗口会糊掉步骤局部统计);$T_{\text{low}}$ 在 0.1–0.4 之间只波动 0.4 分;$T_{\text{high}}$ 则是"越大越好、到 1.0 封顶"的一致趋势——这正好呼应熵塌缩分析:量化压缩了多少多样性,就用升高的 $T_{\text{high}}$ 还回去多少:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 9:混合估计器滑动窗口大小 w 的敏感性(AIME-120,默认 w=32)</caption>
+    <thead><tr><th>w</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr><td>16</td><td>44.9</td><td>53.9</td><td>65.7</td><td>70.3</td><td>76.7</td><td>62.3</td></tr>
+      <tr class="hl"><td>32</td><td>43.8</td><td>54.0</td><td>64.9</td><td>72.1</td><td>77.5</td><td>62.5</td></tr>
+      <tr><td>64</td><td>44.5</td><td>54.4</td><td>63.5</td><td>72.0</td><td>75.1</td><td>61.9</td></tr>
+      <tr><td>128</td><td>43.2</td><td>52.0</td><td>64.7</td><td>71.8</td><td>75.3</td><td>61.4</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 10:$T_{\text{low}}$=0.1 固定时,不同 $T_{\text{high}}$ 下的 AIME-120(默认 $T_{\text{high}}$=1.0;无 Avg 列)</caption>
+    <thead><tr><th>$T_{\text{high}}$</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th></tr></thead>
+    <tbody>
+      <tr><td>0.6 (Baseline)</td><td>39.6</td><td>50.9</td><td>61.9</td><td>71.4</td><td>74.9</td></tr>
+      <tr><td>0.7</td><td>39.8</td><td>51.6</td><td>64.3</td><td>70.6</td><td>74.1</td></tr>
+      <tr><td>0.8</td><td>40.4</td><td>54.8</td><td>64.5</td><td>73.7</td><td>74.9</td></tr>
+      <tr><td>0.9</td><td>43.8</td><td>54.5</td><td>64.6</td><td>71.1</td><td>75.3</td></tr>
+      <tr class="hl"><td>1.0 (Default in ReSET)</td><td>42.0</td><td>52.9</td><td>64.9</td><td>70.9</td><td>77.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 13:$T_{\text{high}}$=1.0 固定时,不同 $T_{\text{low}}$ 下的 AIME-120(默认 $T_{\text{low}}$=0.1)</caption>
+    <thead><tr><th>$T_{\text{low}}$</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr class="hl"><td>0.1</td><td>42.0</td><td>52.9</td><td>64.9</td><td>70.9</td><td>77.5</td><td>61.6</td></tr>
+      <tr><td>0.2</td><td>42.7</td><td>52.9</td><td>64.3</td><td>70.7</td><td>75.7</td><td>61.2</td></tr>
+      <tr><td>0.3</td><td>41.4</td><td>54.0</td><td>64.1</td><td>72.1</td><td>75.6</td><td>61.4</td></tr>
+      <tr><td>0.4</td><td>43.8</td><td>52.2</td><td>64.8</td><td>71.2</td><td>75.4</td><td>61.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">三张表合计:默认配置 (w=32, $T_{\text{low}}$=0.1, $T_{\text{high}}$=1.0) 附近性能平坦,部署无需精细调参。</p>
+</section>
+
+<!-- ================= 7 补充分析 ================= -->
+<section id="s7">
+  <div class="sec-no">07 · More Analysis</div>
+  <h2 class="sec">补充分析:困惑度、与 GPTQ 叠加、小/大 M 内核</h2>
+
+  <h3>7.1 困惑度视角:为什么再压权重误差没意义(配 Table 11)</h3>
+  <p>如果 NVFP4 的采样问题如此突出,那为什么常见 PTQ 手段在推理任务上帮不上忙?WikiText-2 困惑度给出一个侧面答案:RTN 与 4/6、BRQ、MR-GPTQ 的困惑度差距在 0.1–1.0 之间,全部远小于 BF16↔RTN 的量化鸿沟(R1-7B 上 25.07→26.23)。<b>NVFP4 下权重误差已经小到"再压也没意义"的地步</b>——推理精度问题的根源在解码采样,不在权重重构:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 11:各方法在 WikiText-2 上的困惑度对比(↓;RTN/4/6/BRQ/MR-GPTQ 均为 NVFP4)</caption>
+    <thead><tr><th>Bit-Precision</th><th>Method</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th></tr></thead>
+    <tbody>
+      <tr><td>BF16</td><td>Baseline</td><td>25.07</td><td>8.91</td><td>9.72</td><td>8.65</td><td>7.61</td></tr>
+      <tr><td rowspan="4">NVFP4</td><td>RTN</td><td>26.23</td><td>9.50</td><td>10.10</td><td>8.91</td><td>8.01</td></tr>
+      <tr><td>4/6</td><td>26.19</td><td>9.49</td><td>10.08</td><td>8.86</td><td>7.98</td></tr>
+      <tr><td>BRQ</td><td>27.00</td><td>9.81</td><td>10.35</td><td>9.53</td><td>8.17</td></tr>
+      <tr><td>MR-GPTQ</td><td>27.48</td><td>9.64</td><td>10.06</td><td>8.95</td><td>7.81</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>7.2 ReSET 与 GPTQ 叠加吗(配 Table 12)</h3>
+  <p>有人会想:ReSET 加在 RTN 上就能追上先进 PTQ,那把 ReSET 直接叠到 GPTQ 上会不会更强?结论是不会(Table 12):除了 LiveCodeBench 平均 +1.0 之外,其余基本打平或略降(如 AIME-120:62.5 → 61.6)。作者的猜测:GPTQ 的纠错作用是"压低低熵 token 的非 top-1 概率",而 ReSET 的温度机制已经在做同一件事,两者功能重叠、收益互相吸收——这也再次说明 ReSET 是 PTQ 之上"便宜的最后一公里",不需要再叠昂贵的重建优化:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 12:ReSET 叠加 GPTQ 的对比(†:ReSET applied on top of GPTQ)</caption>
+    <thead><tr><th>Task</th><th>Method</th><th>R1-Qwen-7B</th><th>R1-Qwen-14B</th><th>Qwen3-8B</th><th>Qwen3-14B</th><th>Qwen3-32B</th><th>Avg</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="3">AIME-120</td><td>RTN</td><td>39.6</td><td>52.4</td><td>62.5</td><td>70.4</td><td>74.4</td><td>59.9</td></tr>
+      <tr class="hl"><td>ReSET</td><td>43.8</td><td>54.0</td><td>64.9</td><td>72.1</td><td>77.5</td><td>62.5</td></tr>
+      <tr><td>ReSET†</td><td>41.9</td><td>53.5</td><td>65.0</td><td>72.4</td><td>76.1</td><td>61.6</td></tr>
+      <tr><td rowspan="3">GPQA-Diamond</td><td>RTN</td><td>47.1</td><td>53.7</td><td>50.7</td><td>57.4</td><td>62.8</td><td>54.3</td></tr>
+      <tr class="hl"><td>ReSET</td><td>46.0</td><td>57.6</td><td>53.2</td><td>58.5</td><td>62.9</td><td>55.6</td></tr>
+      <tr><td>ReSET†</td><td>44.4</td><td>57.4</td><td>52.2</td><td>59.6</td><td>64.3</td><td>55.6</td></tr>
+      <tr><td rowspan="3">LiveCodeBench</td><td>RTN</td><td>29.5</td><td>37.1</td><td>36.4</td><td>46.7</td><td>46.5</td><td>39.2</td></tr>
+      <tr class="hl"><td>ReSET</td><td>28.4</td><td>37.9</td><td>42.1</td><td>46.1</td><td>46.7</td><td>40.2</td></tr>
+      <tr><td>ReSET†</td><td>29.5</td><td>37.3</td><td>43.8</td><td>46.7</td><td>48.8</td><td>41.2</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>7.3 小 M 与 M=128 的内核全景(配 Table 15/16)</h3>
+  <p>正文只报了 M=1,这里补全另外两个运行形态(附录 C):<b>M=4/8</b> 时 CUDA-core 核仍全面领先(1.19–1.66×,24 个组合全部更快);<b>M=128</b>(Tensor-Core tile 被充分占用)时,自研 GEMM 相对 vLLM-CUTLASS 仍有 1.00–1.34× 的优势。换句话说,整个 M 轴的调度图谱都是正的:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 15:小解码 batch(M=4/8)的逐层延迟(µs,↓)。Ours = CUDA-core 小 M 核与 Tensor-Core GEMM 核中较快者。</caption>
+    <thead><tr><th>Model</th><th>Layer</th><th>N</th><th>K</th><th>vLLM M=4</th><th>Ours M=4</th><th>Speedup</th><th>vLLM M=8</th><th>Ours M=8</th><th>Speedup</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4">Qwen3-8B</td><td>qkv_proj</td><td>6144</td><td>4096</td><td>8.32</td><td>6.18</td><td>1.35×</td><td>8.05</td><td>6.01</td><td>1.34×</td></tr>
+      <tr><td>o_proj</td><td>4096</td><td>4096</td><td>7.47</td><td>6.00</td><td>1.25×</td><td>7.42</td><td>5.81</td><td>1.28×</td></tr>
+      <tr><td>gate/up_proj</td><td>12288</td><td>4096</td><td>10.34</td><td>8.67</td><td>1.19×</td><td>10.35</td><td>8.26</td><td>1.25×</td></tr>
+      <tr><td>down_proj</td><td>4096</td><td>12288</td><td>16.05</td><td>11.57</td><td>1.39×</td><td>15.49</td><td>11.62</td><td>1.33×</td></tr>
+      <tr><td rowspan="4">Qwen3-14B</td><td>qkv_proj</td><td>7168</td><td>5120</td><td>10.92</td><td>7.40</td><td>1.48×</td><td>10.09</td><td>7.42</td><td>1.36×</td></tr>
+      <tr><td>o_proj</td><td>5120</td><td>5120</td><td>9.09</td><td>6.88</td><td>1.32×</td><td>8.66</td><td>6.81</td><td>1.27×</td></tr>
+      <tr><td>gate/up_proj</td><td>17408</td><td>5120</td><td>14.88</td><td>11.21</td><td>1.33×</td><td>13.59</td><td>11.19</td><td>1.21×</td></tr>
+      <tr><td>down_proj</td><td>5120</td><td>17408</td><td>23.58</td><td>15.40</td><td>1.53×</td><td>22.22</td><td>15.02</td><td>1.48×</td></tr>
+      <tr><td rowspan="4">Qwen3-32B</td><td>qkv_proj</td><td>10240</td><td>5120</td><td>13.50</td><td>8.43</td><td>1.60×</td><td>11.95</td><td>8.45</td><td>1.41×</td></tr>
+      <tr><td>o_proj</td><td>5120</td><td>8192</td><td>12.31</td><td>9.31</td><td>1.32×</td><td>11.92</td><td>9.46</td><td>1.26×</td></tr>
+      <tr><td>gate/up_proj</td><td>25600</td><td>5120</td><td>26.08</td><td>17.51</td><td>1.49×</td><td>23.14</td><td>17.33</td><td>1.34×</td></tr>
+      <tr><td>down_proj</td><td>5120</td><td>25600</td><td>34.14</td><td>20.54</td><td>1.66×</td><td>31.94</td><td>20.56</td><td>1.55×</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Table 16:M=128 时自研 NVFP4 Tensor-Core GEMM 的逐层延迟(µs,↓)</caption>
+    <thead><tr><th>Model</th><th>Layer</th><th>N</th><th>K</th><th>vLLM (µs)</th><th>Ours (µs)</th><th>Speedup</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4">Qwen3-8B</td><td>qkv_proj</td><td>6144</td><td>4096</td><td>13.76</td><td>11.36</td><td>1.21×</td></tr>
+      <tr><td>o_proj</td><td>4096</td><td>4096</td><td>13.79</td><td>11.23</td><td>1.23×</td></tr>
+      <tr><td>gate/up_proj</td><td>12288</td><td>4096</td><td>18.85</td><td>14.78</td><td>1.27×</td></tr>
+      <tr><td>down_proj</td><td>4096</td><td>12288</td><td>18.91</td><td>14.82</td><td>1.28×</td></tr>
+      <tr><td rowspan="4">Qwen3-14B</td><td>qkv_proj</td><td>7168</td><td>5120</td><td>13.89</td><td>11.30</td><td>1.23×</td></tr>
+      <tr><td>o_proj</td><td>5120</td><td>5120</td><td>13.79</td><td>11.52</td><td>1.20×</td></tr>
+      <tr><td>gate/up_proj</td><td>17408</td><td>5120</td><td>20.93</td><td>18.69</td><td>1.12×</td></tr>
+      <tr><td>down_proj</td><td>5120</td><td>17408</td><td>25.06</td><td>18.88</td><td>1.33×</td></tr>
+      <tr><td rowspan="4">Qwen3-32B</td><td>qkv_proj</td><td>10240</td><td>5120</td><td>18.91</td><td>14.94</td><td>1.27×</td></tr>
+      <tr><td>o_proj</td><td>5120</td><td>8192</td><td>16.86</td><td>12.74</td><td>1.32×</td></tr>
+      <tr><td>gate/up_proj</td><td>25600</td><td>5120</td><td>25.06</td><td>24.99</td><td>1.00×</td></tr>
+      <tr class="hl"><td>down_proj</td><td>5120</td><td>25600</td><td>33.25</td><td>24.80</td><td>1.34×</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">M=128 是 Tensor-Core 主场:本文 GEMM 依然不差于 vLLM-CUTLASS,唯一打平的是 Qwen3-32B gate/up(1.00×);整体 1.12–1.34×。</p>
+</section>
+
+<!-- ================= 8 局限与点评 ================= -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">局限与点评</h2>
+
+  <h3>作者自陈的局限(附录 D)</h3>
+  <ul class="tight">
+    <li>熵动力学可能依赖模型训练方式(RL、SFT、蒸馏配方),最优阈值/温度可能随之变化。</li>
+    <li>推理失败并不只有符号采样错误一个原因:长程一致性、话语规划、中间语义表示同样可能被量化影响。</li>
+    <li>只验证了 Blackwell + NVFP4 + 小 batch 延迟场景;大 batch 吞吐场景、其他硬件、更激进的 MXFP4 格式(量化误差更大、熵动力学不同)尚未探索。</li>
+  </ul>
+
+  <h3>可取之处</h3>
+  <ul class="tight">
+    <li><b>问题选得好、讲得透。</b>"小 batch 解码时 NVFP4 峰值吞吐兑不了现"(Fig 1)戳中了推理服务最实际的痛点:大多数论文在吞吐模式下自嗨,这篇明确把目标锁定在 SLO 可行域。</li>
+    <li><b>从数据出发的完整论证链。</b>150 万 token 分析 → 低熵符号 token 是重灾区 → token 级信号被步骤不确定性污染 → 步骤相对阈值。每一步都有图有数据(Fig 2/3/8),不是拍脑袋调参。</li>
+    <li><b>零成本干预。</b>不动权重、不重训、不加旋转,解码期每 token 一次标量比较 + 两次更新,~1.5% 开销换 2-4 分,对部署方几乎白捡。</li>
+    <li><b>算法 + 系统一体化,口径诚实。</b>温度策略与专用内核是一个完整方案的两半;端到端数字把采样开销计入,不玩文字游戏。</li>
+    <li><b>超参鲁棒性做得扎实。</b>w、$T_{\text{low}}$、$T_{\text{high}}$、$\tau_0$ 标定全部给了敏感性分析,强调"不用任务级调参"。</li>
+  </ul>
+
+  <h3>值得商榷之处</h3>
+  <ul class="tight">
+    <li><b>对比公平性疑点。</b>所有 PTQ 基线(BRQ、4/6、MR-GPTQ)都按 T=0.6 解码,而 ReSET 用 $T_{\text{high}}$=1.0——"多样性恢复"到底来自"温度调高"本身还是"步骤感知选择",二者被混在一起;Table 10 的 0.6→1.0 收益其实部分暴露了这一点。一个 T=1.0 的等温度基线会让结论更干净。</li>
+    <li><b>$T_{\text{low}}$ 在(模型, 任务)上选择。</b>论文声称"无需任务级调参",但 $T_{\text{low}}$ 明说是 per-(model, task) 校准——AIME-120 上选的值直接用于 GPQA/LiveCodeBench 报告,存在一定信息泄漏风险。</li>
+    <li><b>步骤定义的简朴性。</b>用 \n\n 切步是工程妥协:格式敏感,也没有利用语义边界;更稳的步骤分割可能是更好的方向。</li>
+    <li><b>"首个 CUDA-core NVFP4 GEMV"的措辞。</b>论文自谦为"据我们所知",行业同类闭源实现并不少,贡献边界建议读者自行判断。</li>
+  </ul>
+
+  <div class="takeaway">
+    <b>一句话评价:</b>这是一篇"工程品位很好"的论文——诊断扎实、干预轻量、系统闭环,数字口径诚实;短板在对比公平性(温度差异混入)与步骤定义的粗糙,但都不影响其核心洞察("读熵要按步骤语境来读")的成立。对做量化推理部署的同学,ReSET 是低成本高回报的参考实现。
+  </div>
+</section>
+
+<!-- ================= 9 术语速查 ================= -->
+<section id="s9">
+  <div class="sec-no">09 · Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也都可以悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>LRM</td><td>Large Reasoning Model</td><td>靠生成长思维链解题的大模型,如 DeepSeek-R1、Qwen3</td></tr>
+      <tr><td>CoT</td><td>Chain-of-Thought</td><td>思维链:解题前先生成一步步推理过程</td></tr>
+      <tr><td>NVFP4</td><td>NVIDIA FP4 (microscaled)</td><td>Blackwell 原生 4-bit 格式:FP4 元素 + 组内共享缩放</td></tr>
+      <tr><td>W4A4</td><td>Weight 4-bit / Activation 4-bit</td><td>权重与激活都量化为 4-bit 的推理模式</td></tr>
+      <tr><td>PTQ</td><td>Post-Training Quantization</td><td>训练后量化:不重训,直接量化权重/激活</td></tr>
+      <tr><td>RTN</td><td>Round-To-Nearest</td><td>最朴素的"就近舍入"量化基线</td></tr>
+      <tr><td>BRQ / 4-6 / MR-GPTQ</td><td>—</td><td>三种先进 PTQ 基线:块旋转 / 自适应块缩放 / 重建式</td></tr>
+      <tr><td>SLO</td><td>Service Level Objective</td><td>服务质量目标,如"单 token 延迟 ≤ 某值"</td></tr>
+      <tr><td>TPOT</td><td>Time Per Output Token</td><td>每生成一个输出 token 的耗时,延迟关键指标</td></tr>
+      <tr><td>KV cache</td><td>Key-Value cache</td><td>缓存历史键值对,避免重复计算,吃显存</td></tr>
+      <tr><td>Tile / M</td><td>Tensor-Core tile</td><td>Tensor Core 每次矩阵乘的最小块,本文 token 维固定 M=128</td></tr>
+      <tr><td>GEMV / GEMM</td><td>Matrix-Vector / Matrix-Matrix</td><td>向量×矩阵(解码)与矩阵×矩阵(prefill/大 batch)</td></tr>
+      <tr><td>CTA</td><td>Cooperative Thread Array</td><td>协作线程数组,即一个线程块</td></tr>
+      <tr><td>ILP</td><td>Instruction-Level Parallelism</td><td>指令级并行:多条独立指令同时执行</td></tr>
+      <tr><td>Perplexity</td><td>困惑度</td><td>语言模型对文本的"惊讶程度",越低越好</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<!-- lightbox:点击图片查看原始高清大图 -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2606.13233《ReSET: Accurate Latency-Critical NVFP4 Reasoning via Step-Aware Temperature Scaling》的人工精读笔记。
+    图片以 300 DPI 摘自论文原文(arXiv:2606.13233)并按比例缩放展示(未裁剪),表格按原文数据重建;解读部分为编者观点,不构成对原文的替代。<br>
+    原文:arXiv:2606.13233 · 代码:https://github.com/aiha-lab/ReSET<br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  var btn = document.querySelector('.theme-toggle');
+  if (btn) btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:图片点击放大看原图
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lbImg');
+  var lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){
+    lb.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>
