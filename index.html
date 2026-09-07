@@ -148,8 +148,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>4</b> 篇</span><span class="i18n-en"><b>4</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>29</b> 图 + <b>43</b> 表</span><span class="i18n-en"><b>29</b> figures + <b>43</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>5</b> 篇</span><span class="i18n-en"><b>5</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>34</b> 图 + <b>54</b> 表</span><span class="i18n-en"><b>34</b> figures + <b>54</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>2</b> 大类</span><span class="i18n-en"><b>2</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -226,6 +226,26 @@
       </div>
     </div>
 
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">KV Cache 驱逐 · 推理模型 · 高效服务</span><span class="i18n-en">KV Cache Eviction · Reasoning Models · Efficient Serving</span></span>
+      <h3>
+        <a class="i18n-zh" href="efficient-inference/random-attention/">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">重新思考面向高效推理的 KV Cache 驱逐</span></a>
+        <a class="i18n-en" href="efficient-inference/random-attention/en.html">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Rethinking KV Cache Eviction for Efficient Reasoning</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐,4 模型 × 6 任务追平最强基线、<b>60 格中 31 格显著领先</b>,vLLM 吞吐再快 <b>32–43%</b>——一篇把"选择信号几乎不贡献精度"钉死的机制论文。</span>
+        <span class="i18n-en">KV cache eviction needs no score: pin the prompt and evict uniformly at random within each head — matching the strongest evictor across 4 models × 6 reasoning tasks (<b>significantly ahead in 31 of 60 cells</b>) while serving <b>32–43% higher throughput</b> in vLLM, with a full mechanistic account of why the selection signal buys almost nothing.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">5 图 11 表</span><span class="i18n-en">5 figures · 11 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.03430">2609.03430</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="efficient-inference/random-attention/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/random-attention/en.html">Read in English →</a>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -240,8 +260,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">多模态 · 嵌入模型 · 长上下文</span><span class="i18n-en">Multimodal · Embeddings · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="benchmarks/mmlongembed/">④ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
-        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">④ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
+        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑤ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
+        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑤ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">首个专门评测多模态嵌入模型长上下文能力的基准:<b>4 个检索任务、8 个数据集、8,460 个查询、11 个模型</b>。核心发现:现役模型靠表面特征匹配"作弊",细粒度信息保持随长度衰退——"窗口大"≠"读得懂"。</span>

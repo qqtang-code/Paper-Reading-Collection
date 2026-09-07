@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Random Attention (arXiv:2609.03430) — English quick-read edition: KV cache eviction needs no score. Keep the prompt, evict at random per head, match the strongest baseline and serve 32–43% faster. Every figure at 300 DPI.">
+<meta name="keywords" content="paper reading, KV cache, eviction, reasoning models, efficient inference, vLLM, Random Attention">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Random Attention: Rethinking KV Cache Eviction — English Quick-Read">
+<meta property="og:description" content="The selection signal in KV cache eviction contributes almost nothing: prompt protection plus uniform per-head random eviction matches the strongest evictor and serves 32–43% faster in vLLM.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Random Attention: Rethinking KV Cache Eviction — English Quick-Read</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:56px 0 48px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:31px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:16.5px; opacity:.92; max-width:920px}
+  header.hero .meta{margin-top:20px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center; overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+  .algo{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:16px 22px; margin:14px auto; max-width:820px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13.5px; line-height:1.7}
+  .algo .algo-title{font-weight:700; font-family:inherit; margin-bottom:8px; color:var(--ink)}
+  .algo .cmt{color:var(--muted)}
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:24px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">Random Attention<span>·Quick Read</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Preliminaries</a>
+      <a class="jump" href="#s3">Method</a>
+      <a class="jump" href="#s4">Results</a>
+      <a class="jump" href="#s5">Analysis</a>
+      <a class="jump" href="#s6">Efficiency</a>
+      <a class="jump" href="#s7">Diagnostics</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文精读版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark/light" title="Toggle dark/light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.03430 · English quick-read edition</div>
+    <h1>Random Attention: Rethinking KV Cache Eviction<br>for Efficient Reasoning</h1>
+    <div class="subtitle">Every KV cache evictor to date scores cached tokens by estimated future importance and keeps the top-scoring ones. This paper tests that premise directly and rejects it: keep the prompt, evict uniformly at random within each KV head, compute no score at all — and you match the strongest prior evictor across four models and six reasoning tasks while serving 32–43% higher throughput in vLLM. Two controlled experiments explain why: the prompt is the fragile part of the cache, and the reasoning trace protects itself with redundancy in the text and across attention heads.</div>
+    <div class="meta">
+      <span>Salesforce AI Research + UIUC (Heng Wang et al.)</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2609.03430">arXiv:2609.03430</a></span>
+      <span>Code: <a href="https://github.com/SalesforceAIResearch/Random-Attention">GitHub</a></span>
+      <span>Full Chinese deep-read: <a href="index.html" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}" style="color:#cfe0ff">中文精读版</a></span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">KV cache eviction</span><span class="pill">reasoning models</span><span class="pill">long CoT</span><span class="pill">efficient serving</span><span class="pill">vLLM</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Navigation (figures appear in narrative order)</h2>
+  <ol>
+    <li><a href="#s1">Overview: the counterintuitive claim</a></li>
+    <li><a href="#s2">Preliminaries: the eviction framework</a></li>
+    <li><a href="#s3">Method: two structural choices, four lines</a></li>
+    <li><a href="#s4">Results: the main grid</a></li>
+    <li><a href="#s5">Analysis: why the signal buys so little</a></li>
+    <li><a href="#s6">Efficiency: what skipping the score is worth</a></li>
+    <li><a href="#s7">Diagnostics: keep-logs, lengths, variance</a></li>
+    <li><a href="#s8">Commentary: strengths and limits</a></li>
+    <li><a href="#s9">Glossary</a></li>
+  </ol>
+</nav>
+
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview</h2>
+  <p class="lead">Reasoning models generate chains of thought that run to tens of thousands of tokens, and the <abbr title="Key-Value Cache">KV cache</abbr> grows linearly with generation — a decode-phase memory bottleneck. The entire eviction literature shares one paradigm: score each cached token by how much it will matter later, keep the top-scoring ones. This paper shows the selection signal contributes almost nothing.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">The method</div><div class="v">Pin the prompt + random per head<small>No score, no calibration, no tuning: one rand and one topk per eviction</small></div></div>
+    <div class="item"><div class="k">Accuracy (4 models × 6 tasks)</div><div class="v">Significantly ahead in 31 of 60 cells<small>Behind in exactly one (32B code; traced to prompt length, not selection)</small></div></div>
+    <div class="item"><div class="k">Throughput (vLLM, 32k gens)</div><div class="v">+32–43% over the best baseline<small>And 1.6–2.7× full attention, because no scoring pass ever runs</small></div></div>
+    <div class="item"><div class="k">Cost per eviction round</div><div class="v">0.30 ms<small>The compaction floor; TriAttention pays 1.47–1.64 ms</small></div></div>
+  </div>
+
+  <p>Random Attention is deliberately both a deployable method and a <strong>null hypothesis</strong>: any signal-based selector that cannot beat uniform randomness at matched budget is not extracting usable information from its signal.</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: mean accuracy across six tasks and vLLM serving throughput">
+    <figcaption>
+      <b>Figure 1:</b>(a) Mean accuracy over the six reasoning tasks of Tables 1 and 5 at ∼4× compression: Random Attention matches the strongest prior evictor on every model (the small gaps to TriAttention at 14B and 32B are mostly driven by code reasoning, where long prompts consume the budget). (b) vLLM serving throughput at 32k-token generations; labels give Random Attention's multiple of full attention and its margin over TriAttention: with no scoring pass it serves 32–43% higher throughput.
+      <span class="ex">Left: at ~4× compression the random policy (rightmost bars) is statistically indistinguishable from the best score-based evictor on all four models. Right: it serves 1.58×/2.23×/1.97×/2.67× full-attention throughput and beats TriAttention by +37%/+43%/+40%/+32% on identical kernels — the entire margin comes from never running a scoring pass.</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image for the full-resolution original; click again or press Esc to close.</p>
+
+  <div class="takeaway"><b>The one-sentence claim:</b> an evictor's accuracy is decided by <b>what it protects</b>, not by how it ranks the rest. Once the irreplaceable prompt is safe, the trace's own redundancy keeps enough copies of what the model still needs — and the only thing a signal still buys is the rare fact stated once and never restated, which reasoning traces seldom produce.</div>
+</section>
+
+<section id="s2">
+  <div class="sec-no">02 · Preliminaries</div>
+  <h2 class="sec">Preliminaries: the eviction framework</h2>
+  <p>The regime reasoning models create: a 200-token question triggers a 10,000+-token chain of thought, so the cache fills <strong>during decoding</strong>. Eviction discards pairs permanently once a budget is reached — memory-bounded, irrecoverable — and is therefore distinct from sparse-attention selection, which attends to a subset but keeps every pair (saves compute, not memory).</p>
+  <p>The decode-phase framework: a persistent per-head budget of $K$ pairs plus a buffer of the $r \ll K$ most recent pairs (never scored). Every $r$ steps the buffer fills and triggers an eviction over the candidate set $C_t$ (all cached positions outside the buffer):</p>
+  <div class="math">$$S_t=\operatorname{top-}K_{i\in C_t}\; s_i \tag{2}$$</div>
+  <p>Prior methods are choices of the score $s_i$:</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Every evictor as its scoring rule (one row per method; the last row is this paper)</caption>
+    <thead><tr><th>Method</th><th>Score s<sub>i</sub></th><th>Intuition</th><th>Default prompt handling</th></tr></thead>
+    <tbody>
+      <tr><td>StreamingLLM</td><td>none (structural rule)</td><td>attention sinks + recent window</td><td>sinks only</td></tr>
+      <tr><td>H2O</td><td>$\sum_{t'=i}^{t}\alpha_i^{(t')}$</td><td>accumulated attention since entry</td><td>left to the score</td></tr>
+      <tr><td>SnapKV</td><td>$\sum_{t'=t-w+1}^{t}\alpha_i^{(t')}$, max-pooled</td><td>attention from the last $w$ queries</td><td>sinks only</td></tr>
+      <tr><td>R-KV</td><td>$\lambda s_i^{\text{Snap}}+(1-\lambda)(1-\bar c_i)$, $\bar c_i$ = mean key cosine</td><td>important and non-redundant</td><td>sinks only (retains the most)</td></tr>
+      <tr><td>VaSE</td><td>value range $\max_j v_{ij}-\min_j v_{ij}$, rest sampled ∝ SnapKV</td><td>large value swings matter</td><td>sinks only</td></tr>
+      <tr><td>TriAttention</td><td>$f(t-i)$, per-head calibrated trigonometric series + $\lVert k_i\rVert$</td><td>position distance from the query</td><td><strong>keeps the whole input</strong></td></tr>
+      <tr class="hl"><td>Random Attention (this paper)</td><td>$+\infty$ (prompt) / $u_i\sim\mathrm{Uniform}(0,1)$</td><td>question never dies, trace scattered</td><td><strong>entire prefill pinned</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note"><b>The confound to remember:</b> the last column. Methods differ in whether the prompt survives by rule or by score — TriAttention protects the whole input by default; SnapKV/R-KV/VaSE leave it to the score. Cross-paper accuracy comparisons therefore compare protection regimes as much as scores. §5 turns this into the key experiment.</div>
+</section>
+
+<section id="s3">
+  <div class="sec-no">03 · Method</div>
+  <h2 class="sec">Method: two structural choices, four lines</h2>
+  <p class="lead">The intuition separates the irreplaceable input from the model-generated trace: the question is stated once and cannot be recovered if evicted; the trace revisits and restates its intermediates as generation proceeds. Protect the former; scatter the latter.</p>
+  <ul class="tight">
+    <li><strong>1. Protect the question.</strong> Positions $1,\ldots,\ell_p$ — the entire prefill (system prompt, chat template, question) — are never evicted.</li>
+    <li><strong>2. Scatter the rest, per head.</strong> Every remaining position draws an i.i.d. uniform random score; each KV head independently keeps its top-$K$. The retained budget spreads evenly over the whole trace, differently in every head.</li>
+  </ul>
+  <div class="math">$$s_i=\begin{cases}+\infty, & i\le \ell_p \quad(\text{the prompt})\\[2pt] u_i\sim\mathrm{Uniform}(0,1), & \text{otherwise}\end{cases} \tag{3}$$</div>
+  <div class="algo">
+    <div class="algo-title">Algorithm 1 · Random Attention scoring (one eviction event; runs per layer)</div>
+    <div>1: s ← rand(B, H<sub>kv</sub>, S) <span class="cmt">▹ i.i.d. uniform score per cached position, per KV head</span></div>
+    <div>2: s[:, :, 0:ℓ<sub>p</sub>] ← +∞ <span class="cmt">▹ force-keep the question</span></div>
+    <div>3: keep ← topk(s, K) <span class="cmt">▹ independent top-K per KV head</span></div>
+    <div>4: return keep</div>
+  </div>
+  <p>Per-eviction cost: one <code>rand</code> plus one <code>topk</code>. This is the weakest selection signal that can be written down — which is exactly the point. Note the policy is not age-blind in effect: a position surviving $n$ evictions had to win $n$ fresh draws, so survival is $\left(\frac{K-\ell_p}{K+r-\ell_p}\right)^n\approx 0.94^n$ at $K=1024$, $r=64$ — a soft recency window with a per-head long tail.</p>
+</section>
+
+<section id="s4">
+  <div class="sec-no">04 · Results</div>
+  <h2 class="sec">Results: the main grid</h2>
+  <p><strong>Setup.</strong> Qwen3-4B/14B/32B and Phi-4-reasoning across six tasks — MATH500 (500 problems), GPQA-Diamond (198), AIME 2025+2026 pooled (60), HMMT (60), LiveCodeBench-v6 medium (383, pass@1 by real test execution). Budgets at ~4× compression of each task's typical trace (~3× for LiveCodeBench): $K$ = 1024 / 2048 / 4096 / 4096 / 3072; 32k generation cap; official sampling settings with 2–16 independent runs per cell; every claimed margin gated by a paired, problem-clustered percentile bootstrap (95% CI) plus an exact sign test.</p>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: main accuracy grid on three models">
+    <figcaption>
+      <b>Table 1:</b>Accuracy under KV cache eviction at each task's ∼4× compression (LiveCodeBench: ∼3×); the header gives each task's per-head KV budget K. Bold: best eviction method per column; grayed: significantly below Random Attention.
+      <span class="ex">Reading the grid: on MATH500/GPQA-D the random policy significantly beats VaSE and SnapKV on every model (and R-KV on Qwen3-4B), and no selector is significantly above it. On competition math (AIME/HMMT, 16 runs per problem) SnapKV trails significantly everywhere; VaSE's nominal +1.7/+1.5 on 32B sits well inside a ±5-point run-to-run σ on 30 problems. LiveCodeBench is the one task with large gaps — SnapKV loses 20–35 points everywhere and VaSE collapses on Phi-4 (0.373) — explained below by prompt length, not selection quality.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: Qwen3-14B replication">
+    <figcaption>
+      <b>Table 5:</b>Performance of Qwen3-14B with the same setting as in Table 1.
+      <span class="ex">The 14B replication shows the same picture, with three cells where a baseline is significantly ahead: TriAttention on LiveCodeBench (+2.6, p=.007) and MATH500 (+2.1, p=.02), and VaSE on AIME (+2.6, p=.007) — consistent with their nominal edges at 32B. The code-task wins line up with the prompt-length account below.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: accuracy from 2x to 16x compression">
+    <figcaption>
+      <b>Figure 2:</b>Accuracy from 2× to 16× compression on Qwen3-4B and Phi-4-reasoning, on the four math and science tasks; dashed lines mark full attention.
+      <span class="ex">At 2× every method sits near full attention; as the budget tightens, Random Attention stays tied with TriAttention while the gap to VaSE opens on both families (e.g. Qwen3-4B MATH500 at 16×: 0.39 vs 0.09). Randomness does not fall apart under pressure. LiveCodeBench is excluded from the sweep — its prompts alone would not fit the small budgets.</span>
+    </figcaption>
+  </figure>
+
+  <p><strong>Why code is different: prompts are six times longer.</strong> LiveCodeBench prompts average 557 tokens — six times MATH500 under the same tokenizer — and the longest consume up to half of the $K=3072$ budget. A selector that loses the prompt pays the most here (that is SnapKV's and VaSE's collapse); Random Attention pins every prompt token, so on code a large share of its budget is spent before selection begins. Much of a code prompt is scaffolding (I/O formats, harness instructions) that a smarter rule might compress rather than pin — left to future work, since the method's value as a null lies in having nothing to tune.</p>
+</section>
+<section id="s5">
+  <div class="sec-no">05 · Analysis</div>
+  <h2 class="sec">Analysis: why the signal buys so little</h2>
+  <p class="lead">Cache content in reasoning splits into the <strong>prompt</strong> (stated once, never again) and the <strong>working state</strong> (intermediates written and rewritten continually). Two controlled experiments show the first is fragile — most of the gap between selectors is just whether their score kept the question — and the second is redundant enough that a random draw suffices.</p>
+
+  <h3>The prompt is the fragile part</h3>
+  <p>Give every method the same rule — keep the prompt — and the score separates from the protection:</p>
+
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: performance before and after protecting the prompt">
+    <figcaption>
+      <b>Table 2:</b>Performance before and after protecting the prompt. R-KV never gains more than 1.9 points, SnapKV gains everywhere, VaSE gains materially only on Phi-4-reasoning.
+      <span class="ex">The rule pays each method exactly what its score was losing of the question: SnapKV (which retains the least prompt) gains everywhere, up to +22.5 on Phi-4 GPQA-D; VaSE gains only where its retention fails (+4.2/+10.2 on Phi-4, whose prompts run 2–3× longer); R-KV, which already keeps most of it, never gains more than +1.9. After the rule the three baselines land within 2.2 points of one another in every setting. The two signal-free rows make the point from the other side: without the rule a recency window scores as low as 0.093 and Random Attention (prompt surviving only at the uniform rate) falls to 0.23–0.76; with the rule, Random Attention is the best policy in every setting and even a plain recency window comes within two points of the best baseline. Losing the prompt is catastrophic; cutting the trace at random is not.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: matched protection in the remaining settings">
+    <figcaption>
+      <b>Table 6:</b>Matched protection in the settings Table 2 does not cover (LiveCodeBench: pass@1; others: accuracy; AIME pools 2025+2026). Small numbers give the gain from the rule; bold marks the best protected method. TriAttention and Random Attention keep the prompt by construction and appear only in the protected column.
+      <span class="ex">Across all fifteen protected settings the payoff follows the retention deficit (SnapKV's largest gain +35.2 on Phi-4 code; R-KV moves by −1.4 to +0.9, essentially zero), and protection closes the large method-specific gaps completely — SnapKV and VaSE become statistical ties with Random Attention on code for both models. What survives the rule is smaller and runs in Random Attention's favour: on 32B GPQA-D all three protected baselines remain 4–6 points below a policy that ranks nothing. Since TriAttention and Random Attention both keep the prompt by construction, every TriAttention-vs-Random-Attention cell of Table 1 was already a matched-protection comparison.</span>
+    </figcaption>
+  </figure>
+
+  <h3>The working state protects itself: two levels of redundancy</h3>
+  <p>The trace is stored redundantly <strong>in the text</strong> (the model restates what it is still using) and <strong>across heads</strong> (every KV head holds its own copy; eviction decides per head which copies die — a token is lost only when all heads drop it). A <strong>planted-fact probe</strong> quantifies the second level: a synthetic fact ("Let zq = 4729", fresh names each time) is inserted into real MATH500 traces 1,536 tokens before the question (15 evictions in between); the experiment controls which heads keep the fact, measured by greedy-decode <strong>retrieval</strong> and a graded <strong>recall</strong></p>
+  <div class="math">$$R=\frac{\sum_i\left(LP_i-LP_i^{\text{del}}\right)}{\sum_i\left(LP_i^{\text{kept}}-LP_i^{\text{del}}\right)} \tag{4}$$</div>
+  <p>with $LP_i$ the log-probability of trace $i$'s correct value under the tested condition; $R=1$ means the surviving copies are worth as much as never evicting the fact, $R=0$ that they are worth nothing.</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: cross-head pooling and shape insensitivity">
+    <figcaption>
+      <b>Figure 3:</b>(a) A fact held in one head is almost never retrieved; held in several it is. (b) Two facts in different heads are worth more together than the sum of each alone (dashed). (c) Real MATH500: contiguous blocks cost nothing up to size 64; accuracy drops only once a head is left with 4 (K=1024) or 2 (K=512) blocks.
+      <span class="ex">(a) Heads specialise — only 3 of Qwen3-4B's 8 KV heads retain a usable trace alone, and weakly (best single head 0.03, next 0.01) — but pooling is strongly superadditive: the same two heads together yield the fact in 60% of trials, three heads 83%, all eight 99%. (b) Pooling even crosses facts: two values held in different heads give R=0.31 together against 0.10 and 0.16 alone. (c) Shape does not matter: dealing the fact token-by-token across heads (no readable span) barely moves retrieval (0.33 vs 0.39) or recall (R=0.75 vs 0.76); on real traces, contiguous blocks from 1 to 64 tokens cost nothing and only block size 256 drops accuracy — because a head is left with just 4 (K=1024) or 2 (K=512) blocks. What matters is whether some usable copy survives somewhere — exactly what independent per-head draws maximise.</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>Shared-draw control:</b> removing cross-head diversity (all heads share one random keep-set) costs nothing on real MATH500 traces — 0.871 vs 0.874 at K=1024, 0.788 vs 0.789 at K=512. Text-level redundancy already keeps a restated copy; the cross-head level carries what the text does not restate (the probe's regime). The two redundancies are substitutes, and Random Attention preserves both.</div>
+
+  <h3>What is left for a selection signal: the fact stated once</h3>
+
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: the passcode experiment">
+    <figcaption>
+      <b>Table 3:</b>A passcode stated once, 57 compression rounds before the question.
+      <span class="ex">The one case a signal-free policy cannot cover. Retrieval tracks the statistic each signal scores by: R-KV, whose importance accumulates attention over the whole history, finds the passcode 84% of the time (log p −0.71); VaSE's attention-proportional sampling a third of the time; the recent-window signals of SnapKV and TriAttention almost never; Random Attention never (0.000, −18.35 — the passcode is effectively gone). Wang (2026) proves random caches must lose at pointer-chasing when nothing is redundant — needle-finding is real selection skill — but it neither implies nor follows from aggregate strength: the best needle-finder (R-KV) leads only one column of Table 1, and the strongest aggregate baseline (TriAttention) recovers almost nothing here. On real traces the case is rare, because the model keeps restating what it is still using.</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>The mechanism account:</b> accuracy gaps ≈ prompt-protection regime + a small (often negative) residual selection effect; the trace's two-level redundancy makes random draws sufficient once the prompt is safe; the genuinely irreplaceable role of a signal — once-stated facts — exists but is rare in reasoning. That is the full story of "the signal buys almost nothing."</div>
+</section>
+
+<section id="s6">
+  <div class="sec-no">06 · Efficiency</div>
+  <h2 class="sec">Efficiency: what skipping the score is worth</h2>
+  <p>Two settings: ① <strong>vLLM + PagedAttention</strong> (the TriAttention protocol and plugin, identical kernels and scheduler, only the selector swapped), and ② <strong>HuggingFace + FlashAttention-2, no paging</strong>, each method at the largest batch that fits the GPU.</p>
+
+  <h3>Paged serving: +32–43% on the same kernels</h3>
+  <p>One H200, $K=2048$, 1k-token prompts, 32k-token generations, 128 requests (Qwen3-32B capped at 96 — its 64 GB of weights shrink the KV pool; Phi-4 generates 31.5k within its 32k context). At 32k the cache, not compute, limits concurrency, so a smaller cache means more requests in flight:</p>
+
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: vLLM serving throughput">
+    <figcaption>
+      <b>Table 4:</b>Serving throughput (output tok/s, and the multiple of full attention) under vLLM with PagedAttention on one H200 (K=2048, 1k-token prompts, 32k-token generations).
+      <span class="ex">Random Attention serves 2046 / 1737 / 1819 / 923 tok/s — 1.58× / 2.23× / 1.97× / 2.67× full attention, and +37% / +43% / +40% / +32% over TriAttention on identical kernels. The margin is not specific to this operating point: it holds at 8k short generations (+35–42%), at the capacity ceiling (+41/+42%), while at a single request the two methods differ by ~1% (115.8 vs 117.0 s) — the serving margin is the barrier-multiplied cost of reading paged cache state, not a kernel-time gap.</span>
+    </figcaption>
+  </figure>
+
+  <h3>Why the scoring pass costs 32–43% in serving</h3>
+
+  <figure class="fig">
+    <img src="figs/table9.png" alt="Table 9: cost of one eviction round">
+    <figcaption>
+      <b>Table 9:</b>Cost of one eviction round (scoring + compaction), measured with CUDA events on an otherwise idle H200: K=1024, 4096 decode steps, single stream. Random Attention performs no scoring, so its round time is the compaction floor every evictor pays.
+      <span class="ex">Per-round ladder: Random Attention 0.30 ms (the compaction floor), SnapKV 0.37, R-KV 0.58, VaSE 0.74, TriAttention 1.47–1.64 ms — the excess over the floor is the price of the selection signal. Ordering and per-call costs are unchanged across a 3.5× change in model size (within 12%).</span>
+    </figcaption>
+  </figure>
+
+  <ul class="tight">
+    <li><strong>Compressions pile up at barriers.</strong> 128 concurrent requests, each compressed every 64 of its own tokens → about 62,000 compressions per workload, each executed at a synchronisation point between batched steps: while one request is compressed, all 128 wait. On Qwen3-14B, TriAttention's extra 910 s over a 32k run amounts to ~15 ms of whole-batch waiting per compression, against well under a millisecond for Random Attention.</li>
+    <li><strong>Paged serving makes content-dependent scores expensive.</strong> Fused kernels never materialise attention weights, so weight-reading scores (SnapKV, R-KV, VaSE's fill) must recompute a windowed query-key product; cache-reading scores (VaSE's value range, TriAttention's key statistics) still need gathers across block tables, layer by layer. Random Attention reads nothing: its keep-set is a random permutation of slot indices, so the runtime's existing compaction path is the whole integration — adding it to TriAttention's plugin took a single function (R-KV's released port spans ~849 lines of wiring across 13 files).</li>
+  </ul>
+
+  <h3>Equal memory: everyone banks the capacity win; the ordering follows the scoring pass</h3>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: equal-memory decode throughput at each method's largest batch">
+    <figcaption>
+      <b>Figure 5:</b>Equal-memory serving: decode throughput relative to full attention at each method's largest batch on one H200 (K=3072, 32k generations). ∗TriAttention here is an unfused re-implementation of its scorer, far slower than the vLLM version.
+      <span class="ex">Full attention fits only 28 (4B) / 20 (14B) concurrent sequences; compressed caches fit 109–200 — that shared capacity is where the 3–10× speedups come from. The residual ordering follows scoring cost: Random Attention 10.0× (batch 200) / 8.8× (batch 120) on top, SnapKV and VaSE ~9.1×, R-KV 6.9×/5.7×. The TriAttention bar (starred) is the authors' unfused PyTorch re-implementation, far slower than their released kernels — on vLLM the gap to Random Attention is 1.4×, not 2.7–3.0×; the method-level claim therefore rests on Table 4.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table10.png" alt="Table 10: equal-memory throughput, exact numbers">
+    <figcaption>
+      <b>Table 10:</b>Serving throughput when each method runs at the largest batch that fits one 143 GB H200, at K=3072 with 32k generations. The small cache is what buys the batch, so every evictor collects most of the win; the ordering among them follows the cost of their scoring pass.
+      <span class="ex">Exact numbers: full attention 178 / 164 tok/s at batch 28 / 20; Random Attention reaches 1779 / 1436 tok/s (10.01× / 8.78×) at the largest batches (200 / 120) and the smallest peak footprint (101 and 89 GB). Same-code-path baselines: SnapKV 1624, VaSE 1617, R-KV 1223 on 4B. Ordering unchanged at 16k generations.</span>
+    </figcaption>
+  </figure>
+
+  <p>At the tighter MATH500 budget $K=1024$ the same protocol fits 544–584 sequences against 28, and Random Attention reaches <strong>28.8×</strong> full-attention throughput (5110 tok/s) — 16% above SnapKV and 20% above VaSE at their own largest batches:</p>
+
+  <figure class="fig">
+    <img src="figs/table11.png" alt="Table 11: equal-memory serving at K=1024">
+    <figcaption>
+      <b>Table 11:</b>Equal-memory serving at K=1024 (Qwen3-4B, 32k generations, one 143 GB H200): the tighter budget fits a batch of 584 against 28 for full attention, and Random Attention reaches 28.8× full-attention throughput.
+      <span class="ex">The capacity multiple grows as the budget shrinks: batch 584 vs 28, 5110 tok/s = 28.79× full attention. The no-score advantage takes its extra slice at every budget. R-KV and TriAttention were not measured at this budget.</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>Two tooling pitfalls the authors recorded (worth copying into your own benchmarking checklist):</b> ① vLLM's own throughput benchmark ignores the requested output length — its default 128-token outputs never reach the compression threshold, so it silently times full-attention decoding; ② the integration's deduplication guard can disable all later compaction after one benign under-budget round. Both were fixed with bookkeeping-only changes, and every reported run is verified by its applied-event counters.</div>
+</section>
+
+<section id="s7">
+  <div class="sec-no">07 · Diagnostics</div>
+  <h2 class="sec">Diagnostics: keep-logs, lengths, variance</h2>
+  <p>The retention numbers of §5 come from logging every eviction round of real runs: 19 policy–cell logs, 16 traces each, 10<sup>4</sup>–10<sup>5</sup> rounds per log, recording each (layer, KV head) keep-set with the age of every retained position. Slot coverage (fraction of candidates retained by at least one head): 0.999–1.000 for Random Attention and VaSE, 0.993 for TriAttention, 0.938 for the shared-draw control. Prompt survival (union / per head): 0.994–0.999 and identical per head for Random Attention, vs 0.55–0.91 / 0.26–0.67 for R-KV, 0.56–0.70 / 0.20–0.29 for VaSE, and 0.32–0.42 / 0.11–0.22 for SnapKV — the lowest in every setting. By age:</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: retention by token age for three policies">
+    <figcaption>
+      <b>Figure 4:</b>Fraction of positions of a given age that a head still holds (log scale; Qwen3-4B MATH500, K=1024). Random Attention decays geometrically with age; VaSE concentrates and freezes a tail of old favourites; TriAttention spends almost uniformly across ages.
+      <span class="ex">Three budget shapes: Random Attention decays geometrically (a soft recency window whose tail differs head to head); VaSE concentrates and freezes a tail of old favourites; TriAttention spends almost uniformly across ages but its heads keep nearly the same positions — the least cross-head diversity of any per-head policy measured (cross-head union in the 1–2k band only 0.199, vs 0.776 for Random Attention). The band reasoning looks back into spans ~2.2× of age — but per §5.2 the shape is not what accuracy depends on; surviving copies are.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: mean generated tokens per cell">
+    <figcaption>
+      <b>Table 7:</b>Mean generated tokens (thousands) per cell of Tables 1 and 5, measured over every run of the cell; Avg = unweighted mean over the five tasks.
+      <span class="ex">Eviction generally lengthens generation (losing things → re-deriving them), most for the weakest selectors (SnapKV averages 17.0k vs full attention's 12.1k on Qwen3-4B). Random Attention is the shortest-generating evictor on Qwen3-4B and 14B (13.9k / 13.1k average) and within ~5% of the shortest on the others — its accuracy parity is not bought with longer generations. The 32B LiveCodeBench cell (18.4k) is its longest, consistent with the tight code budget.</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table8.png" alt="Table 8: run-to-run standard deviation per cell">
+    <figcaption>
+      <b>Table 8:</b>Run-to-run variability: standard deviation of per-run accuracy (points) across each cell's independent sampled runs.
+      <span class="ex">Variability by task: at or under ~1 point on MATH500, 1–3 points on GPQA-D and LiveCodeBench, 2–5 points on competition math (AIME has only 30 problems). This is why every claim is decided by the paired, problem-clustered tests rather than raw cell differences — e.g. VaSE's +1.7 AIME edge on 32B against a ±5-point σ is noise. MATH500 cells have R=2 runs, so their σ is a two-sample estimate.</span>
+    </figcaption>
+  </figure>
+
+  <p>Hardware: accuracy generation on a mixed fleet of H200 nodes; every efficiency measurement H200-only, one job per GPU, nothing else on the node. All cells graded at the 32k limit by the final boxed answer (LiveCodeBench by test execution); no partially completed cell enters any table.</p>
+</section>
+
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary: strengths and limits</h2>
+  <h3>What is worth learning</h3>
+  <ul class="tight">
+    <li><strong>The null-hypothesis move.</strong> "Random" is promoted from a passive baseline to an active null: a signal that cannot beat it at matched budget extracts no usable information. The argument structure transfers to any heuristic-stacking field.</li>
+    <li><strong>Experimental discipline.</strong> Matched budget, matched prompt protection, paired problem-clustered bootstrap + sign tests. The "default prompt handling" column in §2 is the key to spotting the confound — before comparing across papers, ask what each one protects.</li>
+    <li><strong>A complete attribution chain.</strong> Rule experiment (gaps vanish) → probe experiment (redundancy quantified: single heads 0.03 → all eight 0.99, superadditive) → boundary experiment (the passcode: each signal retrieves exactly per its statistic). The conclusion is not "random is fine" but "why random is fine, and where it is not."</li>
+    <li><strong>Systems work done properly.</strong> Throughput claims decompose to "15 ms whole-batch wait per compression vs &lt;1 ms", with honest recording of two benchmarking pitfalls and of which TriAttention implementation each comparison uses.</li>
+  </ul>
+  <h3>Boundaries and caveats</h3>
+  <ul class="tight">
+    <li><strong>Code remains the soft spot.</strong> Pinning whole prompts wastes budget when prompts are long (up to half of K); TriAttention's small code wins at 14B/32B are the only significant baseline victories in the grid. Compressing scaffolding instead of pinning it is the obvious next step — but then the method is no longer tune-free.</li>
+    <li><strong>Once-stated facts genuinely lose.</strong> 0.000 vs R-KV's 0.836 in the passcode test is not a small gap; accumulated-attention scoring has real value on needle workloads. If your workload declares things once, never restates them, and uses them far away (legal clauses? code dependencies?), random eviction is not for you.</li>
+    <li><strong>Eviction only.</strong> Sparse-attention selection (saves compute, not memory) and quantization (keeps everything at lower precision) are orthogonal; the conclusions do not transfer to them.</li>
+    <li><strong>Bound to reasoning-trace corpora.</strong> The mechanism (restatement + cross-head copies) is richest in long chains of thought; long-input/short-output working states are thin, and the paper is explicit about the distinction.</li>
+  </ul>
+  <h3>Concurrent work and implications</h3>
+  <p>Independent lines assemble the same picture: Prefix Sliding keeps the prompt plus a recent window (the recency+prompt row that lands within two points of the best baseline here); Garcia (2026) finds scoring second-order once prompt boundaries are guarded in globally capped long-context QA; Wang (2026) proves random caches must lose pointer-chasing when nothing is redundant — and this paper's empirical finding (two-level redundancy in reasoning traces) is precisely the real-world condition that evades that lower bound. For future work: move eviction research from better scores to better protection (prompt budgeting for long prompts, content-dependent preservation of rare once-stated facts), and treat "beat Random Attention at matched budget and matched prompt protection" as the acceptance test for any new selection signal. For practitioners serving reasoning models under a memory budget, Random Attention is a reasonable default — no calibration, no tuning, no scoring pass, fastest at equal accuracy.</p>
+</section>
+
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Hover any dotted-underlined abbreviation in the text, or consult the table.</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Reading glossary (abbreviations with dotted underlines are hoverable in the text)</caption>
+    <thead><tr><th>Term</th><th>Meaning</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>KV cache</td><td>Key-Value Cache</td><td>Cached history key-value pairs; grows linearly with generation, the bottleneck here</td></tr>
+      <tr><td>eviction</td><td>KV cache eviction</td><td>Permanently discarding pairs once the cache exceeds a budget; memory-bounded but irrecoverable</td></tr>
+      <tr><td>K / r</td><td>budget / buffer</td><td>Per-head persistent KV budget K; the r most recent positions, never scored</td></tr>
+      <tr><td>prefill / ℓ<sub>p</sub></td><td>—</td><td>Everything injected before generation (system prompt + template + question); pinned by Random Attention</td></tr>
+      <tr><td>working state</td><td>—</td><td>Intermediates the trace writes and rewrites; protected by two-level redundancy (text restatement + per-head copies)</td></tr>
+      <tr><td>attention sink</td><td>—</td><td>Early positions that consistently receive high attention; StreamingLLM-style methods keep only these by default</td></tr>
+      <tr><td>top-K keep-set</td><td>S<sub>t</sub></td><td>The K positions each head retains after an eviction round; decisions are per layer and per KV head</td></tr>
+      <tr><td>KV head / GQA</td><td>Grouped-Query Attention</td><td>Query groups share KV heads; a group shares its head's keep-set</td></tr>
+      <tr><td>planted-fact probe</td><td>—</td><td>Inserting a synthetic fact into real traces and controlling which heads keep it, to measure cross-head redundancy</td></tr>
+      <tr><td>Retr. / R</td><td>Retrieval / graded Recall</td><td>Greedy-decode reproduction rate; and Eq. 4 recall where 1 = as good as never evicted, 0 = worthless</td></tr>
+      <tr><td>passcode test</td><td>—</td><td>Announce a passcode once, ask 57 compression rounds later: the regime where selection signals are irreplaceable</td></tr>
+      <tr><td>slot coverage / prompt survival</td><td>keep-log metrics</td><td>Fraction of candidates kept by ≥1 head / fraction of prompt positions still held; the quantitative basis of §5</td></tr>
+      <tr><td>shared draw</td><td>—</td><td>Ablation where all heads share one random keep-set; costs only 0.3 points on real MATH500 traces</td></tr>
+      <tr><td>implicit age bias</td><td>—</td><td>Survival over n evictions ≈ 0.94<sup>n</sup>: random eviction is a soft recency window plus a per-head tail</td></tr>
+      <tr><td>preemption</td><td>vLLM preemption</td><td>Requests silently evicted when the KV pool is oversubscribed; compression state does not survive it, hence concurrency caps</td></tr>
+      <tr><td>barrier</td><td>synchronisation point</td><td>Where vLLM runs compressions, between batched steps — the whole batch waits while one request is compressed</td></tr>
+      <tr><td>vLLM / PagedAttention</td><td>—</td><td>Paged serving runtime; block tables make content-dependent scoring require extra passes over paged state</td></tr>
+      <tr><td>FlashAttention-2</td><td>—</td><td>Fused attention kernels that never materialise attention weights, forcing weight-reading scorers to recompute</td></tr>
+      <tr><td>clustered bootstrap / sign test</td><td>—</td><td>The paper's dual significance gate: paired, problem-clustered percentile bootstrap 95% CI plus an exact sign test</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    English quick-read edition of arXiv:2609.03430 "Random Attention: Rethinking KV Cache Eviction for Efficient Reasoning". Images are extracted from the original paper at 300 DPI and shown at scale (uncropped); interpretations are the editor's.<br>
+    Paper: <a href="https://arxiv.org/abs/2609.03430">arXiv:2609.03430</a> · Code: <a href="https://github.com/SalesforceAIResearch/Random-Attention">SalesforceAIResearch/Random-Attention</a> · Full Chinese deep-read: <a href="index.html" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文精读版</a><br>
+    <span style="opacity:.75">Dark mode · Click images for originals · Print-friendly · Bilingual</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'} }); 
+})();
+</script>
+
+</body>
+</html>
