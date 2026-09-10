@@ -2,9 +2,9 @@
 
 我的论文中文精读页合集。每篇论文一个**图文配合**的单文件 HTML 精读页:全部 Figure / Table 以 **300 DPI 高清 PNG** 内嵌在对应讲解段落中(等比缩放、不裁剪),配中文逐点解读,支持深色模式、点击看原图、KaTeX 公式渲染、打印友好。
 
-> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——旗舰论文 Declarative Attention 为**完整英译**(`en.html`),其余四篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
+> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——两篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash)为**完整英译**(`en.html`),其余四篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
 >
-> This collection ships a **full Chinese deep-read plus an English edition for every paper** — a complete English translation for the flagship paper (Declarative Attention), and English quick-read editions (full digest of the argument + every figure with its original caption) for the rest. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
+> This collection ships a **full Chinese deep-read plus an English edition for every paper** — complete English translations for the two flagship papers (Declarative Attention, DeepSeek-V4.1-Flash), and English quick-read editions (full digest of the argument + every figure with its original caption) for the rest. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
 
 > 由 [paper-reading-html](https://github.com/qqtang-code/paper-reading-html) skill 制作 · 在线门户:[**qqtang-code.github.io/Paper-Reading-Collection**](https://qqtang-code.github.io/Paper-Reading-Collection/)
 
@@ -17,8 +17,9 @@
 | 3 | **ReSET** — Accurate Latency-Critical NVFP4 Reasoning via Step-Aware Temperature Scaling | [高效推理](efficient-inference/) | 量化 · NVFP4 · 低精度推理 · 温度缩放 | [中](efficient-inference/reset/) · [EN 速读](efficient-inference/reset/en.html) | 2026-08 | 8 图 16 表 | [arXiv:2606.13233](https://arxiv.org/abs/2606.13233) |
 | 4 | **Random Attention** — Rethinking KV Cache Eviction for Efficient Reasoning | [高效推理](efficient-inference/) | KV Cache 驱逐 · 推理模型 · 长思维链 · vLLM | [中](efficient-inference/random-attention/) · [EN 速读](efficient-inference/random-attention/en.html) | 2026-09 | 5 图 11 表 | [arXiv:2609.03430](https://arxiv.org/abs/2609.03430) |
 | 5 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
+| 6 | **DeepSeek-V4.1-Flash** — 552B 多模态 MoE 高效推理技术报告 | [高效推理](efficient-inference/) | KV Cache 压缩 · MoE · 多模态 · 长上下文 · FP4 | [中](efficient-inference/deepseek-v41-flash/) · [EN 完整版](efficient-inference/deepseek-v41-flash/en.html) | 2026-09 | 12 图 5 表 | [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page) |
 
-点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)**
+点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)**
 
 ## 目录结构
 
@@ -30,12 +31,13 @@ Paper-Reading-Collection/
 │   ├── declarative-attention/   ← arXiv:2609.02737(10 图 10 表)
 │   ├── freetoken/               ← arXiv:2608.16157(5 图 1 表)
 │   ├── reset/                   ← arXiv:2606.13233(8 图 16 表)
-│   └── random-attention/        ← arXiv:2609.03430(5 图 11 表)
+│   ├── random-attention/        ← arXiv:2609.03430(5 图 11 表)
+│   └── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
 └── benchmarks/                  ← 分类二:评测基准
     └── mmlongembed/             ← 多模态长上下文嵌入基准(6 图 16 表)
 
 每个论文目录:中文精读页(index.html 或 <论文名>精读_HTML.html)
-            + en.html(英文版:DA 为完整英译,其余为英文速读)
+            + en.html(英文版:DA 与 DeepSeek-V4.1-Flash 为完整英译,其余为英文速读)
             + figs/(300 DPI 图表原图,中英文页共用)
 ```
 
@@ -56,6 +58,9 @@ NVFP4 低精度推理在延迟敏感(交互式)场景下的精度救星:**步骤
 
 **④ Random Attention(2026-09 · Salesforce AI Research + UIUC)**
 KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐、不打任何分,4 模型 × 6 推理任务追平最强基线(**60 格中 31 格显著领先**、仅 1 格落后),vLLM 部署吞吐再快 **32–43%**。机制账:prompt 是 cache 的脆弱部分;推理轨迹靠"文本复述 + 跨头复制"两层冗余自我保护——选择信号真正剩下的用武之地,是"只说一次、从不复述"的稀有事实。→ [精读页](efficient-inference/random-attention/) · [原文](https://arxiv.org/abs/2609.03430)
+
+**⑥ DeepSeek-V4.1-Flash(2026-09 · DeepSeek 技术报告)**
+552B 多模态 MoE:Causal Encoder-Decoder 让 prefill 只激活 8B(decode 16B);CSA2 跨层 KV 复用 + FP4(MXFP4)量化把全局 KV Cache 压到**每 token 890 字节**(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代的 1/8;配 196B 条件记忆 Engram 与 45T 多模态 token 预训练,性能反超更大的 V4-Flash——DeepSWE v1.1 **74.2**、Terminal-Bench 2.1 **90.6**、Codeforces **3471**。→ [精读页](efficient-inference/deepseek-v41-flash/) · [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page)
 
 ### 📏 benchmarks/ · 评测基准
 
@@ -81,5 +86,5 @@ KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱�
 
 ## 说明
 
-- 各精读页此前以独立仓库发布(`ReSET-Project-Page`、`MMLongEmbed-PaperReading-Page`、`FreeToken-Project-Page`、`Declarative-Attention-Project-Page`),现已整合至本仓库;旧仓库与其 Pages 链接暂时保留,后续可归档。
+- 各精读页此前以独立仓库发布(`ReSET-Project-Page`、`MMLongEmbed-PaperReading-Page`、`FreeToken-Project-Page`、`Declarative-Attention-Project-Page`、`DeepSeek-V4.1-Flash-Project-Page`),现已整合至本仓库;旧仓库与其 Pages 链接暂时保留,后续可归档。
 - 精读页中的解读文字为编者观点,关键数字均与论文原文核对;图片以 300 DPI 摘自原文,版权归原作者所有,仅供学习研究。

@@ -11,6 +11,11 @@ PAGES = [
     "/efficient-inference/freetoken/en.html",
     "/efficient-inference/reset/",
     "/efficient-inference/reset/en.html",
+    "/efficient-inference/random-attention/",
+    "/efficient-inference/random-attention/en.html",
+    "/efficient-inference/deepseek-v41-flash/",
+    "/efficient-inference/deepseek-v41-flash/DeepSeek-V4.1-Flash论文精读_HTML.html",
+    "/efficient-inference/deepseek-v41-flash/en.html",
     "/benchmarks/mmlongembed/",
     "/benchmarks/mmlongembed/en.html",
 ]

@@ -136,8 +136,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(旗舰论文为完整英译,其余为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (a complete translation for the flagship paper, quick-read editions for the rest).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(两篇旗舰论文为完整英译,其余为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete translations for the two flagship papers, quick-read editions for the rest).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -148,8 +148,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>5</b> 篇</span><span class="i18n-en"><b>5</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>34</b> 图 + <b>54</b> 表</span><span class="i18n-en"><b>34</b> figures + <b>54</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>6</b> 篇</span><span class="i18n-en"><b>6</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>46</b> 图 + <b>59</b> 表</span><span class="i18n-en"><b>46</b> figures + <b>59</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>2</b> 大类</span><span class="i18n-en"><b>2</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -243,6 +243,26 @@
       <div class="go">
         <a class="i18n-zh" href="efficient-inference/random-attention/">开始阅读 →</a>
         <a class="i18n-en" href="efficient-inference/random-attention/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">KV Cache 压缩 · MoE · 多模态 · 长上下文</span><span class="i18n-en">KV Cache Compression · MoE · Multimodal · Long Context</span></span>
+      <h3>
+        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">⑥ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">552B 多模态 MoE 高效推理技术报告</span></a>
+        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">⑥ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Technical Report · 552B Multimodal MoE</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">DeepSeek-V4.1-Flash 技术报告:552B 多模态 MoE 用 Causal Encoder-Decoder 让 prefill 只激活 8B;CSA2 跨层 KV 复用 + FP4 量化把全局 KV Cache 压到<b>每 token 890 字节</b>(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代 1/8——性能反超更大的 V4-Flash:DeepSWE v1.1 <b>74.2</b>、Codeforces <b>3471</b>。</span>
+        <span class="i18n-en">The DeepSeek-V4.1-Flash technical report: a 552B multimodal MoE whose Causal Encoder-Decoder activates just 8B in prefill; CSA2 cross-layer KV reuse + FP4 squeeze the global KV cache to <b>890 bytes/token</b> (1/4 of V4-Flash, 1/437 of V1) while SWA Bounded Replay shrinks the persistent cache to 1/8 of the last generation — outperforming the larger V4-Flash: DeepSWE v1.1 <b>74.2</b>, Codeforces <b>3471</b>.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">12 图 5 表</span><span class="i18n-en">12 figures · 5 tables</span></span><span><a href="https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page">GitHub</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">Read in English →</a>
       </div>
     </div>
 
