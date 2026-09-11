@@ -112,6 +112,7 @@
   figure.fig figcaption b{color:var(--ink)}
   figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
   html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
   .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
 
   /* Lightbox */
@@ -129,6 +130,9 @@
   table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
   table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
   table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
   table.data tr.hl td{background:#eef3ff; font-weight:700}
   html[data-theme="dark"] table.data tr.hl td{background:#23304f}
   table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
@@ -237,6 +241,8 @@
     <div class="item"><div class="k">Pre-Training Data</div><div class="v">45T tokens<small>multimodal corpus, text : multimodal = 7 : 1</small></div></div>
   </div>
 
+  <div class="note"><b>Reading conventions:</b> every number on this page follows the report; anything this page synthesizes, organizes or converts from the report's configuration is explicitly flagged as <b>[organized]</b> or <b>[estimated]</b> so it stays distinguishable from the report's own figures. Notation follows the report: $L$ total layers, $m$ sequence compression ratio, $N$ sequence length, $n_{\text{win}}$ SWA window.</div>
+
   <p>The two figures on the report's front page answer "how good" and "how cheap":</p>
 
   <figure class="fig">
@@ -244,6 +250,7 @@
     <figcaption>
       <b>Figure 1:</b>(a) Performance of DeepSeek-V4.1-Flash and its counterparts on agentic benchmarks. (b) Global KV cache size per token (in bytes) across generations of DeepSeek models, highlighting DeepSeek's sustained efforts to reduce context memory requirements. DeepSeek-V4.1-Flash achieves approximately 4-fold and 437-fold reductions in per-token global KV cache size relative to DeepSeek-V4-Flash and DeepSeek-V1, respectively.
       <span class="ex">Left: on core agentic benchmarks V4.1-Flash (blue) competes head-to-head with closed-source frontier models and leads on several. Right: per-token global KV shrinks generation over generation — another ~4× down from V4-Flash, a cumulative ~437× from V1. Since the unit is bytes/token, 890 bytes means even a 1M-token context needs only a sub-gigabyte global KV, dragging the memory threshold for long-context deployment far down.</span>
+          <span class="pgref">Report p.1</span>
     </figcaption>
   </figure>
 
@@ -254,6 +261,7 @@
     <figcaption>
       <b>Figure 2:</b>Single-token Decode FLOPs versus context length across generations of DeepSeek models. We account for compute precision by weighting BF16, FP8, and FP4 operations by 1, 0.5, and 0.25, respectively. DeepSeek-V4.1-Flash maintains nearly constant Decode FLOPs as context length increases, substantially reducing the computational cost of long-context scenarios.
       <span class="ex">With BF16/FP8/FP4 weighted at 1/0.5/0.25, the V4.1-Flash decode-FLOPs curve is nearly flat: growing the context 256× (4K → 1M) raises decode compute by only ~1/4, versus a visible climb for V4-Flash. "Cost per token that doesn't grow with conversation length" is the heart of long-horizon agent economics.</span>
+          <span class="pgref">Report p.5</span>
     </figcaption>
   </figure>
 
@@ -287,6 +295,7 @@
     <figcaption>
       <b>Figure 3:</b>Overall architecture of DeepSeek-V4.1-Flash. The 40-layer network is divided into a causal encoder and a decoder, each with 20 layers. All feed-forward layers use standard DeepSeekMoE. The first two encoder layers use sliding window attention (SWA); the rest use Compressed Sparse Attention 2 (CSA2), with CSA2(ratio, mode) specifying the compression ratio and mode. The model also uses Single-Pass mHC, Engram, DSpark, and a Hierarchical Sparse Indexer.
       <span class="ex">Read bottom-up: visual/text embeddings enter the 20-layer causal encoder — first 2 layers pure SWA, the remaining 18 CSA2 (compression ratio 2) in three groups of "1 Full + 5 Reuse"; encoder hidden states flow up and simultaneously feed the decoder's global-KV projections. The decoder's 20 layers are all CSA2 (ratio 1): the first group is "1 Full + 3 Reuse", the other four "1 Reindex + 3 Reuse". Engram memory modules sit at layers 1 and 14, DSpark handles speculative decoding, Single-Pass mHC handles residual-stream mixing — every component's placement is deliberate, for memory and pipeline balance.</span>
+          <span class="pgref">Report p.7</span>
     </figcaption>
   </figure>
 
@@ -299,7 +308,7 @@
 
   <h3>Multimodal architecture: DeepSeek-ViT and modality-specific load balancing</h3>
   <p>The vision pathway = ViT encoder + MLP projector. The ViT is trained from scratch with several changes to handle arbitrary resolutions: <strong>2D-RoPE</strong> replaces absolute positional embeddings; the patch-embedding convolution becomes a linear projection (for Muon-optimizer compatibility); RMSNorm + SwiGLU throughout. Before features enter the LLM, a <strong>3×3 pixel-unshuffle</strong> cuts spatial resolution by a factor of nine, effectively supporting inputs up to ~1344×1344 pixels. The ViT has 32 layers, hidden dim 1024, 16 attention heads, patch size 14; the projector has 2 layers with hidden dim 5120.</p>
-  <p>One MoE-side detail: <strong>modality-specific auxiliary-loss-free load balancing</strong>. Image and text tokens have different representation distributions and hence different expert-routing preferences; balancing them in aggregate would mask within-modality imbalance. So the model keeps separate expert-wise correction biases for text and image tokens: at routing time each modality uses its own biases for expert selection, while weighting still uses the original routing scores; after each training step the two bias sets update independently from their respective loads. A small change that makes multimodal training noticeably more stable.</p>
+  <p>One MoE-side detail: <strong>modality-specific auxiliary-loss-free load balancing</strong>. Image and text tokens have different representation distributions and hence different expert-routing preferences; balancing them in aggregate would mask within-modality imbalance (the loss-free scheme itself is Wang et al., 2024a; here it is specialized per modality). So the model keeps separate expert-wise correction biases for text and image tokens: at routing time each modality uses its own biases for expert selection, while weighting still uses the original routing scores; after each training step the two bias sets update independently from their respective loads. A small change that makes multimodal training noticeably more stable.</p>
 
   <div class="takeaway"><b>Takeaway:</b>The architecture diagram's core message is "grouping and reuse": 3 encoder groups, 5 decoder groups, and in each group only one layer does the heavy lifting (Full/Reindex) while the rest reuse. As we'll see, this static "few producers, many consumers" assignment is the common source of both the KV compression and the kernel-count collapse.</div>
 </section>
@@ -310,11 +319,11 @@
   <h2 class="sec">Core Methods: CED and CSA2</h2>
 
   <h3>CED: run only half the layers in prefill</h3>
-  <p>Frequent tool calls in agent workflows generate massive prefill requests; whenever the KV cache misses, prefill cost bites. CED inherits the idea from YoCo ("You Only Cache Once"): let the upper half of the layers share the KV produced by the lower half. The difference is that CED adds two structural refinements — improving both the overall KV capacity and the computational depth of KV generation.</p>
+  <p>Frequent tool calls in agent workflows generate massive prefill requests; whenever the KV cache misses, prefill cost bites. CED inherits the idea from YoCo (Sun et al., 2024; "You Only Cache Once"): let the upper half of the layers share the KV produced by the lower half. The difference is that CED adds two structural refinements — improving both the overall KV capacity and the computational depth of KV generation.</p>
   <p>Concretely, for global attention the bottom $L/2$ layers act as the causal encoder; the decoder layers ($l &gt; L/2$) no longer derive KV from their own hidden states $H_l$, but project it directly from the $L/2$-th (final encoder) hidden state $H_{L/2}$ with layer-dependent weights:</p>
   <div class="math">$$C_l = H_{L/2} W_l^{KV}, \qquad Z_l = H_{L/2} W_l^{Z}, \qquad l &gt; \frac{L}{2}$$</div>
   <p>where $C_l$ is the KV entries and $Z_l$ the associated compression weights. Prefill then only has to fully compute the first half of the network, and the upper half's global KV arrives at the cost of a small projection — <strong>activated parameters per token drop from 16B (decode) to 8B (prefill)</strong>. For input-heavy agentic loads, that is the most direct saving.</p>
-  <p>SWA keeps the conventional layer-wise computation: layer $l$'s local keys and values still come from its own hidden state $H_l$. This preserves the computational depth of local KV generation, but the price is a replay process in the decoder — computing decoder SWA KV during prefill needs an extra $n_{\text{win}} \times L/2$ tokens. For multi-turn interactions with short prompts per turn, that overhead is non-negligible. Hence <b>Decoder SWA Bounded Replay</b>: replay only the last $n_{\text{win}}$ tokens of the prompt for SWA (instead of $L \times n_{\text{win}}$).</p>
+  <p>SWA keeps the conventional layer-wise computation: layer $l$'s local keys and values still come from its own hidden state $H_l$. This preserves the computational depth of local KV generation, but the price is a replay process in the decoder — computing decoder SWA KV during prefill needs an extra $n_{\text{win}} \times L/2$ tokens. For multi-turn interactions with short prompts per turn, that overhead is non-negligible. Hence <b>Decoder SWA Bounded Replay</b>: replay only the last $n_{\text{win}}$ tokens of the prompt for SWA (instead of $L \times n_{\text{win}}$). The justification is prior work: the effective receptive field of SWA is far smaller than the theoretical $n_{\text{win}}$ bound (Chen et al., 2025), and the report's experiments confirm the accuracy loss is negligible.</p>
   <p>Overall, for sequence length $N \gg n_{\text{win}}$:</p>
   <div class="math">$$O(NL) \;\to\; O\!\left(\frac{NL}{2} + n_{\text{win}} \times \frac{L}{2}\right) \approx O\!\left(\frac{NL}{2}\right)$$</div>
   <p>prefill compute is roughly halved.</p>
@@ -333,6 +342,7 @@
     <figcaption>
       <b>Figure 4:</b>Three operating modes of CSA2. The modes differ in how they obtain main KV, indexer K, and Top-K indices. Green blocks indicate quantities computed in the current layer; yellow blocks indicate main KV and indexer K reused from the most recent Full Mode layer; while red blocks indicate Top-K indices reused from the most recent index-producing (Full or Reindex Mode) layer. All three modes compute main Q and SWA KV in the current layer.
       <span class="ex">Division of labor: green = computed in this layer, yellow = main KV / indexer K reused from the most recent Full layer, red = Top-K indices reused from the most recent index-producing layer. Full mode computes everything itself; Reindex mode borrows the KV but rescoring with its own indexer Q to pick fresh Top-K; Reuse mode borrows even the indices and does no indexing at all. All three modes compute their own main Q and SWA KV — "every layer's query is its own", preserving cross-layer expressive differences.</span>
+          <span class="pgref">Report p.10</span>
     </figcaption>
   </figure>
 
@@ -343,6 +353,12 @@
     <li><strong>Reuse Mode</strong>: reuses both main KV and Top-K indices, attends directly — no indexer Q, no index scoring.</li>
   </ul>
   <p>Sharing main KV and indexer K removes duplicated storage; reusing Top-K indices removes index computation; Reindex mode keeps cache sharing while letting each layer select different entries. Under CED, the decoder's Full-Mode layers derive global KV from the final encoder hidden state; Reindex/Reuse are unchanged.</p>
+  <p><strong>Dropping the configuration onto layer indices (organized from report §4.2.1; full training config in §7).</strong> Across the 40 layers, compression ratio and mode are statically assigned per group:</p>
+  <ul class="tight">
+    <li><strong>Encoder, 20 layers</strong>: the first 2 layers are pure SWA; the remaining 18 use CSA2 with compression ratio $m=2$, split into <b>3 groups × 6 layers</b> — in each group the first layer is Full and the other 5 are Reuse, identical across groups;</li>
+    <li><strong>Decoder, 20 layers</strong>: CSA2 with compression ratio $m=1$ (ratio 1 means the main KV is not sequence-compressed at all — a special case of CSA2; under CSA the ratio $m$ meant each main KV entry was built from $2m$ original entries, and CSA2 drops the overlap between adjacent entries plus the absolute positional embedding), split into <b>5 groups × 4 layers</b> — group 1 is Full + 3×Reuse, the other four groups are Reindex + 3×Reuse.</li>
+  </ul>
+  <p>Count the "producing" layers: 3 Full in the encoder + 1 Full in the decoder = <strong>only 4 layers in the whole model generate global KV from scratch</strong>; 4 more (Reindex) only recompute Top-K indices; the remaining 30 CSA2 layers are pure Reuse. That is what "layer-dimension compression" looks like at the layer-index level — and where the cross-layer-reuse contribution to the 890 bytes/token comes from.</p>
 
   <h3>Hierarchical Sparse Indexer: making deep-indexer cost constant</h3>
   <p>Cross-layer index reuse cuts the number of indexer evaluations, but the surviving indexers still score the full causally visible context — at extreme lengths that remains a compute bottleneck. The Hierarchical Sparse Indexer (decoder-only under CED) rests on a simple observation: <strong>information from shallower indexers can naturally restrict the candidates considered by deeper ones, with zero extra state</strong>.</p>
@@ -352,6 +368,7 @@
     <figcaption>
       <b>Figure 5:</b>Hierarchical Sparse Indexer. Each square represents a position; green squares mark selected indices, and blue rectangles mark blocks selected based on their maximum indexer scores. The decoder's first CSA2 layer in Full mode selects its own Top-512 indices and builds a shared candidate pool from the selected blocks for subsequent layers. CSA2 layers in Reindex mode then select their Top-512 indices from this pool.
       <span class="ex">The first Full layer scores all visible positions, picks its own Top-512, and simultaneously performs blockwise candidate selection — each block gets the max index score among its positions, high-scoring blocks are selected, and their covered positions are collected into a shared candidate pool (green = finally selected indices, blue = selected blocks). Later Reindex layers score only inside the pool and pick their own Top-512. The configuration selects 2,048 blocks × 8 positions each = 16,384 candidate positions — from then on, each deeper indexer's scoring cost is constant, independent of context length.</span>
+          <span class="pgref">Report p.11</span>
     </figcaption>
   </figure>
 
@@ -366,7 +383,7 @@
   <h2 class="sec">Efficient Extensions: mHC, Engram, DSpark, FP4, and Optimizers</h2>
 
   <h3>Single-Pass mHC: halving activation memory traffic</h3>
-  <p>mHC maintains $n$ residual streams between adjacent Transformer blocks, with per-token coefficients $A_l, B_l, C_l$ predicted from $X_l$:</p>
+  <p>mHC (Xie et al., 2026) maintains $n$ residual streams between adjacent Transformer blocks, with per-token coefficients $A_l, B_l, C_l$ predicted from $X_l$:</p>
   <div class="math">$$X_{l+1} = B_l X_l + C_l F_l(A_l X_l), \qquad (A_l, B_l, C_l) = \mathcal{H}(X_l)$$</div>
   <p>Ideally the residual transformation between two blocks is a single map $(X_{l-1}, Y_{l-1}) \to (X_l, \hat{X}_l)$ with a lower bound of $(2n+2)d$ on activation traffic. But DeepSeek-V4's three-kernel implementation realizes $(4n+4)d$ — exactly twice the bound. The culprit is a dependency: input mixing $\hat{X}_l = A_l X_l$ must wait for the full reduction over $X_l$ (to produce $A_l$), forcing a second read of $X_l$.</p>
   <p><strong>Single-Pass mHC's fix is elegant: shift the input-mixing coefficients by one block</strong> — each block consumes the coefficients produced by the previous one:</p>
@@ -380,13 +397,13 @@
   <p>DSpark = semi-autoregressive drafting + confidence-scheduled verification. The drafter is 3 Transformer blocks (128-token sliding window); a single forward pass computes base logits for 5 draft positions in parallel, a lightweight Markov head models dependencies among draft tokens, and a confidence head predicts per-position conditional acceptance probabilities to estimate prefix survival probabilities. The scheduler combines these estimates with profiled engine-throughput curves to pick a per-request verification length that maximizes expected system-wide token throughput under current load. Unlike DeepSeek-V3's MTP, <b>DSpark is trained in a dedicated stage after backbone pre-training</b> (backbone frozen); during post-training it trains alongside the backbone without propagating its gradients into it — staying aligned with the evolving policy while accelerating both online serving and RL/OPD rollouts.</p>
 
   <h3>FP4 main KV cache: E2M1 with one E4M3 scale per 16 channels</h3>
-  <p>V4 already applied <abbr title="Quantization-Aware Training">QAT</abbr> to indexer Q/K to accelerate indexing; V4.1 extends QAT to the main KV — note that FP4 here is for <b>storage, not faster matmuls</b>: values are dequantized before attention, so no native FP4 matmul hardware is needed and portability is preserved. The format is OCP-standard <b>MXFP4</b> (even though alternatives scored slightly higher in tests): E2M1 with one E4M3 scale per 16 channels; following NVFP4 but <b>omitting the second-level global scale</b>. The feasibility argument is neat: after RMSNorm the 512-channel KV latent has L2 norm at most $\sqrt{512} \approx 22.6$ (largest trained RMSNorm weight ≈ 1, RoPE preserves norms), while the format supports magnitudes up to $448 \times 6 = 2688$ and training observed maxima around 10 — dropping the global scale causes no measurable accuracy loss and simplifies the cache layout. Implementation details: quantize after RoPE (quantizing before gave only marginal gains and would add decode-time overhead); non-RoPE and RoPE components share the format; QAT enters during <b>post-training</b>; SWA KV stays FP8 (quantization-sensitive). Versus V4's FP8 main KV, storage halves again — in HBM and on SSD alike.</p>
+  <p>V4 already applied <abbr title="Quantization-Aware Training">QAT</abbr> to indexer Q/K (Jacob et al., 2018) to accelerate indexing; V4.1 extends QAT to the main KV — note that FP4 here is for <b>storage, not faster matmuls</b>: values are dequantized before attention, so no native FP4 matmul hardware is needed and portability is preserved. The format is OCP-standard <b>MXFP4</b> (Rouhani et al., 2023; even though alternatives scored slightly higher in tests): E2M1 with one E4M3 scale per 16 channels; following NVFP4 (Alvarez et al., 2025) but <b>omitting the second-level global scale</b>. The feasibility argument is neat: after RMSNorm the 512-channel KV latent has L2 norm at most $\sqrt{512} \approx 22.6$ (largest trained RMSNorm weight ≈ 1, RoPE preserves norms), while the format supports magnitudes up to $448 \times 6 = 2688$ and training observed maxima around 10 — dropping the global scale causes no measurable accuracy loss and simplifies the cache layout. Implementation details: quantize after RoPE (quantizing before gave only marginal gains and would add decode-time overhead); non-RoPE and RoPE components share the format; QAT enters during <b>post-training</b>; SWA KV stays FP8 (quantization-sensitive). Versus V4's FP8 main KV, storage halves again — in HBM and on SSD alike.</p>
 
   <h3>Optimizers: head-wise Muon + Sinkhorn-balanced updates</h3>
-  <p>The base configuration continues V4: AdamW for normalization-layer and other non-matrix parameters ($\beta_1=0.9$, $\beta_2=0.95$, $\varepsilon=10^{-20}$, weight decay 0.1); Muon for linear-transformation weights (including Engram projections and the vision-language projector) with momentum 0.95, decoupled weight decay, and Nesterov momentum, rescaling each update's RMS to 0.18 to reuse the AdamW learning rate. Two new designs:</p>
+  <p>The base configuration continues V4: AdamW for normalization-layer and other non-matrix parameters ($\beta_1=0.9$, $\beta_2=0.95$, $\varepsilon=10^{-20}$, weight decay 0.1); Muon (Jordan et al., 2024) for linear-transformation weights (including Engram projections and the vision-language projector) with momentum 0.95, decoupled weight decay, and Nesterov momentum, rescaling each update's RMS to 0.18 to reuse the AdamW learning rate. Two new designs:</p>
   <ul class="tight">
     <li><strong>Head-wise Muon</strong>: split the Query (and Key) weights by head before the Muon update. Viewing Muon as preconditioned gradient descent, vanilla Muon shares one preconditioner across all heads, yet attention heads are heterogeneous — grouping by head empirically beats vanilla (independently corroborated by GLM-5 and Kimi-K3);</li>
-    <li><strong>Sinkhorn-balanced update</strong>: applying Adam to the newly added Engram parameters would blow up optimizer-state memory. Instead: momentum + Sinkhorn balancing — same skeleton as Muon, but Newton–Schulz orthogonalization is replaced by alternating row/column normalization. It needs only a momentum buffer and empirically outperforms Adam.</li>
+    <li><strong>Sinkhorn-balanced update</strong>: applying Adam to the newly added Engram parameters would blow up optimizer-state memory. Instead: momentum + Sinkhorn balancing (extending SinkGD from linear layers to embedding tables; Scetbon et al., 2025) — same skeleton as Muon, but Newton–Schulz orthogonalization is replaced by alternating row/column normalization. It needs only a momentum buffer and empirically outperforms Adam.</li>
   </ul>
 
   <figure class="fig">
@@ -394,6 +411,7 @@
     <figcaption>
       <b>Algorithm 1:</b>Momentum update with Sinkhorn balancing. Nesterov momentum is followed by K alternating row/column normalizations (with near-zero rows masked for stability); the $\sqrt{n}$ factor converts unit row $\ell_2$ norm into unit row-wise RMS, and the learning rate is corrected by $\gamma$ to match the update magnitude of Adam.
       <span class="ex">The procedure is structurally identical to Muon — only lines 6–16 swap Newton–Schulz for K alternating row/column normalizations. Intuition: in an embedding table, one row corresponds to a token index (or N-gram identity) and one column to a hidden feature; Sinkhorn equalizes RMS along both the "token" and "feature" axes, exactly exploiting the axis structure of these huge matrices. Rows with norm below $\tau \bar{\rho}$ are masked for numerical stability; $\sqrt{n}$ converts unit row $\ell_2$ norm to unit row RMS; $\gamma = 0.18$ corrects the effective learning rate (close to the 0.2 used in Moonlight).</span>
+          <span class="pgref">Report p.16</span>
     </figcaption>
   </figure>
 
@@ -469,6 +487,7 @@
     <figcaption>
       <b>Table 1:</b>Comparison among DeepSeek-V4-Flash-Base, DeepSeek-V4-Pro-Base, and DeepSeek-V4.1-Flash-Base. All models are evaluated in our internal framework and share the same evaluation setting. Scores with a gap not exceeding 0.3 are considered to be at the same level. The highest score in each row is in bold font, and the second is underlined.
       <span class="ex">The three columns: V4-Flash-Base (13B activated / 284B backbone), V4-Pro-Base (49B / 1.6T), V4.1-Flash-Base (8B·16B / 552B). Highlights: MMLU-Pro 74.1, BigCodeBench 60.6, HumanEval 79.4, and GSM8K 93.0 are all best or tied-best — with ~1/3 the total parameters and 1/4 the activated parameters, V4.1-Flash-Base matches the 1.6T V4-Pro-Base on knowledge and reasoning and beats it on several code/math benchmarks. The multimodal block (MMMU-Pro 56.5, DocVQA 95.6, CVBench 77.9, RefCOCO-avg 86.0) is the direct validation of native multimodal training.</span>
+          <span class="pgref">Report p.24</span>
     </figcaption>
   </figure></div>
 
@@ -481,6 +500,7 @@
     <figcaption>
       <b>Figure 6:</b>Bits-per-bytes (BPB) comparison of DeepSeek-V4-Flash-Base, DeepSeek-V4-Pro-Base and DeepSeek-V4.1-Flash-Base on our held-out evaluation sets. DeepSeek-V4.1-Flash-Base achieves lowest BPB on all tasks and demonstrates greater potential to serve as a strong base-model.
       <span class="ex">On every internal held-out task, V4.1-Flash-Base posts the lowest BPB — the strongest compression ability on internal docs, code, and academic material. A 5%–10% edge on held-out sets, at a smaller parameter count, says its base-model potential is about distribution fit, not benchmark gaming.</span>
+          <span class="pgref">Report p.25</span>
     </figcaption>
   </figure>
 
@@ -507,6 +527,7 @@
     <figcaption>
       <b>Figure 7:</b>Performance improves on various code agent benchmarks as RL training scales in the Minimal mode of DeepSeek Harness. Further extending maximal context length to 1M tokens continues to improve performance on extremely long-horizon tasks, e.g., Terminal-Bench v3.0.
       <span class="ex">Four panels — DeepSWE v1.1, SWE-Bench Pro, Terminal-Bench v2.1, and v3.0 (no-gpu): solid Pass@1 climbs monotonically with cumulative RL steps; dashed lines are output tokens. The disconnected curve segments correspond to successive runs re-initialized by model merging — performance keeps rising after each merge. Most striking is the bottom-right panel: raising the context cap from 512K to 1M buys another jump on Terminal-Bench v3.0-style ultra-long-horizon tasks — context length itself becomes part of RL scaling.</span>
+          <span class="pgref">Report p.27</span>
     </figcaption>
   </figure>
 
@@ -515,6 +536,7 @@
     <figcaption>
       <b>Figure 8:</b>Performance improves with cumulative RL steps when jointly training across multiple versions of Claude Code (left) and across heterogeneous scaffolds, including OpenCode, Pi, and DeepSeek Harness in Standard and PTC modes (right). Performance is evaluated on DeepSWE v1.1. Lighter curves show the evaluation of individual scaffold versions or scaffolds.
       <span class="ex">Left: joint training across several Claude Code versions lifts the average Pass@1 steadily. Right: joint training across heterogeneous scaffolds (OpenCode, Pi, DeepSeek Harness Standard/PTC) works just as well. The lighter curves are per-scaffold evaluations — joint training sacrifices no single scaffold and lifts the whole ensemble, which directly explains the cross-scaffold robustness in Table 4 below.</span>
+          <span class="pgref">Report p.28</span>
     </figcaption>
   </figure>
 
@@ -538,6 +560,7 @@
     <figcaption>
       <b>Table 2:</b>Mapping between the public API reasoning-effort tiers and the underlying scalar effort values $b$.
       <span class="ex">max / high / low map to $b = 100 / 75 / 50$. Users pick an operating point on the learned cost-quality frontier — model weights and decoding configuration unchanged. One checkpoint, three temperaments.</span>
+          <span class="pgref">Report p.30</span>
     </figcaption>
   </figure></div>
 
@@ -558,6 +581,7 @@
     <figcaption>
       <b>Table 3:</b>Comparison between DeepSeek-V4.1-Flash with closed/open source models. † denotes text-only subset of HLE. The best results are highlighted in bold; the second-best results are underlined.
       <span class="ex">Seven columns: Opus-5, GPT-5.6 Sol, Kimi-K3, GLM-5.3, DS-V4-Pro, DS-V4-Flash, and V4.1-Flash. V4.1-Flash takes several firsts: Terminal-Bench 2.1 90.6, DeepSWE v1.1 74.2 (above Opus-5's 74.0 and GPT-5.6 Sol's 73.0), CyberGym 88.1, SEC-Bench Pro 62.8, AutomationBench 54.8, Agents' Last Exam 31.8, HLE w/ tools 63.9; Codeforces 3471 beats both V4-Pro (3348) and V4-Flash (3289); MathArena Apex 65.6 ties Kimi-K3 for best open-source. Versus V4-Flash nearly everything leaps (DeepSWE 54.4→74.2, TB3.0 7.6→30.0, SEC-Bench 30.9→62.8). The blind spots are honest too: TB4.0 31.2 vs Opus-5's 51.8 — expert-level science-oriented tasks remain giant-model territory; HLE 36.8 also trails Opus-5's 56.3.</span>
+          <span class="pgref">Report p.33</span>
     </figcaption>
   </figure></div>
 
@@ -570,6 +594,7 @@
     <figcaption>
       <b>Figure 9:</b>Performance and output length as a function of reasoning effort. Each panel plots Pass@1 (solid, left axis) and mean output tokens per response (dashed, right axis) as the reasoning-effort value is varied from 25 to 100; The results of reasoning-intensive benchmarks are averaged over eight benchmarks (AIME 2026, Apex 2025 Shortlist, GPQA Diamond, HLE, IMO-AnswerBench, LiveCodeBench, MathArena-Apex, SimpleQA-Verified). DeepSWE v1.1 is evaluated based on mini-SWE and Terminal-Bench v2.1 is evaluated based on DeepSeek Harness (Minimal).
       <span class="ex">Raising effort from 25 to 100 lifts the eight-benchmark reasoning average from 67.1% to 76.3%, DeepSWE v1.1 from 66.0% to 74.2%, and TB2.1 from 82.4% to 90.6%, at roughly 2.5× the output tokens. The gains are front-loaded: the 60–80 range already recovers most of max-tier accuracy at under half its token budget, while the final push to 100 stretches agent trajectories 1.6–1.8× for marginal returns. Effort control learned on single-response reasoning transfers faithfully to multi-turn agentic trajectories — governing the total exploration and verification across turns.</span>
+          <span class="pgref">Report p.35</span>
     </figcaption>
   </figure>
 
@@ -581,6 +606,7 @@
     <figcaption>
       <b>Table 4:</b>Performance across agent scaffolds at Max reasoning effort.
       <span class="ex">Across the eight configurations, DeepSWE v1.1 spans 65.5–74.2 and TB2.1 spans 84.1–90.6 — a spread under 9 points, and the in-house mini-SWE / DeepSeek Harness don't always win (Claude Code hits 88.0 on TB2.1). Capability transfers smoothly across scaffolds rather than binding to one framework — credit the diversity of environments, tool schemas, and interaction formats in the synthesized training data. Notes: DeepSWE uses N=8 samples per task, TB2.1 N=3; Linux containers, temperature 1.0, top-p 0.95, 1M-token context, max_steps=500 per agent; TB2.1 without network; the Claude Code column reports v2.1.251 with all four versions detailed in Table 5 below.</span>
+          <span class="pgref">Report p.35</span>
     </figcaption>
   </figure></div>
 
@@ -589,6 +615,7 @@
     <figcaption>
       <b>Table 5:</b>Performance across Claude Code versions at Max reasoning effort.
       <span class="ex">Appendix detail: across four Claude Code versions (v2.1.105/238/251/259), DeepSWE spans 68.4–69.8 (average 68.9) and TB2.1 spans 87.3–88.4 (average 87.8) — under 1.5 points of variation. Table 4's 251 column wasn't cherry-picked; behavior is stable across versions.</span>
+          <span class="pgref">Report p.48</span>
     </figcaption>
   </figure></div>
 
@@ -601,6 +628,7 @@
     <figcaption>
       <b>Figure 10:</b>Test-time compute scaling for single-agent and multi-agent configurations on ProgramBench (Almost@1) and FrontierSWE v2 (Mean@5) as functions of the per-rollout wall-clock deadline.
       <span class="ex">The x-axis is the per-rollout wall-clock deadline (log scale). ProgramBench: multi-agent Almost@1 climbs from 13.59% at 1 hour to 30.04% at 8 hours, versus 12.79%→20.39% for single-agent; FrontierSWE v2: 13.50%@1h → 32.90%@20h multi-agent versus 10.50%→28.20% single. Multi-agent wins at every deadline, and the gap widens with the budget — collaboration's value compounds with available compute. The report is candid that these are preliminary experiments comparing each side's strongest configuration.</span>
+          <span class="pgref">Report p.36</span>
     </figcaption>
   </figure>
 
@@ -611,6 +639,7 @@
     <figcaption>
       <b>Figure 11:</b>Reasoning effort drives trajectory length consistently but correlates only weakly with accuracy across coding scaffolds. Each panel plots Pass@1 (%, solid, left axis) and mean output tokens per trajectory (k, dashed, right axis) against the reasoning-effort setting, for DeepSWE v1.1 (top row) and Terminal-Bench v2.1 (bottom row) under three agent scaffolds: Claude Code, DeepSeek Harness (Minimal) and mini-SWE. All panels come from the same checkpoint.
       <span class="ex">The six panels (top row DeepSWE, bottom row TB2.1 × three scaffolds) agree: trajectory length grows monotonically with effort, while Pass@1 improves overall but not monotonically (plateaus and dips mid-range); the three scaffolds are calibrated differently — on DeepSWE, Claude Code is the flattest and spends the fewest extra tokens while DSH (Minimal) starts lowest and gains the most; on TB2.1 the three collapse into a narrow band. Same checkpoint, meaningfully different behavior per scaffold: once tasks near saturation, scaffold choice matters at least as much as the effort tier.</span>
+          <span class="pgref">Report p.49</span>
     </figcaption>
   </figure>
 
@@ -619,6 +648,7 @@
     <figcaption>
       <b>Figure 12:</b>Performance and output length as a function of reasoning effort on eight reasoning-intensive benchmarks. Each panel plots Pass@1 (solid, left axis) and mean output tokens per response (dashed, right axis) as the reasoning-effort value is varied from 25 to 100.
       <span class="ex">All eight benchmarks (AIME 2026, Apex 2025 Shortlist, GPQA Diamond, HLE-Text, IMO-AnswerBench, LiveCodeBench, MathArena Apex 2025, SimpleQA-Verified) behave: length scales uniformly at 2.0–3.1× (AIME 4.6k→11.4k, MathArena Apex 29.1k→86.1k — costs are predictable), and no benchmark ever degrades as effort rises — MathArena Apex 2025 gains +40.3 (25.3%→65.6%), AIME 2026 reaches a full 100% at effort 100, and already-saturated benchmarks hold steady (GPQA +1.3, LiveCodeBench +2.6). One reliable, predictable knob lets each deployment pick its effort tier by latency and compute budget without sacrificing accuracy.</span>
+          <span class="pgref">Report p.50</span>
     </figcaption>
   </figure>
 
@@ -669,6 +699,36 @@
     <li><strong>Robustness boundaries not fully characterized</strong>: CSA2 selection errors and Bounded Replay's approximate reconstruction could degrade capability on untested extreme inputs and deployment conditions; internal evaluations saw no systematic degradation, but no finite test suite covers everything — stress testing will continue (focus: sparse retrieval over long contexts and SWA reconstruction at cache-resumption boundaries);</li>
     <li><strong>Benchmark saturation vs the real frontier</strong>: scores close to Fable-5 and GPT-6 Astra do not imply parity with closed-source frontiers on the hardest tasks and edge cases; evaluation protocols will keep evolving;</li>
     <li><strong>Next</strong>: coordinated scaling of data, model capacity, and RL; model-harness co-design (optimizing the agent framework as part of the system).</li>
+  </ul>
+
+  <h3>Lineage and provenance (organized from the report's citations)</h3>
+  <p>The report labels the upstream source of every component, but the citations are scattered through the text; this table gathers them for a re-read through an "inherit → adapt" lens:</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Where each component comes from (organized from inline citations; not a table from the report)</caption>
+    <thead><tr><th>Component</th><th>Upstream as labeled by the report</th><th>What V4.1-Flash changes / how it integrates</th></tr></thead>
+    <tbody>
+      <tr><td>CED encoder-decoder</td><td>YoCo (Sun et al., 2024)</td><td>Decoder global KV is projected layer-wise from the final encoder hidden state; SWA stays layer-wise and gets Bounded Replay; prefill compute roughly halved</td></tr>
+      <tr><td>Single-Pass mHC</td><td>mHC (Xie et al., 2026; from DeepSeek-V4)</td><td>Four kernels fused into one (Mega-mHC); activation traffic $(4n+4)d \to (2n+2)d$</td></tr>
+      <tr><td>Engram conditional memory</td><td>Cheng et al., 2026b</td><td>Integrated into the backbone; embedding tables / token embedding / prediction head switch to momentum + Sinkhorn, dropping Adam's second-order state</td></tr>
+      <tr><td>DSpark speculative decoding</td><td>Cheng et al., 2026a</td><td>Semi-autoregressive drafts + confidence-scheduled verification; trained after backbone pre-training and kept aligned with the evolving policy</td></tr>
+      <tr><td>MoE load balancing</td><td>Auxiliary-loss-free balancing (Wang et al., 2024a)</td><td>Separate expert-wise correction biases for image and text, updated per modality</td></tr>
+      <tr><td>Optimizers</td><td>Muon (Jordan et al., 2024); Nesterov momentum (Nesterov, 1983)</td><td>Head-wise Muon for Q/K; decoupled weight decay + Nesterov momentum</td></tr>
+      <tr><td>Sinkhorn-balanced update</td><td>SinkGD (Scetbon et al., 2025)</td><td>Extended from linear-layer weights to very large embedding tables and the prediction head</td></tr>
+      <tr><td>FP4 cache format</td><td>NVFP4 (Alvarez et al., 2025); MXFP4/OCP (Rouhani et al., 2023); QAT (Jacob et al., 2018)</td><td>Adopts the OCP format and drops the second-level global scale; QAT extended from the indexer to the main KV</td></tr>
+      <tr><td>Sparse-attention lineage</td><td>GQA (Ainslie et al., 2023); MLA (DeepSeek-AI, 2024); CSA/HCA (DeepSeek-V4)</td><td>CSA2 unites all three dimensions; the CSA-HCA hybrid is dropped for pure CSA2</td></tr>
+      <tr><td>SWA effective receptive field</td><td>Chen et al., 2025</td><td>Motivates Decoder SWA Bounded Replay (replay only the last $n_{\text{win}}$ tokens)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted" style="font-size:13.5px">Note: citations follow the report's inline labels; this page does not verify each bibliography entry.</p>
+
+  <h3>Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><b>A component ledger for the 890 bytes/token</b>: the report gives the total and the multiples vs V4-Flash/V1, but no itemized split across main KV, indexer K, and persistent cache — the "three-layer breakdown" in §1 of this page is a mechanism-level synthesis, not the report's own accounting;</li>
+    <li><b>End-to-end serving gains</b>: the deployment chapter argues through mechanisms and kernel counts (a Reuse-mode layer runs 15 kernels in prefill, 11 in decode); measured throughput/latency/cost on production-like loads is not shown;</li>
+    <li><b>Independent replication</b>: pre-training, post-training, and evaluation all run on DeepSeek's own scaffolds and environments; third-party replication and cross-framework consistency remain open;</li>
+    <li><b>Boundary behavior</b>: 1M context combined with multimodality, and the approximate SWA reconstruction at cache-continuation boundaries, are summarized as "negligible loss" only — degradation curves are not systematically charted, which the authors themselves acknowledge as a limitation.</li>
   </ul>
 
   <h3>Editor's commentary</h3>

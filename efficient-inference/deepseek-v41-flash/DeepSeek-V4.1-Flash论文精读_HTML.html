@@ -112,6 +112,7 @@
   figure.fig figcaption b{color:var(--ink)}
   figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
   html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
   .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
 
   /* lightbox 全图查看 */
@@ -129,6 +130,9 @@
   table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
   table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
   table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
   table.data tr.hl td{background:#eef3ff; font-weight:700}
   html[data-theme="dark"] table.data tr.hl td{background:#23304f}
   table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
@@ -237,6 +241,8 @@
     <div class="item"><div class="k">预训练数据</div><div class="v">45T tokens<small>多模态语料,文本:多模态 = 7:1</small></div></div>
   </div>
 
+  <div class="note"><b>读数约定:</b>本页全部数字以报告原文为准;凡由本页依据报告配置整理、归纳或换算的内容,均以「<b>整理</b>」「<b>推算</b>」显式标注,便于与报告口径区分。记号沿用报告:$L$ 为总层数,$m$ 为序列压缩率,$N$ 为序列长度,$n_{\text{win}}$ 为 SWA 窗口大小。</div>
+
   <p>报告首页的两张图分别回答"性能如何"与"省了多少":</p>
 
   <figure class="fig">
@@ -244,6 +250,7 @@
     <figcaption>
       <b>Figure 1:</b>(a) Performance of DeepSeek-V4.1-Flash and its counterparts on agentic benchmarks. (b) Global KV cache size per token (in bytes) across generations of DeepSeek models, highlighting DeepSeek's sustained efforts to reduce context memory requirements. DeepSeek-V4.1-Flash achieves approximately 4-fold and 437-fold reductions in per-token global KV cache size relative to DeepSeek-V4-Flash and DeepSeek-V1, respectively.
       <span class="zh">左图:在核心智能体基准上,V4.1-Flash(蓝)与闭源前沿模型同台竞技,多个项目领先;右图:从 V1 到 V4.1-Flash,每 token 全局 KV 一路压缩——V4.1-Flash 相比 V4-Flash 再降约 4 倍,相比 V1 累计压缩约 437 倍。注意纵轴是字节/token:890 字节意味着 1M 上下文的全局 KV 也只需约 0.9 GB 量级,长上下文部署的内存门槛被大幅拉低。</span>
+          <span class="pgref">报告 p.1</span>
     </figcaption>
   </figure>
 
@@ -254,6 +261,7 @@
     <figcaption>
       <b>Figure 2:</b>Single-token Decode FLOPs versus context length across generations of DeepSeek models. We account for compute precision by weighting BF16, FP8, and FP4 operations by 1, 0.5, and 0.25, respectively. DeepSeek-V4.1-Flash maintains nearly constant Decode FLOPs as context length increases, substantially reducing the computational cost of long-context scenarios.
       <span class="zh">把 BF16/FP8/FP4 按 1/0.5/0.25 加权折算后,V4.1-Flash 的解码 FLOPs 曲线几乎水平:上下文从 4K 扩到 1M(256 倍),解码计算量只增加约 1/4。对比之下 V4-Flash 随上下文明显爬升。"每 token 成本不随对话变长而变贵",是智能体长程任务经济性的核心。</span>
+          <span class="pgref">报告 p.5</span>
     </figcaption>
   </figure>
 
@@ -287,6 +295,7 @@
     <figcaption>
       <b>Figure 3:</b>Overall architecture of DeepSeek-V4.1-Flash. The 40-layer network is divided into a causal encoder and a decoder, each with 20 layers. All feed-forward layers use standard DeepSeekMoE. The first two encoder layers use sliding window attention (SWA); the rest use Compressed Sparse Attention 2 (CSA2), with CSA2(ratio, mode) specifying the compression ratio and mode. The model also uses Single-Pass mHC, Engram, DSpark, and a Hierarchical Sparse Indexer.
       <span class="zh">从下往上读:视觉/文本嵌入进入 20 层因果编码器——前 2 层纯 SWA,后 18 层 CSA2(压缩率 2),按"1 个 Full + 5 个 Reuse"分成 3 组;编码器隐状态一路向上,同时供解码器投影出全局 KV。右侧解码器 20 层全部 CSA2(压缩率 1):第一组"1 Full + 3 Reuse",其余四组"1 Reindex + 3 Reuse"。Engram 记忆模块放在第 1 与第 14 层,DSpark 负责投机解码,Single-Pass mHC 负责残差流混合——每个组件的位置都是为内存与流水线平衡专门安排的。</span>
+          <span class="pgref">报告 p.7</span>
     </figcaption>
   </figure>
 
@@ -299,7 +308,7 @@
 
   <h3>多模态架构:DeepSeek-ViT 与模态专属负载均衡</h3>
   <p>视觉通路 = ViT 编码器 + MLP 投影器。ViT 从零训练,为支持任意分辨率做了几处改造:用 <strong>2D-RoPE</strong> 替换绝对位置编码;patch 嵌入的卷积换成线性投影(兼容 Muon 优化器);RMSNorm + SwiGLU。视觉特征送入 LLM 前做 <strong>3×3 pixel-unshuffle</strong>,空间分辨率降低 9 倍,等效支持约 1344×1344 像素的输入。ViT 共 32 层、隐维 1024、16 个注意力头、patch 14;投影器 2 层、隐维 5120。</p>
-  <p>MoE 侧的一个细节设计:<strong>模态专属的无辅助损失负载均衡</strong>。图像 token 与文本 token 的表征分布不同,专家路由偏好也不同,混在一起做全局均衡会掩盖模态内部的失衡。因此模型为文本与图像分别维护一组专家级纠正偏置:路由时各模态用各自的偏置选专家,但加权仍用原始路由分数;每步训练后两组偏置按各自的负载独立更新。这个小改动让多模态训练更稳。</p>
+  <p>MoE 侧的一个细节设计:<strong>模态专属的无辅助损失负载均衡</strong>。图像 token 与文本 token 的表征分布不同,专家路由偏好也不同,混在一起做全局均衡会掩盖模态内部的失衡。无辅助损失负载均衡本身出自 Wang et al. (2024a),这里是它的"图文分治"扩展。因此模型为文本与图像分别维护一组专家级纠正偏置:路由时各模态用各自的偏置选专家,但加权仍用原始路由分数;每步训练后两组偏置按各自的负载独立更新。这个小改动让多模态训练更稳。</p>
 
   <div class="takeaway"><b>小结:</b>架构图传达的核心信息是"分组与复用":编码器 3 组、解码器 5 组,每组只有 1 层做重活(Full/Reindex),其余层直接复用。后文可以看到,这种"少数层生产、多数层消费"的静态分配,是 KV 压缩与 kernel 数量骤减的共同来源。</div>
 </section>
@@ -310,11 +319,11 @@
   <h2 class="sec">核心方法:CED 与 CSA2</h2>
 
   <h3>CED:让 prefill 只算一半层</h3>
-  <p>智能体工作流中频繁的工具调用会产生海量 prefill 请求,KV Cache 一旦未命中,prefill 成本便居高不下。CED 的思路继承自 YoCo("只缓存一次"):让上半层直接共享下半层生成的 KV。不同之处在于 CED 做了两项结构强化——同时提升 KV 的整体容量与 KV 生成的计算深度。</p>
+  <p>智能体工作流中频繁的工具调用会产生海量 prefill 请求,KV Cache 一旦未命中,prefill 成本便居高不下。CED 的思路继承自 YoCo(Sun et al., 2024;"只缓存一次"):让上半层直接共享下半层生成的 KV。不同之处在于 CED 做了两项结构强化——同时提升 KV 的整体容量与 KV 生成的计算深度。</p>
   <p>具体做法:全局注意力上,底部 $L/2$ 层作为因果编码器;解码器层($l &gt; L/2$)的 KV 不再由本层隐状态 $H_l$ 生成,而是直接从第 $L/2$ 层(编码器最后一层)的隐状态 $H_{L/2}$ 用逐层投影得到:</p>
   <div class="math">$$C_l = H_{L/2} W_l^{KV}, \qquad Z_l = H_{L/2} W_l^{Z}, \qquad l &gt; \frac{L}{2}$$</div>
   <p>其中 $C_l$ 是 KV 条目,$Z_l$ 是对应的压缩权重。这样 prefill 阶段只需完整计算前一半层,上半层全局 KV 以极小的投影代价获得——<strong>每 token 激活参数因此从 decode 的 16B 降到 prefill 的 8B</strong>。对输入重的智能体负载,这是最直接的省钱。</p>
-  <p>SWA 则保持逐层计算:任意层 $l$ 的局部 K/V 仍来自本层隐状态 $H_l$。这保留了局部 KV 生成的计算深度,但代价是解码器需要一个 SWA replay 过程——prefill 时解码器 SWA KV 要额外处理 $n_{\text{win}} \times L/2$ 个 token。对"每轮 prompt 很短"的多轮交互,这笔开销不可忽略。为此引入 <b>Decoder SWA Bounded Replay</b>:只为 SWA 计算回放 prompt 的最后 $n_{\text{win}}$ 个 token(而非 $L \times n_{\text{win}}$)。</p>
+  <p>SWA 则保持逐层计算:任意层 $l$ 的局部 K/V 仍来自本层隐状态 $H_l$。这保留了局部 KV 生成的计算深度,但代价是解码器需要一个 SWA replay 过程——prefill 时解码器 SWA KV 要额外处理 $n_{\text{win}} \times L/2$ 个 token。对"每轮 prompt 很短"的多轮交互,这笔开销不可忽略。为此引入 <b>Decoder SWA Bounded Replay</b>:只为 SWA 计算回放 prompt 的最后 $n_{\text{win}}$ 个 token(而非 $L \times n_{\text{win}}$)。依据是前人的观察——SWA 的实际有效感受野远小于 $n_{\text{win}}$ 的理论上限(Chen et al., 2025);报告实验亦确认此举的性能损失可忽略。</p>
   <p>综合下来,当序列长度 $N \gg n_{\text{win}}$ 时:</p>
   <div class="math">$$O(NL) \;\to\; O\!\left(\frac{NL}{2} + n_{\text{win}} \times \frac{L}{2}\right) \approx O\!\left(\frac{NL}{2}\right)$$</div>
   <p>prefill 总计算量近似减半。</p>
@@ -333,6 +342,7 @@
     <figcaption>
       <b>Figure 4:</b>Three operating modes of CSA2. The modes differ in how they obtain main KV, indexer K, and Top-K indices. Green blocks indicate quantities computed in the current layer; yellow blocks indicate main KV and indexer K reused from the most recent Full Mode layer; while red blocks indicate Top-K indices reused from the most recent index-producing (Full or Reindex Mode) layer. All three modes compute main Q and SWA KV in the current layer.
       <span class="zh">三种模式的分工:绿色=本层现算,黄色=复用最近 Full 层的主 KV/索引器 K,红色=复用最近产索引层的 Top-K 索引。Full 模式全套自己算;Reindex 模式借别人的 KV、用自己的索引器 Q 重新打分选出新 Top-K;Reuse 模式连索引都直接借用,不做任何索引计算。三种模式都本层自算主 Q 与 SWA KV——"每层的查询永远是自己的",这保证了层间的表达差异。</span>
+          <span class="pgref">报告 p.10</span>
     </figcaption>
   </figure>
 
@@ -343,6 +353,12 @@
     <li><strong>Reuse 模式</strong>:主 KV 与 Top-K 索引都复用,直接做稀疏注意力,不计算索引器 Q、不评估索引分数。</li>
   </ul>
   <p>共享主 KV 与索引器 K 削减重复存储,复用 Top-K 索引省掉索引计算;Reindex 模式在保持缓存共享的同时允许各层选择不同条目。与 CED 组合时,解码器中 Full 模式层的全局 KV 由编码器最后一层隐状态投影而来,Reindex/Reuse 不变。</p>
+  <p><strong>把配置落到层号(据报告 §4.2.1 整理;完整训练配置见 §7)。</strong>40 层里,压缩率与模式是按组静态分配的:</p>
+  <ul class="tight">
+    <li><strong>编码器 20 层</strong>:前 2 层纯 SWA;其余 18 层 CSA2、压缩率 $m=2$,分 <b>3 组 × 6 层</b>——每组第 1 层 Full,后 5 层 Reuse,三组模式相同;</li>
+    <li><strong>解码器 20 层</strong>:CSA2、压缩率 $m=1$(压缩率为 1 即主 KV 不做序列压缩,是 CSA2 的特例;CSA 中该比率 $m$ 表示每条主 KV 由 $2m$ 个原始条目压成,CSA2 去掉了相邻条目的重叠与绝对位置编码),分 <b>5 组 × 4 层</b>——第 1 组 Full + 3 Reuse,其余 4 组 Reindex + 3 Reuse。</li>
+  </ul>
+  <p>数一数"生产型"层:编码器 3 个 Full + 解码器 1 个 Full = <strong>全模型只有 4 层真正从零生成全局 KV</strong>;另有 4 层 Reindex 只重算 Top-K 索引,其余 30 个 CSA2 层全部 Reuse。这就是"层维度压缩"落到具体层号的样子——也是 890 字节/token 里"跨层复用"那一份贡献的出处。</p>
 
   <h3>层级稀疏索引器:把深层索引成本变成常数</h3>
   <p>跨层索引复用减少了索引计算次数,但剩下的索引器仍要对整个因果可见上下文打分——超长上下文下这仍是计算瓶颈。层级稀疏索引器(Hierarchical Sparse Indexer)只在 CED 的解码器中使用,思路是:<strong>让浅层索引器的信息天然限制深层索引器的搜索域,不引入任何额外状态</strong>。</p>
@@ -352,6 +368,7 @@
     <figcaption>
       <b>Figure 5:</b>Hierarchical Sparse Indexer. Each square represents a position; green squares mark selected indices, and blue rectangles mark blocks selected based on their maximum indexer scores. The decoder's first CSA2 layer in Full mode selects its own Top-512 indices and builds a shared candidate pool from the selected blocks for subsequent layers. CSA2 layers in Reindex mode then select their Top-512 indices from this pool.
       <span class="zh">第一个 Full 层对全部可见位置打分,选出自用的 Top-512,同时按"块内最大索引分数"选出高分块,把块覆盖的位置收进一个共享候选池(绿色=最终选中的索引,蓝色=选中的块)。后续 Reindex 层只在候选池内打分、各自选 Top-512。配置上选 2,048 个块 × 每块 8 个位置 = 16,384 个候选位置——此后每个深层索引器的打分成本与上下文长度无关,变成常数。</span>
+          <span class="pgref">报告 p.11</span>
     </figcaption>
   </figure>
 
@@ -366,7 +383,7 @@
   <h2 class="sec">高效组件:mHC、Engram、DSpark、FP4 与优化器</h2>
 
   <h3>Single-Pass mHC:把激活访存砍半</h3>
-  <p>mHC 在相邻 Transformer 块之间维护 $n$ 条残差流,逐 token 系数 $A_l, B_l, C_l$ 由 $X_l$ 预测:</p>
+  <p>mHC(Xie et al., 2026)在相邻 Transformer 块之间维护 $n$ 条残差流,逐 token 系数 $A_l, B_l, C_l$ 由 $X_l$ 预测:</p>
   <div class="math">$$X_{l+1} = B_l X_l + C_l F_l(A_l X_l), \qquad (A_l, B_l, C_l) = \mathcal{H}(X_l)$$</div>
   <p>理想情况下,两块之间的残差变换是一张 $(X_{l-1}, Y_{l-1}) \to (X_l, \hat{X}_l)$ 的单一映射,激活访存下界为 $(2n+2)d$。但 DeepSeek-V4 的三 kernel 实现实际产生 $(4n+4)d$——正好是下界的两倍。问题出在依赖:输入混合 $\hat{X}_l = A_l X_l$ 要等 $X_l$ 的全量规约完成、算出 $A_l$ 之后才能做,于是 $X_l$ 被读了第二遍。</p>
   <p><strong>Single-Pass mHC 的解法非常优雅:把输入混合系数挪一个块</strong>——每个块改用上一个块产出的混合系数:</p>
@@ -380,13 +397,13 @@
   <p>DSpark = 半自回归起草 + 置信度调度验证。起草器是 3 个 Transformer 块(128 token 滑窗),一次前向并行算出 5 个草稿位置的基础 logits,轻量 Markov 头建模草稿 token 间依赖;置信度头预测逐位置条件接受概率,进而估计前缀存活概率;调度器结合剖析得到的引擎吞吐曲线,按当前系统负载动态选择每个请求的验证长度,目标是最大化系统级 token 吞吐。与 DeepSeek-V3 的 MTP 不同,<b>DSpark 在骨干预训练之后专门训练</b>(骨干冻结),后训练期间与骨干一起继续训练但不回传梯度到骨干——使其始终跟随演化中的策略,同时加速在线服务与 RL/OPD 的 rollout 生成。</p>
 
   <h3>FP4 主 KV Cache:E2M1 + 每 16 通道一个 E4M3 scale</h3>
-  <p>V4 已对索引器 Q/K 做 <abbr title="Quantization-Aware Training,量化感知训练">QAT</abbr> 加速索引计算;V4.1 把 QAT 扩展到主 KV——注意这里 FP4 的目的是<b>省存储而非加速矩阵乘</b>:注意力计算前反量化,因此不依赖硬件原生 FP4 矩阵乘,跨平台兼容。格式选 OCP 标准的 <b>MXFP4</b>(尽管实验中其他格式精度更高):E2M1 数据格式,每 16 通道一个 E4M3 缩放因子;参照 NVFP4 但<b>省去第二级全局缩放</b>。可行性论证很漂亮:RMSNorm 后 512 通道 KV 潜在向量的 L2 范数至多 $\sqrt{512} \approx 22.6$(最大训练 RMSNorm 权重约 1,RoPE 保范数),而格式可表示的量级上限是 $448 \times 6 = 2688$,训练中实测最大幅度约 10——去掉全局 scale 没有可测的精度损失,却简化了缓存布局。实现细节:RoPE 之后量化(RoPE 前量化只有边际收益且增加解码开销);非 RoPE 与 RoPE 分量同格式;QAT 在<b>后训练</b>阶段引入;SWA KV 对量化敏感,保持 FP8。相比 V4 的 FP8 主 KV,存储再减半(HBM 与 SSD 皆然)。</p>
+  <p>V4 已对索引器 Q/K 做 <abbr title="Quantization-Aware Training,量化感知训练">QAT</abbr>(Jacob et al., 2018)加速索引计算;V4.1 把 QAT 扩展到主 KV——注意这里 FP4 的目的是<b>省存储而非加速矩阵乘</b>:注意力计算前反量化,因此不依赖硬件原生 FP4 矩阵乘,跨平台兼容。格式选 OCP 标准的 <b>MXFP4</b>(Rouhani et al., 2023;尽管实验中其他格式精度更高):E2M1 数据格式,每 16 通道一个 E4M3 缩放因子;参照 NVFP4(Alvarez et al., 2025)但<b>省去第二级全局缩放</b>。可行性论证很漂亮:RMSNorm 后 512 通道 KV 潜在向量的 L2 范数至多 $\sqrt{512} \approx 22.6$(最大训练 RMSNorm 权重约 1,RoPE 保范数),而格式可表示的量级上限是 $448 \times 6 = 2688$,训练中实测最大幅度约 10——去掉全局 scale 没有可测的精度损失,却简化了缓存布局。实现细节:RoPE 之后量化(RoPE 前量化只有边际收益且增加解码开销);非 RoPE 与 RoPE 分量同格式;QAT 在<b>后训练</b>阶段引入;SWA KV 对量化敏感,保持 FP8。相比 V4 的 FP8 主 KV,存储再减半(HBM 与 SSD 皆然)。</p>
 
   <h3>优化器:head-wise Muon + Sinkhorn 平衡更新</h3>
-  <p>基础配置延续 V4:AdamW 管归一化层与非矩阵参数;$\beta_1=0.9$、$\beta_2=0.95$、$\varepsilon=10^{-20}$、weight decay 0.1;Muon 管线性变换权重(含 Engram 投影与视觉-语言投影器),带动量 0.95、去耦 weight decay 与 Nesterov 动量,更新矩阵 RMS 重整为 0.18 以复用 AdamW 学习率。两处新设计:</p>
+  <p>基础配置延续 V4:AdamW 管归一化层与非矩阵参数;$\beta_1=0.9$、$\beta_2=0.95$、$\varepsilon=10^{-20}$、weight decay 0.1;Muon(Jordan et al., 2024)管线性变换权重(含 Engram 投影与视觉-语言投影器),带动量 0.95、去耦 weight decay 与 Nesterov 动量,更新矩阵 RMS 重整为 0.18 以复用 AdamW 学习率。两处新设计:</p>
   <ul class="tight">
     <li><strong>head-wise Muon</strong>:把 Query(及 Key)权重按头拆开分别做 Muon 更新。把 Muon 视为预条件梯度下降,原版全头共享一个预条件子,而各注意力头之间存在异质性——按头分组后经验上优于 vanilla Muon(GLM-5 与 Kimi-K3 也独立验证了这一点);</li>
-    <li><strong>Sinkhorn 平衡更新</strong>:Engram 嵌入表、token 嵌入与预测头若用 Adam,优化器状态内存会爆炸。改用"动量 + Sinkhorn 平衡":与 Muon 同框架,只是把 Newton-Schulz 正交化换成交替行列归一化,仅需动量缓冲,经验上还优于 Adam。</li>
+    <li><strong>Sinkhorn 平衡更新</strong>:Engram 嵌入表、token 嵌入与预测头若用 Adam,优化器状态内存会爆炸。改用"动量 + Sinkhorn 平衡"(把 SinkGD 的做法从线性层扩展到嵌入表,Scetbon et al., 2025):与 Muon 同框架,只是把 Newton-Schulz 正交化换成交替行列归一化,仅需动量缓冲,经验上还优于 Adam。</li>
   </ul>
 
   <figure class="fig">
@@ -394,6 +411,7 @@
     <figcaption>
       <b>Algorithm 1:</b>Momentum update with Sinkhorn balancing. Nesterov momentum is followed by K alternating row/column normalizations (with near-zero rows masked for stability); the $\sqrt{n}$ factor converts unit row $\ell_2$ norm into unit row-wise RMS, and the learning rate is corrected by $\gamma$ to match the update magnitude of Adam.
       <span class="zh">整个流程与 Muon 完全同构,只是第 6-16 行把 Newton-Schulz 换成 K 步交替"行归一 / 列归一"。直觉:嵌入表的一行对应一个 token 索引(或 N-gram 身份),一列对应一个隐维特征,Sinkhorn 同时沿"token-特征"两个轴做 RMS 均衡——这恰好利用了大嵌入矩阵的轴结构。行范数低于阈值 $\tau \bar{\rho}$ 的行被置零以保数值稳定;$\sqrt{n}$ 把单位行 $\ell_2$ 范数换算成单位行 RMS;$\gamma = 0.18$ 校正等效学习率(与 Moonlight 的 0.2 接近)。</span>
+          <span class="pgref">报告 p.16</span>
     </figcaption>
   </figure>
 
@@ -469,6 +487,7 @@
     <figcaption>
       <b>Table 1:</b>Comparison among DeepSeek-V4-Flash-Base, DeepSeek-V4-Pro-Base, and DeepSeek-V4.1-Flash-Base. All models are evaluated in our internal framework and share the same evaluation setting. Scores with a gap not exceeding 0.3 are considered to be at the same level. The highest score in each row is in bold font, and the second is underlined.
       <span class="zh">三列分别是:V4-Flash-Base(13B 激活 / 284B 骨干)、V4-Pro-Base(49B / 1.6T)、V4.1-Flash-Base(8B·16B / 552B)。亮点:MMLU-Pro 74.1、BigCodeBench 60.6、HumanEval 79.4、GSM8K 93.0 均为三者最高或并列最高——V4.1-Flash-Base 以约 1/3 的总参数、1/4 的激活参数,知识与推理能力对齐 1.6T 的 V4-Pro-Base,并在代码/数学上反超。多模态一栏(MMMU-Pro 56.5、DocVQA 95.6、CVBench 77.9、RefCOCO-avg 86.0)为原生多模态训练的直接验证。</span>
+          <span class="pgref">报告 p.24</span>
     </figcaption>
   </figure></div>
 
@@ -481,6 +500,7 @@
     <figcaption>
       <b>Figure 6:</b>Bits-per-bytes (BPB) comparison of DeepSeek-V4-Flash-Base, DeepSeek-V4-Pro-Base and DeepSeek-V4.1-Flash-Base on our held-out evaluation sets. DeepSeek-V4.1-Flash-Base achieves lowest BPB on all tasks and demonstrates greater potential to serve as a strong base-model.
       <span class="zh">在全部内部留出任务上,V4.1-Flash-Base 的 BPB 一致最低——即对内部文档、代码与学术材料的"压缩能力"最强。留出集上 5%–10% 的提升,配合更小的参数规模,说明其作为基座的潜力不是跑分,而是真实的分布匹配能力。</span>
+          <span class="pgref">报告 p.25</span>
     </figcaption>
   </figure>
 
@@ -507,6 +527,7 @@
     <figcaption>
       <b>Figure 7:</b>Performance improves on various code agent benchmarks as RL training scales in the Minimal mode of DeepSeek Harness. Further extending maximal context length to 1M tokens continues to improve performance on extremely long-horizon tasks, e.g., Terminal-Bench v3.0.
       <span class="zh">四个面板分别是 DeepSWE v1.1、SWE-Bench Pro、Terminal-Bench v2.1 与 v3.0(no-gpu):实线 Pass@1 随累积 RL 步数单调爬升,虚线是输出 token 数。曲线的"断段"对应模型合并后重新初始化的接力 run——合并后性能继续上行。最值得注意的是右下角:上下文上限从 512K 提到 1M 后,Terminal-Bench v3.0 这类超长程任务还能再涨一截——上下文长度本身成了 RL 规模化的一部分。</span>
+          <span class="pgref">报告 p.27</span>
     </figcaption>
   </figure>
 
@@ -515,6 +536,7 @@
     <figcaption>
       <b>Figure 8:</b>Performance improves with cumulative RL steps when jointly training across multiple versions of Claude Code (left) and across heterogeneous scaffolds, including OpenCode, Pi, and DeepSeek Harness in Standard and PTC modes (right). Performance is evaluated on DeepSWE v1.1. Lighter curves show the evaluation of individual scaffold versions or scaffolds.
       <span class="zh">左:跨多个 Claude Code 版本联合训练,平均 Pass@1 稳步上升;右:跨 OpenCode、Pi、DeepSeek Harness(Standard/PTC)等异构 scaffold 联合训练同样有效。浅色细线是各 scaffold 单独的评测——联合训练没有牺牲任何单一 scaffold,反而整体抬升。这直接解释了后文 Table 4 里跨 scaffold 的稳健性。</span>
+          <span class="pgref">报告 p.28</span>
     </figcaption>
   </figure>
 
@@ -538,6 +560,7 @@
     <figcaption>
       <b>Table 2:</b>Mapping between the public API reasoning-effort tiers and the underlying scalar effort values $b$.
       <span class="zh">max / high / low 三档分别映射 $b = 100 / 75 / 50$。用户选择的是"学到的成本-质量前沿上的工作点",模型权重与解码配置完全不变——同一份 checkpoint,三种性格。</span>
+          <span class="pgref">报告 p.30</span>
     </figcaption>
   </figure></div>
 
@@ -558,6 +581,7 @@
     <figcaption>
       <b>Table 3:</b>Comparison between DeepSeek-V4.1-Flash with closed/open source models. † denotes text-only subset of HLE. The best results are highlighted in bold; the second-best results are underlined.
       <span class="zh">七列对比:Opus-5、GPT-5.6 Sol、Kimi-K3、GLM-5.3、DS-V4-Pro、DS-V4-Flash 与 V4.1-Flash。V4.1-Flash 拿下多个第一:Terminal-Bench 2.1 90.6、DeepSWE v1.1 74.2(超过 Opus-5 的 74.0 与 GPT-5.6 Sol 的 73.0)、CyberGym 88.1、SEC-Bench Pro 62.8、AutomationBench 54.8、Agents' Last Exam 31.8、HLE w/ tools 63.9;Codeforces 3471 同时超过 V4-Pro(3348)与 V4-Flash(3289);MathArena Apex 65.6 与 Kimi-K3 并列开源最高。相对 V4-Flash 几乎全线大幅跃升(DeepSWE 54.4→74.2、TB3.0 7.6→30.0、SEC-Bench 30.9→62.8)。盲区也很诚实:TB4.0 31.2 距 Opus-5 的 51.8 仍有差距——专家级科学向任务仍是巨模型的领地;HLE 36.8 也明显低于 Opus-5 的 56.3。</span>
+          <span class="pgref">报告 p.33</span>
     </figcaption>
   </figure></div>
 
@@ -570,6 +594,7 @@
     <figcaption>
       <b>Figure 9:</b>Performance and output length as a function of reasoning effort. Each panel plots Pass@1 (solid, left axis) and mean output tokens per response (dashed, right axis) as the reasoning-effort value is varied from 25 to 100; The results of reasoning-intensive benchmarks are averaged over eight benchmarks (AIME 2026, Apex 2025 Shortlist, GPQA Diamond, HLE, IMO-AnswerBench, LiveCodeBench, MathArena-Apex, SimpleQA-Verified). DeepSWE v1.1 is evaluated based on mini-SWE and Terminal-Bench v2.1 is evaluated based on DeepSeek Harness (Minimal).
       <span class="zh">努力从 25 提到 100:八项推理基准平均 Pass@1 从 67.1% 升至 76.3%,DeepSWE v1.1 从 66.0% 到 74.2%,TB2.1 从 82.4% 到 90.6%,代价约 2.5× 输出 token。收益前置:60-80 区间已用不到一半的 token 预算恢复 max 档绝大部分精度,最后冲到 100 只换来边际提升、轨迹却要拉长 1.6-1.8×。单轮推理学到的努力控制还能无损迁移到多轮智能体轨迹——控制的是跨轮次的探索与验证总量。</span>
+          <span class="pgref">报告 p.35</span>
     </figcaption>
   </figure>
 
@@ -581,6 +606,7 @@
     <figcaption>
       <b>Table 4:</b>Performance across agent scaffolds at Max reasoning effort.
       <span class="zh">DeepSWE v1.1 上八种配置 65.5–74.2、TB2.1 上 84.1–90.6——极差不到 9 个点,且自家 mini-SWE / DeepSeek Harness 也不总是最高(Claude Code 在 TB2.1 达 88.0)。能力随 scaffold 平滑迁移而非绑定某家框架,这要归功于训练数据里环境、工具 schema 与交互格式的多样性。注:DeepSWE 用 N=8 采样、TB2.1 用 N=3;Linux 容器、temperature 1.0、top-p 0.95、1M 上下文、每 agent max_steps=500;TB2.1 断网评测;Claude Code 列报 v2.1.251,四个版本的明细见下方 Table 5。</span>
+          <span class="pgref">报告 p.35</span>
     </figcaption>
   </figure></div>
 
@@ -589,6 +615,7 @@
     <figcaption>
       <b>Table 5:</b>Performance across Claude Code versions at Max reasoning effort.
       <span class="zh">附录补充:四个 Claude Code 版本(v2.1.105/238/251/259)上 DeepSWE 68.4–69.8(平均 68.9)、TB2.1 87.3–88.4(平均 87.8)——版本间波动不到 1.5 个点。Table 4 报 251 版并非挑了最好的一列,跨版本表现稳定。</span>
+          <span class="pgref">报告 p.48</span>
     </figcaption>
   </figure></div>
 
@@ -601,6 +628,7 @@
     <figcaption>
       <b>Figure 10:</b>Test-time compute scaling for single-agent and multi-agent configurations on ProgramBench (Almost@1) and FrontierSWE v2 (Mean@5) as functions of the per-rollout wall-clock deadline.
       <span class="zh">横轴是每次 rollout 的墙上时间截止(对数尺度)。ProgramBench:多智能体 Almost@1 从 1 小时的 13.59% 爬到 8 小时的 30.04%,单智能体同期只有 12.79%→20.39%;FrontierSWE v2:多智能体 13.50%@1h → 32.90%@20h,单智能体 10.50%→28.20%。每个截止时间点多智能体都赢,而且时限越宽差距越大——协作的价值随可用算力放大。报告坦承这是初步实验:比较的是各自最强的配置。</span>
+          <span class="pgref">报告 p.36</span>
     </figcaption>
   </figure>
 
@@ -611,6 +639,7 @@
     <figcaption>
       <b>Figure 11:</b>Reasoning effort drives trajectory length consistently but correlates only weakly with accuracy across coding scaffolds. Each panel plots Pass@1 (%, solid, left axis) and mean output tokens per trajectory (k, dashed, right axis) against the reasoning-effort setting, for DeepSWE v1.1 (top row) and Terminal-Bench v2.1 (bottom row) under three agent scaffolds: Claude Code, DeepSeek Harness (Minimal) and mini-SWE. All panels come from the same checkpoint.
       <span class="zh">六个面板(上排 DeepSWE、下排 TB2.1 × 三种 scaffold)一致显示:轨迹长度随努力单调增长,Pass@1 总体上升但非单调(中段有平台与回落);三种 scaffold 校准不同——DeepSWE 上 Claude Code 曲线最平、token 花得最省,DSH(Minimal)起点最低但涨幅最大;TB2.1 上三者挤在窄带里。同一 checkpoint,行为随 scaffold 有可观差异:scaffold 的选择在任务接近饱和时与努力档位同样重要。</span>
+          <span class="pgref">报告 p.49</span>
     </figcaption>
   </figure>
 
@@ -619,6 +648,7 @@
     <figcaption>
       <b>Figure 12:</b>Performance and output length as a function of reasoning effort on eight reasoning-intensive benchmarks. Each panel plots Pass@1 (solid, left axis) and mean output tokens per response (dashed, right axis) as the reasoning-effort value is varied from 25 to 100.
       <span class="zh">八个基准(AIME 2026、Apex 2025 Shortlist、GPQA Diamond、HLE-Text、IMO-AnswerBench、LiveCodeBench、MathArena Apex 2025、SimpleQA-Verified)全部行为良好:长度随努力均匀放大 2.0–3.1×(AIME 4.6k→11.4k,MathArena Apex 29.1k→86.1k,开销可预估),精度无一例随努力上升而下降——MathArena Apex 2025 大涨 +40.3(25.3%→65.6%),AIME 2026 在 effort 100 达到满分 100%,已饱和的基准保持稳定(GPQA +1.3、LiveCodeBench +2.6)。一个可靠、可预测的旋钮,让每种部署按延迟与算力预算选档而不牺牲精度。</span>
+          <span class="pgref">报告 p.50</span>
     </figcaption>
   </figure>
 
@@ -669,6 +699,36 @@
     <li><strong>鲁棒性边界尚未完全刻画</strong>:CSA2 的选择错误与 Bounded Replay 的近似重建,在未测试的极端输入/部署条件下可能造成能力退化;内部评测未观察到系统性退化,但有限测试集不可能覆盖一切,团队将持续加压测试(重点是长上下文稀疏检索与缓存续传边界的 SWA 重建);</li>
     <li><strong>基准饱和与真实前沿的差距</strong>:分数接近 Fable-5、GPT-6 Astra 不等于在最难任务与边界案例上对齐闭源前沿;评测协议会持续更新;</li>
     <li><strong>下一步</strong>:数据、模型容量、RL 的协同扩展;模型-harness 协同设计(把 agent 框架当作系统的一部分一起优化)。</li>
+  </ul>
+
+  <h3>技术来源与继承(据报告引用整理)</h3>
+  <p>报告对每个组件的上游来源都做了明确标注,只是散落在正文各处;下表把它们汇总到一处,方便按"继承 → 改造"的视角重读全文:</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>技术来源一览(据报告正文行内引用整理,非报告原表)</caption>
+    <thead><tr><th>组件</th><th>报告标注的上游</th><th>V4.1-Flash 的改造 / 集成</th></tr></thead>
+    <tbody>
+      <tr><td>CED 编码器-解码器</td><td>YoCo(Sun et al., 2024)</td><td>解码器全局 KV 改由编码器末层隐状态逐层投影生成;SWA 保持逐层计算并配 Bounded Replay;prefill 计算近似减半</td></tr>
+      <tr><td>Single-Pass mHC</td><td>mHC(Xie et al., 2026;来自 DeepSeek-V4)</td><td>四 kernel 融为单 kernel(Mega-mHC),激活访存 $(4n+4)d \to (2n+2)d$</td></tr>
+      <tr><td>Engram 条件记忆</td><td>Cheng et al., 2026b</td><td>集成进主干;嵌入表/词嵌入/预测头改用"动量 + Sinkhorn"更新,省去 Adam 二阶状态</td></tr>
+      <tr><td>DSpark 投机解码</td><td>Cheng et al., 2026a</td><td>半自回归草稿 + 置信度调度验证;骨干预训练后专门训练,持续跟随策略演化</td></tr>
+      <tr><td>MoE 负载均衡</td><td>无辅助损失负载均衡(Wang et al., 2024a)</td><td>图像/文本各维护一套专家级纠正偏置,分别按模态负载更新</td></tr>
+      <tr><td>优化器</td><td>Muon(Jordan et al., 2024);Nesterov 动量(Nesterov, 1983)</td><td>head-wise Muon 用于 Q/K;去耦权重衰减 + Nesterov 动量</td></tr>
+      <tr><td>Sinkhorn 更新</td><td>SinkGD(Scetbon et al., 2025)</td><td>从线性层权重扩展到超大嵌入表与预测头</td></tr>
+      <tr><td>FP4 缓存格式</td><td>NVFP4(Alvarez et al., 2025);MXFP4/OCP(Rouhani et al., 2023);QAT(Jacob et al., 2018)</td><td>取 OCP 标准格式、去掉第二级全局 scale;QAT 从索引器扩到主 KV</td></tr>
+      <tr><td>稀疏注意力谱系</td><td>GQA(Ainslie et al., 2023);MLA(DeepSeek-AI, 2024);CSA/HCA(DeepSeek-V4)</td><td>三维联合的 CSA2,弃用 CSA-HCA 混合,改用纯 CSA2</td></tr>
+      <tr><td>SWA 有效感受野</td><td>Chen et al., 2025</td><td>据此设计 Decoder SWA Bounded Replay(只回放最后 $n_{\text{win}}$ 个 token)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted" style="font-size:13.5px">注:引用为报告正文的行内标注口径;本页未逐条核对参考文献条目。</p>
+
+  <h3>报告未披露、值得补测的点</h3>
+  <ul class="tight">
+    <li><b>890 字节/token 的分项账本</b>:报告给出总量口径与倍数(≈ V4-Flash 的 1/4),未见主 KV、索引器 K、持久缓存各自占比的逐项明细——本页 §1 的"三层拆解"是机制归纳,不是报告的分项数字;</li>
+    <li><b>服务侧端到端收益</b>:部署章节以机制与 kernel 数叙述(Reuse 层 prefill 15 个 kernel、decode 11 个),未见真实负载下的吞吐/延迟/成本实测;</li>
+    <li><b>独立复现</b>:预训练、后训练与评测均基于 DeepSeek 自家 scaffold 与环境,第三方复现与跨框架一致性仍待观察;</li>
+    <li><b>边界行为</b>:1M 上下文与多模态叠加、缓存续传边界处的近似 SWA 重建,报告只给出"损失可忽略"的总体结论,退化曲线未系统展开——这也是作者自认的局限。</li>
   </ul>
 
   <h3>编者点评</h3>
