@@ -79,7 +79,7 @@ KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱�
 
 ## 如何新增一篇精读
 
-1. 用 [paper-reading-html](https://github.com/qqtang-code/paper-reading-html) skill 生成精读页(`index.html` + `figs/`);
+1. 用 [paper-reading-html](https://github.com/qqtang-code/paper-reading-html) skill 生成精读页(`index.html` + `figs/`),并按 skill 的溯源规范补齐:速览章「读数约定」、上游方法的行内引用、点评章「技术来源一览」与「未披露、值得补测」清单、图注原文页码(`scripts/add_pagerefs.py` 从 `crops.json` 批量注入);
 2. 放入对应分类目录(没有合适的分类就新建一个);
 3. 在本 README 的总览表格与分类速览里登记一行;
 4. push 到 `main`,GitHub Pages 自动更新。
