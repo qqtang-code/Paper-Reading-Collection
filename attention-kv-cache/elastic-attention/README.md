@@ -2,8 +2,8 @@
 
 混合注意力(全注意力 FA + 稀疏注意力 SA)的 FA/SA 比例从静态超参数变为**输入自适应**:每层挂一个 0.27M 参数的轻量 Attention Router,推理时按输入把每个 KV 头分配到 FA 或 SA。
 
-- **中文精读**:[Elastic-Attention论文精读_HTML.html](Elastic-Attention论文精读_HTML.html) · [在线](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/elastic-attention/)
-- **English quick-read**:[en.html](en.html) · [online](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/elastic-attention/en.html)
+- **中文精读**:[Elastic-Attention论文精读_HTML.html](Elastic-Attention论文精读_HTML.html) · [在线](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)
+- **English quick-read**:[en.html](en.html) · [online](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/en.html)
 - **图表**:`figs/` 共 32 张(17 Figure + 14 Table + Algorithm 1),300 DPI 从原文提取,中英页共用
 - **原文**:<https://openreview.net/forum?id=rLO2NTUHSW>(ICML 2026 投稿) · **代码**:<https://github.com/LCM-Lab/Elastic-Attention>
 

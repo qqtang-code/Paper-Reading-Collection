@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Elastic Attention (ICML 2026 submission) English reading notes: a lightweight Attention Router makes per-head FA/SA sparsity input-adaptive at inference; all figures and tables embedded at 300 DPI">
+<meta name="keywords" content="Elastic Attention, sparse attention, hybrid attention, dynamic routing, long-context inference, ICML 2026, paper reading">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · Elastic Attention: Test-time Adaptive Sparsity Ratios for Efficient Transformers">
+<meta property="og:description" content="English reading notes for Elastic Attention: an Attention Router assigns every KV head to full or sparse attention per input, adapting sparsity at test time; trained in 12 hours on a frozen backbone">
+<meta property="og:url" content="https://qqtang-code.github.io/Elastic-Attention-Project-Page/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · Elastic Attention: Test-time Adaptive Sparsity Ratios</title>
+<style>
+  /* ===== paper-reading-html skill v2 styles (EN quick-read edition) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">Elastic Attention<span> · notes</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Method</a>
+      <a class="jump" href="#s4">Deployment</a>
+      <a class="jump" href="#s5">Experiments</a>
+      <a class="jump" href="#s6">Analysis</a>
+      <a class="jump" href="#s7">Appendix</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="Elastic-Attention论文精读_HTML.html" title="阅读中文版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark / light" title="Toggle dark / light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · ICML 2026 Submission · OpenReview rLO2NTUHSW</div>
+    <h1>Elastic Attention: a sparsity ratio that stretches with the input</h1>
+    <div class="subtitle">Hybrid attention (full + sparse heads) lives or dies by its FA/SA ratio — usually a fixed constant. This paper bolts a 0.27M-parameter router onto each layer: at inference, every KV head is assigned to full or sparse attention based on the input. Summaries run aggressively sparse; question answering stays conservative. Twelve hours on 8×A800 with a fully frozen backbone brings 4B/8B models to parity with — or past — full-attention baselines on long-context suites.</div>
+    <div class="meta">
+      <span>Authors: Zecheng Tang*, Quantong Qiu*, Yi Yang, Zhiyi Hong, Haiya Xiang, Kebin Liu, Qingqing Dang, Juntao Li, Min Zhang</span>
+      <span>Affiliation: Soochow University · LCM Laboratory · Baidu Inc</span>
+      <span>Paper:<a href="https://openreview.net/forum?id=rLO2NTUHSW">OpenReview rLO2NTUHSW</a> · <a href="https://openreview.net/pdf?id=rLO2NTUHSW">PDF</a></span>
+      <span>Code:<a href="https://github.com/LCM-Lab/Elastic-Attention">LCM-Lab/Elastic-Attention</a></span>
+      <span>28 pages · 17 figures · 14 tables · 1 algorithm</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Sparse attention</span><span class="pill">Hybrid heads</span><span class="pill">Test-time adaptive</span><span class="pill">Attention Router</span><span class="pill">Long-context inference</span><span class="pill">Fused kernel</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents (figures embedded where they are discussed)</h2>
+  <ol>
+    <li><a href="#s1">Overview: Elastic Attention in one page</a></li>
+    <li><a href="#s2">Background: FA, SA, and the hybrid-head bound</a></li>
+    <li><a href="#s3">Method: the Attention Router</a></li>
+    <li><a href="#s4">Deployment: one fused kernel</a></li>
+    <li><a href="#s5">Experiments: three backbones, three suites</a></li>
+    <li><a href="#s6">Analysis: what the router learned</a></li>
+    <li><a href="#s7">Appendix: details, extra results, cases</a></li>
+    <li><a href="#s8">Commentary</a></li>
+    <li><a href="#s9">Reading glossary</a></li>
+  </ol>
+</nav>
+<!-- ================= s1 ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: Elastic Attention in One Page</h2>
+  <p class="lead">Long-context inference is dominated by attention cost. The standard remedy is <b>hybrid attention</b>: some heads keep <abbr title="Full Attention — every token attends to all previous tokens">full attention (FA)</abbr> for accuracy, the rest run <abbr title="Sparse Attention — only a fraction of keys and values is computed">sparse attention (SA)</abbr> for speed. But the FA/SA ratio is usually a fixed, pre-deployment constant — while the paper's preliminary study (§2) shows that tasks differ by an order of magnitude in how much sparsity they tolerate. So why not let the model <b>decide, per input, how sparse to be</b>? Elastic Attention adds a lightweight Attention Router (0.27M params/layer) that assigns every <abbr title="Key-Value head — the unit that caches keys and values under grouped-query attention">KV head</abbr> to FA or SA at inference time. Trained for 12 hours on 8×A800 with a <b>fully frozen backbone</b>, it lets 4B/8B models match or beat full-attention baselines on long-context benchmarks.</p>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page follows the paper; anything this page organizes or converts from the paper's configuration is flagged as <b>[organized]</b> or <b>[estimated]</b>. Notation follows the paper: <b>FA</b>=full attention, <b>SA</b>=sparse attention, $\Omega_{\text{MSR}}$=model sparsity ratio (share of sparse heads), $\Omega_{\text{ESR}}$=effective sparsity ratio (accounts for each head's pruning rate), $t$=target sparsity during training.</div>
+
+  <div class="kv">
+    <div class="item"><div class="k">Training budget</div><div class="v">12 hours · 8×A800<small>backbone frozen; only the router trains</small></div></div>
+    <div class="item"><div class="k">Router overhead</div><div class="v">+0.27M params/layer<small>head dim 128; avg. latency 0.196 ms</small></div></div>
+    <div class="item"><div class="k">Training data</div><div class="v">0.74B tokens<small>8K–64K sequences, 5 sources</small></div></div>
+    <div class="item"><div class="k">Test-time sparsity</div><div class="v">$\Omega_{\text{MSR}}$ 0.63–0.85<small>input-adaptive: code ~0.82, QA ~0.63–0.68</small></div></div>
+    <div class="item"><div class="k">Inference speedup</div><div class="v">1.51× – 3.28×<small>FA-XA / XA-SSA, RULER 256K</small></div></div>
+    <div class="item"><div class="k">Evaluation</div><div class="v">3 backbones × 3 long-context suites<small>Qwen3-4B/8B, Llama-3.1-8B-Instruct</small></div></div>
+  </div>
+
+  <p>The opening figure puts adaptive sparsity on the table — same model, two settings, compared with existing sparse-attention methods:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: Elastic Attention vs existing approaches on LongBench-V2">
+    <figcaption>
+      <b>Figure 1:</b>Comparison between Elastic Attention (ours) and existing approaches on LongBench-V2 (Bai et al., 2025). &ldquo;(XA+SSA)&rdquo; and &ldquo;(FA+SSA)&rdquo; denote our different settings.
+      <span class="ex">The two settings: FA-SSA keeps retrieval heads on full attention while the rest stream sparsely; XA-SSA implements even the retrieval heads with XAttention's training-free block sparsity, pushing the whole model into the fully sparse regime — one guards accuracy, the other chases throughput. Exact axis definitions are in the paper; per-length readings appear in Figure 8 and Table 2. The paper also notes that methods such as NSA and InfLLM-V2 impose architectural constraints on KV head counts (e.g., multiples of 16) that do not align with Llama-3.1-8B, whereas Elastic Attention leaves the backbone untouched.</span>
+          <span class="pgref">Report p.1</span>
+    </figcaption>
+  </figure>
+
+  <p class="zoom-hint">💡 Click any image to open the full-resolution version; click again or press Esc to close.</p>
+
+  <div class="takeaway"><b>Takeaway:</b> three moves — ①<b>observe</b>: downstream tasks split into sparsity-robust and sparsity-sensitive regimes; ②<b>route</b>: a tiny Attention Router assigns each KV head to FA/SA per input, trained with Gumbel-Softmax + straight-through estimation; ③<b>deploy</b>: one fused kernel executes both head types in a single pass. Together they replace a static ratio with a per-request one.</div>
+</section>
+
+<!-- ================= s2 ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Observation</div>
+  <h2 class="sec">Background: FA, SA, and the hybrid-head bound</h2>
+  <p>Full attention enjoys quadratic cost; sparse attention cuts it by keeping only a fraction of K/V (say 20%) at some accuracy price. The hybrid-head mechanism splits the difference: retrieval heads run FA, the rest run SA. The paper writes the framework down formally — retrieval heads compute</p>
+  <div class="math">$$O_r = \mathrm{Softmax}\!\left(QK^{\top}\right)V \tag{1}$$</div>
+  <p>sparse heads use partial keys and values $\tilde{K},\tilde{V}$,</p>
+  <div class="math">$$O_s = \mathrm{Softmax}\!\left(Q\tilde{K}^{\top}\right)\tilde{V} \tag{2}$$</div>
+  <p>and each head $(\ell,h)$ carries a static assignment $\pi(\ell,h)\in\{\text{FA},\text{SA}\}$:</p>
+  <div class="math">$$O^{(\ell)} = \mathrm{Concat}\!\left(O^{(\ell,1)}, \dots, O^{(\ell,H)}\right), \qquad O^{(\ell,h)} = \begin{cases} O_r, & \pi(\ell,h)=\text{FA} \\ O_s, & \pi(\ell,h)=\text{SA} \end{cases} \tag{3}$$</div>
+  <p>Two sparsity measures drive every table in the paper: $\Omega_{\text{MSR}}$ counts the share of sparse heads, while $\Omega_{\text{ESR}}$ additionally weights each head by its pruning rate $\rho$ (0 for FA heads, $\rho_{\text{SA}}$ for SA heads). The distinction matters: adding one sparse head moves $\Omega_{\text{MSR}}$ in discrete steps of $1/(LH)$, while token pruning moves the effective ratio continuously — which is why Figure 8(c) uses $\Omega_{\text{ESR}}$ as the fair horizontal axis.</p>
+
+  <p>The motivating experiment: replace retrieval heads (ranked by the Retrieval Head method of Wu et al., 2024) with streaming-sparse heads one by one on Llama-3.1-8B-Instruct, and watch six task families.</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: retention rates across sparsity levels">
+    <figcaption>
+      <b>Table 7:</b>Performance retention rates across various model sparsity ratios. The values represent the percentage of performance relative to the Full Attention baseline (Sparsity 0.0), where 100.00 indicates parity. Rows denote the model sparsity ratio, and columns denote the evaluation tasks.
+      <span class="ex">Two worlds by column: Summarization keeps 92–99% from $\Omega_{\text{MSR}}$=0.1 all the way to 1.0, and Code stays ≥95% — coarse context suffices. Single-Doc QA drops to 85.4% already at 0.1 and 61.9% at 0.3; Multi-Hop QA and Synthetic collapse between 0.2–0.4. Tasks need only one bit of information — "does this input need fine-grained evidence?" — not a per-task sparsity configuration.</span>
+          <span class="pgref">Report p.15</span>
+    </figcaption>
+  </figure></div>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: performance trend as sparsity increases">
+    <figcaption>
+      <b>Figure 2:</b>Trend of model performance as the hybrid model sparsity ratio ($\Omega_{\text{MSR}}$) increases. We report model performance as a relative percentage score with respect to that of FA.
+      <span class="ex">The sparsity-robust family (blue) stays essentially flat even at $\Omega_{\text{MSR}}$=1.0; the sparsity-sensitive family (red) falls off early. The point where the curves fork is exactly why a single static ratio cannot serve both.</span>
+          <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Takeaway:</b> tasks collapse into two regimes, so the routing decision is binary per head. Elastic Attention never has to learn per-task coefficients — just an input-conditioned on/off switch, placed at every KV head.</div>
+</section>
+
+<!-- ================= s3 ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Method</div>
+  <h2 class="sec">Method: the Attention Router</h2>
+  <p>The recipe: keep the backbone frozen and bolt a small switchboard onto each layer's attention. Figure 3 shows the adapted block, the information flow, and the router itself.</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: Elastic Attention architecture">
+    <figcaption>
+      <b>Figure 3:</b>Illustration of our proposed Elastic Attention. (a) shows the adapted model block with frozen backbone parameters; (b) details the dynamic assignment of heads via the Attention Router module; (c) presents the lightweight design of the Attention Router.
+      <span class="ex">(a) the frozen backbone with the router attached; head outputs take the FA or SA path, concatenate, and pass through the fused kernel and FFN. (b) the router reads key hidden states $x_K$ and emits a binary decision $r$ per head — blue/red mark retrieval vs sparse heads, all executed inside one fused kernel. (c) pooling → Task MLP → Router MLP → Gumbel-Softmax → hard routing, with gradients flowing back through the straight-through estimator. Cost: 0.27M parameters per layer (head dim 128).</span>
+          <span class="pgref">Report p.3</span>
+    </figcaption>
+  </figure>
+
+  <p>The router pools the key hidden states $x_K\in\mathbb{R}^{s\times H\times d'}$ along the sequence dimension into a per-head task representation, then runs a <b>Task MLP</b> (to disentangle task features) followed by a <b>Router MLP</b> (to score each head), producing logits $z\in\mathbb{R}^{H\times2}$ and a hard decision $r^{(\ell,h)}_{\text{hard}}\in\{0,1\}$. One easily missed engineering detail: the pooling only keeps the <b>first and last 100 tokens</b> — system instructions live at the head of the context, the user query at the tail, and the long document body is mostly noise for task identification (verified in Appendix G.5).</p>
+
+  <div class="note"><b>Configuration in numbers [organized from Appendix C.1]:</b> router input = 100 leading + 100 trailing tokens; Task/Router MLP hidden size = $4\times d'$ (default); router LR $5\times10^{-4}$, regularization LR $1\times10^{-3}$; sequence length 65,536, global batch 48, 300 steps — all inside a 12-hour run on 8×A800 with the backbone frozen. <b>Parameter ledger [estimated]:</b> at 0.27M per layer (paper's figure) a 32-layer model adds ~8.6M parameters — under 0.3% of a 4B/8B backbone, far cheaper than any retraining-based route.</div>
+
+  <p>Training uses hard routing (to match inference) and solves its two problems with continuous relaxation and a gradient bypass:</p>
+  <div class="math">$$r^{(\ell,h)}_{\text{hard}} = \operatorname*{arg\,max}_{c \in \{0,1\}} r^{(h,c)}_{\text{soft}}, \qquad r^{(\ell,h)}_{\text{hard}} = r^{(\ell,h)}_{\text{hard}} + \left[ r^{(\ell,h)}_{\text{soft}} - \operatorname{detach}\!\left(r^{(\ell,h)}_{\text{soft}}\right) \right] \tag{6,7}$$</div>
+  <p>where $r_{\text{soft}}$ comes from Gumbel-Softmax (Jang et al., 2016) with annealing, and the bracket term is the <abbr title="Straight-Through Estimator — hard values forward, soft gradients backward">straight-through estimator</abbr> (Bengio et al., 2013). The objective couples language modeling with a sparsity penalty whose Lagrange multipliers $\lambda_1,\lambda_2$ are learned by gradient ascent:</p>
+  <div class="math">$$\max_{\lambda_1,\lambda_2} \min \mathcal{L}_{\text{language}} + \lambda_1 \mathcal{L}_{\text{diff}} + \lambda_2 \mathcal{L}_{\text{diff}}^2, \qquad \mathcal{L}_{\text{diff}} = \Omega_{\text{MSR}}(f_\theta(X)) - t \tag{8}$$</div>
+  <p>The target $t$ is a <b>non-tight</b> constraint — a direction, not a quota: $t_{\text{rob}}=1.0$ for robust tasks, $t_{\text{sen}}=0.7$ for sensitive ones. Appendix E spells out the differentiable machinery (Gumbel-Sigmoid, temperature annealing $\tau(p)=\max(\tau_{\min},\tau_{\text{init}}e^{-rp})$, $r=0.6$).</p>
+
+  <div class="takeaway"><b>Takeaway:</b> the contribution is not a stronger sparse attention, but handing the <b>mode choice</b> to the input: discrete per-head switching, inference-aligned hard routing, and a soft constraint that lets tasks differentiate themselves.</div>
+</section>
+
+<!-- ================= s4 ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Deployment</div>
+  <h2 class="sec">Deployment: one fused kernel for mixed heads</h2>
+  <p>Mixed head types are a systems trap: the naive Serial Dispatch (Algorithm 1a) materializes split tensors, launches separate kernels, and fragments the sequence-dimension parallelism that long-context inference depends on. The paper's fix passes the routing decision as lightweight kernel metadata into a Block-Sparse-Attention kernel (Guo et al., 2024), so each thread block branches on its head's mode inside one launch.</p>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/alg1.png" alt="Algorithm 1: serial dispatch vs parallel BSA">
+    <figcaption>
+      <b>Algorithm 1:</b>Comparison of Serial Dispatch (Baseline) vs. Parallel BSA (Ours).
+      <span class="ex">(a) the PyTorch baseline splits heads into $I_{\text{full}}$/$I_{\text{sp}}$ groups (explicit tensor copies, red), runs FlashAttention and sliding-window sparsity separately, then writes both outputs back. (b) the paper maps $r$ to metadata $m$, and the BSA kernel executes each head's branch in parallel with the grid (Batch × Heads × Sequence Blocks) left intact — no copies, no fragmentation.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption>
+  </figure></div>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: fused kernel speedup">
+    <figcaption>
+      <b>Figure 4:</b>Comparison of our fused kernel with a Torch-based sequential implementation for layer-wise hybrid attention.
+      <span class="ex">Speedup grows both with layer sparsity (0.125–0.875) and with sequence length (16K–256K), peaking around <b>2.2×</b>. Two readings: longer contexts benefit more (sequence-dimension parallelism is what fragmentation hurts), and sparser layers benefit more (more skipped SA work).</span>
+          <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10: router latency">
+    <figcaption>
+      <b>Figure 10:</b>Router latency analysis. The router incurs negligible overhead (avg. 0.196 ms). Our design ensures length-invariant stability, maintaining constant speed from 512 to 1M tokens.
+      <span class="ex">Avg. 0.196 ms and constant from 512 to 1M tokens — a direct payoff of boundary pooling: the router only ever reads 200 tokens, so its cost cannot grow with context.</span>
+          <span class="pgref">Report p.22</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>Scope (the paper is upfront):</b> the design targets single-GPU or few-device deployment of small/medium models. Very large models are usually served with head-level parallelism across devices, which conflicts with layer-wise hybrid heads — the Impact Statement draws that boundary explicitly.</div>
+</section>
+<!-- ================= s5 ================= -->
+<section id="s5">
+  <div class="sec-no">05 · Experiments</div>
+  <h2 class="sec">Experiments: three backbones, three suites</h2>
+  <p><b>Setup [organized from §4.1 and Appendix C]:</b> backbones Qwen3-4B, Qwen3-8B, Llama-3.1-8B-Instruct; training data blends five sources (ChatQA2-Long-SFT, MuSiQue, CoLT-132K, GovReport, XSum) into ~<b>0.74B tokens</b> spanning robust (code, summarization, in-context) and sensitive (single-/multi-doc QA) tasks at 8K–64K sequence length; targets $t_{\text{rob}}=1.0$, $t_{\text{sen}}=0.7$; 8×A800, under 12 hours per run. Baselines: DuoAttention, PruLong, InfLLM-V2 (training-based), MoBA, NSA, XAttention (other routes), all retrained in the same environment and evaluated through LOOM-Eval. Sparse-head implementations: SSA (streaming) and XA (XAttention), written as "{retrieval}-{sparse}", e.g. FA-SSA.</p>
+
+  <h3>Main result ① — LongBench-E</h3>
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: LongBench-E main results">
+    <figcaption>
+      <b>Table 1:</b>Performance on LongBench-E (Bai et al., 2024). We report average performance (Perf.) and $\Omega_{\text{MSR}}$ per task category. The 1st and the 2nd performance in each comparison group are highlighted with bold font and underlined, respectively.
+      <span class="ex">Best average in all three groups: Qwen3-4B 48.08 (backbone 48.45, DuoAttention 46.95), Qwen3-8B 51.51 (52.16 / PruLong 51.34), Llama 53.35 (above the 53.28 backbone). The per-category $\Omega_{\text{MSR}}$ columns show the model spreading sparsity by task: code 0.78–0.82, summarization 0.72–0.73, QA 0.63–0.68 — no baseline does this (they are pinned at 0.70 or undefined). The paper notes that individual robust-task cells (Code/Summ) can favor baselines partly because Elastic Attention spends <i>less</i> compute there.</span>
+          <span class="pgref">Report p.5</span>
+    </figcaption>
+  </figure></div>
+
+  <h3>Main result ② — RULER and LongBench-V2</h3>
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: RULER (8K–256K) and LongBench-V2">
+    <figcaption>
+      <b>Table 2:</b>Model performance on RULER (Hsieh et al., 2024) and LongBench-v2 (Bai et al., 2025). We report the average Perf. and $\Omega_{\text{MSR}}$.
+      <span class="ex">Trained at 64K, evaluated to 256K. RULER averages: FA-XA reaches 63.27 / 73.87 / 81.82 against backbones 66.00 / 75.74 / 83.47, while DuoAttention manages only 58.30 / 65.94 / 62.92 and PruLong 58.38 / 69.90 / 48.82 — static ratios decay faster on extrapolation. On LongBench-V2, Elastic Attention beats the full-attention backbone on both Qwen backbones (27.88 / 33.41 vs 25.96 / 31.97). Beyond 64K at 8B scale, FA-XA wins because its lower $\Omega_{\text{ESR}}$ retains more effective information.</span>
+          <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure></div>
+
+  <h3>Main result ③ — math reasoning and domain long documents</h3>
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: AIME24 / GSM8K / Math / LongHealth">
+    <figcaption>
+      <b>Table 3:</b>Performance comparison across different benchmarks. The best results in each column are highlighted in bold. The values in parentheses indicate the performance gap relative to the Qwen3-4B baseline.
+      <span class="ex">On Qwen3-4B: FA-SSA wins all three math benchmarks (AIME24 6.70→10.00, GSM8K 43.10→45.80, Math 55.80→57.10); FA-XA tops LongHealth at 64.40. Averages: backbone 42.38, FA-SSA 43.08 (+0.70), FA-XA 43.35 (+0.97), DuoAttention 38.72 (−3.66). Moderate sparsity can act like regularization here — "sparse" does not automatically mean "worse".</span>
+          <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure></div>
+
+  <h3>Efficiency and effective sparsity</h3>
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8: RULER performance, speedup, and Ω_ESR statistics">
+    <figcaption>
+      <b>Figure 8:</b>Comparison of performance and inference speedup on the RULER benchmark across different methods. We adopt Llama-3.1-8B-Instruct as the backbone model and compare with training-based methods (FA-SSA), as well as other cutting-edge sparse attention methods. We report $\Omega_{\text{ESR}}$, as it provides a fair comparison of the effective proportion of attended tokens across different approaches.
+      <span class="ex">(a) best performance across length buckets; (b) speedup keeps climbing with context because the model allocates higher sparsity to longer inputs; (c) $\Omega_{\text{ESR}}$ statistics — training-based hybrids hold a roughly constant effective sparsity, while Elastic Attention stays lower throughout. The paper also lists systematic failures of rivals: NSA/InfLLM-V2 require KV head counts divisible by 16, and MoBA/InfLLM-V2 reserve budget for sequence-level features, causing OOM at 256K.</span>
+          <span class="pgref">Report p.9</span>
+    </figcaption>
+  </figure>
+
+  <h3>Scalability: the fully sparse regime and continued pretraining</h3>
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: XA-SSA fully sparse setting">
+    <figcaption>
+      <b>Table 5:</b>Results of implementing retrieval heads with XA.
+      <span class="ex">Making even retrieval heads sparse costs 0.87 points on Qwen3-4B (46.80→45.93, essentially free), but 3.8/6.5 points on Qwen3-8B and Llama (53.26→49.42, 56.48→50.02). That is the explicit accuracy-for-throughput trade at the extreme-efficiency end of the curve.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: frozen vs LoRA vs full fine-tuning">
+    <figcaption>
+      <b>Table 6:</b>Performance comparison of different tuning methods on LongBench and RULER. The best results are bolded, and the second-best are underlined.
+      <span class="ex">Relaxing the frozen-backbone constraint on Qwen3-4B: frozen 48.08 → LoRA 49.05 → full fine-tuning 50.40 on LongBench, while RULER stays flat (61.81 / 61.62 / 61.97). Elastic Attention composes with continued pretraining without sacrificing existing retrieval skills.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="takeaway"><b>Takeaway:</b> same backbone, same data, same harness — best average on LongBench-E in all three groups, the largest margins in RULER's extrapolation range, and LongBench-V2 above the full-attention backbone, at the price of a 12-hour run and +0.27M params/layer.</div>
+</section>
+
+<!-- ================= s6 ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Analysis</div>
+  <h2 class="sec">Analysis: what the router learned</h2>
+
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7: performance and Ω_MSR vs target sparsity t">
+    <figcaption>
+      <b>Figure 7:</b>Comparison of performance and test-time $\Omega_{\text{MSR}}$ among different training sparsity target $t$ settings. The bar chart denotes the performance and the line chart denotes $\Omega_{\text{MSR}}$ in each task.
+      <span class="ex">Lowering the sensitive-task target from 0.7 to 0.4 widens the gap between tasks and can even push performance past the backbone — yet the paper keeps $t_{\text{sen}}=0.7$, choosing inference efficiency over a few extra points. Note the realized $\Omega_{\text{MSR}}$ never exactly matches $t$: the constraint is a direction, not a quota.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: MLP hidden dimension ablation">
+    <figcaption>
+      <b>Table 4:</b>Comparison among different MLP hidden dimensions.
+      <span class="ex">Average scores are nearly flat across $2\times$–$8\times d'$ (45.22 / 45.92 / 45.45 / 46.40); the paper keeps the default $4\times d'$ as the best trade-off. Routing power comes from the task-representation abstraction, not MLP capacity.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure></div>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: task representation similarity before/after Task MLP">
+    <figcaption>
+      <b>Figure 5:</b>Visualization of task representation similarity. (Left) before Task MLP, the pooled hidden states exhibit high pairwise cosine similarity across different tasks; (Right) after passing through the Task MLP, the inter-task similarity significantly decreases.
+      <span class="ex">Before the Task MLP, pooled hidden states look alike across tasks; afterwards they separate sharply. The Task MLP's job is exactly to disentangle task features for the Router MLP to act on.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9: pairwise cosine similarity of routing representations">
+    <figcaption>
+      <b>Figure 9:</b>Pairwise cosine similarity of routing representations $z_{\text{task}}$. The prevalence of near-zero scores ($M_{uv}\approx 0$) indicates that the router maps distinct tasks to orthogonal subspaces on the local manifold. This confirms that the model implicitly disentangles task semantics into independent directions without supervision.
+      <span class="ex">With a stricter conditional-rescaling metric, most task pairs land near zero similarity — the router maps tasks to nearly orthogonal subspaces, entirely without task labels. The mechanism is a by-product of the sparsity-performance objective.</span>
+          <span class="pgref">Report p.22</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: per-head routing activation frequency (Qwen3-4B)">
+    <figcaption>
+      <b>Figure 6:</b>Overview of routing activation frequency of each head in Qwen3-4B. Red indicates heads that are consistently routed to FA (i.e., retrieval heads) across all 6 tasks in LongBench-E, while blue denotes heads that are consistently routed to SA.
+      <span class="ex">A handful of heads — mostly in middle-to-upper layers — are consistently full attention, matching the retrieval-head literature; some heads switch with the task (light colors), and the rest stay sparse. Routing reproduces known model structure rather than adding noise.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig11.png" alt="Figure 11: cross-model routing robustness">
+    <figcaption>
+      <b>Figure 11:</b>Extended Head Robustness Analysis. Similar to Figure 6, these heatmaps visualize the frequency of full-attention activation for each head. (a) and (b) show the multi-task global robustness for Qwen3-8B and Llama3.1-8B-Instruct, respectively. (c) presents the robustness analysis for Llama3.1-8B-Instruct in a single-task setting.
+      <span class="ex">Qwen3-8B shows task-agnostic structure (heads that are always active or always sparse); Llama-3.1 shows none in the aggregate view, yet its single-task breakdown reveals strong activations that migrate with the input. Qwen3 leans on fixed retrieval heads; Llama reallocates attention per task — the same router learns different policies per model family.</span>
+          <span class="pgref">Report p.22</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig13.png" alt="Figure 13: training dynamics (LM loss / reg loss / Ω_MSR / λ)">
+    <figcaption>
+      <b>Figure 13:</b>Decomposition of Training Objectives for Elastic Attention. We visualize the training dynamics of the Attention Router, separating the total loss into (a) the primary language modeling objective and (b) the sparsity regularization term. Subfigures (c) and (d) illustrate the task-level differentiation in sparsity allocation ($\Omega_{\text{MSR}}$) and adaptive coefficients ($\lambda$), demonstrating how the model automatically distinguishes between sparsity-robust and sparsity-sensitive tasks.
+      <span class="ex">(a) LM loss settles near 2.1 — sparsity injection does not disturb convergence; (b) the regularization loss falls from ~0.16 to ~0.06 within 100 steps; (c) per-task $\Omega_{\text{MSR}}$ diverges from a neutral start (code/in-context climb to ~0.80–0.85, QA plateaus near the target); (d) the Lagrange multipliers race — $\lambda_5$ (in-context) grows fastest, meaning the model prioritizes that task's density requirement. All within 300 stable steps.</span>
+          <span class="pgref">Report p.24</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig14.png" alt="Figure 14: router input truncation">
+    <figcaption>
+      <b>Figure 14:</b>Impact of router input truncation length on downstream performance and $\Omega_{\text{MSR}}$. We compare varying truncation budgets ($L\in\{50,\dots,800,\text{All}\}$) applied to the concatenation of the sequence's prefix and suffix. Results indicate that increasing the input length beyond 100 tokens yields negligible performance gains and may degrade router selectivity due to a lower signal-to-noise ratio.
+      <span class="ex">Performance saturates at 100–200 tokens; longer inputs dilute the task signal (Multi-Doc QA actually degrades). This is the empirical basis for the 100+100 boundary-pooling default — and why router latency is length-invariant (Figure 10).</span>
+          <span class="pgref">Report p.25</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig12.png" alt="Figure 12: length extrapolation and sparsity dynamics">
+    <figcaption>
+      <b>Figure 12:</b>Analysis of length extrapolation capability and sparsity dynamics on the RULER benchmark (8K-256K). We adopt Llama-3.1-8B-Instruct as the backbone model to compare our Elastic Attention variants (FA-XA and XA-SSA) with including MoBA and NSA.
+      <span class="ex">(a) at 256K, MoBA and NSA collapse toward zero while FA-XA holds 68.51 and XA-SSA 47.68 (far above the XAttention baseline's 35.82); (b)(c) NSA/InfLLM-V2 reach higher nominal sparsity (&gt;0.95) but deliver under 1.0× speedup, whereas XA-SSA converts ~0.995 sparsity into a <b>3.28×</b> speedup and FA-XA trades at 1.51×. Two ends of a superior Pareto frontier.</span>
+          <span class="pgref">Report p.23</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Takeaway:</b> the Task MLP orthogonalizes task representations without supervision; routing rediscovers retrieval heads and even learns family-specific policies (fixed for Qwen3, migratory for Llama); sparsity differentiation emerges within 300 steps; and 200 tokens of routing input suffice. The model already contained a task-sensitivity structure — the router just reads it out.</div>
+</section>
+
+<!-- ================= s7 ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Appendix</div>
+  <h2 class="sec">Appendix: reproducibility, extra results, cases</h2>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table8.png" alt="Table 8: hyperparameters">
+    <figcaption>
+      <b>Table 8:</b>Hyperparameters: General configuration (Left) and Baseline-specific settings (Right).
+      <span class="ex">Left: sequence 65,536, bfloat16, global batch 48, 300 steps, router/regularization LRs $5\times10^{-4}$/$1\times10^{-3}$, warmup 0.2, AdamW (0.9, 0.95), weight decay 0.1, cosine schedule; sparsity config sink/local 128/2048, block/chunk 64/16384, stride/threshold 16/0.9. Right: per-baseline block sizes (1024/64/64), top-k (8/128/64), windows (–/512/2048) — all retrained on the same data and environment.</span>
+          <span class="pgref">Report p.16</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table11.png" alt="Table 11: RULER evaluation configuration">
+    <figcaption>
+      <b>Table 11:</b>Detailed configuration for the RULER benchmark evaluation. We evaluate across exponentially increasing context windows up to 256k tokens.
+      <span class="ex">RULER protocol: six lengths from 8K to 256K, 50 samples per task-length pair, <abbr title="Needle-in-a-Haystack — the classic long-context retrieval probe">NIAH</abbr> retrieval family (single/multikey/multiquery/multivalue) plus QA extraction (qa1/qa2, fwe).</span>
+          <span class="pgref">Report p.20</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table9.png" alt="Table 9: full LongBench-E per-task results">
+    <figcaption>
+      <b>Table 9:</b>LongBench-E results comparison. The 1st and the 2nd performance in each comparison group are highlighted with bold font and underlined, respectively.
+      <span class="ex">All 13 sub-tasks (MF-en, Qasper, HotpotQA, 2WikiMQA, GovReport, MultiNews, TREC, TriviaQA, SAMSum, PCount, PRe, Lcc, RB-P) across the three backbone groups — the fine-grained companion to Table 1.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table10.png" alt="Table 10: LongBench-E category averages with MoBA/NSA/XA-SSA">
+    <figcaption>
+      <b>Table 10:</b>Performance on LongBench-E. We report average performance (Perf.) and $\Omega_{\text{MSR}}$ per task category. The 1st and the 2nd performance in each comparison group are highlighted with bold font and underlined, respectively.
+      <span class="ex">The MoBA/NSA/XA-SSA-inclusive companion table. Elastic Attention's per-category $\Omega_{\text{MSR}}$ (e.g. QA 0.66–0.68 vs code 0.82 on Qwen3-4B) contrasts with baselines that are either pinned at 0.70 or undefined.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table12.png" alt="Table 12: extra RULER / LongBench-V2 results">
+    <figcaption>
+      <b>Table 12:</b>Additional results on RULER and LongBench-v2.
+      <span class="ex">Per-length table including MoBA, NSA, XAttention. On Llama, MoBA dies from 32K (30.12 → 6.13 → 1.15 → 0) and NSA reaches only 11.42 at 256K, while FA-XA / XA-SSA hold 68.51 / 47.68 — the sharpest evidence that dynamic sparsity extrapolates better than static patterns.</span>
+          <span class="pgref">Report p.20</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table13.png" alt="Table 13: RULER sub-task breakdown">
+    <figcaption>
+      <b>Table 13:</b>Performance comparison of different attention methods on RULER subtasks. Tasks are grouped logically to highlight performance variations.
+      <span class="ex">Sub-task detail (NIAH single/multikey/multi Val/Qry, QA1/QA2, FWE). On Llama, Elastic Attention (FA-XA) stays close to baseline on FWE (81.89 vs 82.11, where DuoAttention manages 78.22); the losses concentrate in the hardest multikey NIAH tiers.</span>
+          <span class="pgref">Report p.21</span>
+    </figcaption>
+  </figure></div>
+
+  <div class="tbl-wrap"><figure class="fig">
+    <img src="figs/table14.png" alt="Table 14: comparison with LyChee">
+    <figcaption>
+      <b>Table 14:</b>Performance comparison on LongBench and RULER. The performance drop relative to the respective base model is shown in parentheses.
+      <span class="ex">Head-to-head with contemporaneous hybrid-head work LyChee: LongBench is close (−0.37 vs −0.62 at 4B; −0.65 vs −0.93 at 8B), but RULER separates them — Elastic loses 4.19/4.00 while LyChee loses <b>15.08/18.88</b>.</span>
+          <span class="pgref">Report p.21</span>
+    </figcaption>
+  </figure></div>
+
+  <h3>Qualitative cases: three ways sparsity loses the detail</h3>
+  <figure class="fig">
+    <img src="figs/fig15.png" alt="Figure 15: policy reasoning case">
+    <figcaption>
+      <b>Figure 15:</b>Qualitative comparison on a complex policy reasoning task. Our model correctly identifies the 'Gradual' approach required for stability, whereas baselines hallucinate 'Aggressive' or 'Immediate' measures that contradict the stability constraint.
+      <span class="ex">The question demands balancing fiscal sustainability, stability, and the energy transition. Elastic Attention picks the "gradual" package (green bank, subsidies kept five years, carbon tax deferred); baselines propose aggressive carbon taxes or immediate subsidy removal — fluent answers that violate the stated constraint.</span>
+          <span class="pgref">Report p.26</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig16.png" alt="Figure 16: bilingual legal document case">
+    <figcaption>
+      <b>Figure 16:</b>Comparison on a bilingual legal document. Our model accurately extracts the specific legal provision regarding asset reallocation for public use (FAA), whereas baselines provide generic descriptions of &ldquo;legal assessments&rdquo; or &ldquo;compliance&rdquo; without specific details.
+      <span class="ex">SEMA vs FAA: the correct answer hinges on FAA's "reallocation for public use"; baselines answer with generic "legal review" boilerplate — sparse attention dropping the fine print and letting language priors fill it in.</span>
+          <span class="pgref">Report p.27</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig17.png" alt="Figure 17: narrative entity tracking case">
+    <figcaption>
+      <b>Figure 17:</b>Qualitative comparison on narrative entity tracking. The task requires identifying the specific characters who conspired to frame the protagonist. Our model accurately retrieves the correct trio, whereas baselines consistently hallucinate &ldquo;Villefort&rdquo; (the public prosecutor) into the group, failing to distinguish between the plotters and the judicial figure involved later.
+      <span class="ex">Who wrote the incriminating letter in <i>The Count of Monte Cristo</i>? Correct: Danglars, Fernand, Caderousse. Several baselines add Villefort (who appears later) and InfLLM-V2 misses the mastermind entirely — exactly the entity relations sparsity tends to damage, and why sensitive tasks keep $\Omega_{\text{MSR}}$ at 0.63–0.68.</span>
+          <span class="pgref">Report p.28</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>Editor's note (paper typo):</b> Appendix H says "In <b>Table</b> 15, 16, and 17, we present representative model outputs" — those numbers actually refer to Figures 15/16/17; no Tables 15–17 exist. Harmless, but recorded so readers don't hunt for missing tables.</div>
+</section>
+
+<!-- ================= s8 ================= -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary</h2>
+
+  <h3>The paper's own conclusion and stated limits</h3>
+  <p>Sorting tasks into robust/sensitive regimes and adding a per-head FA/SA router yields input-adaptive sparsity without touching the pretrained backbone — supported by three backbones and three suites, all trained in 12 hours. The authors explicitly bound the scope: ① the design targets single-GPU / few-device deployment of small-to-medium models (head-level parallelism on large clusters conflicts with layer-wise hybrid heads); ② sensitive tasks still trade accuracy for sparsity by scenario; ③ routing is decided once per request at the prefill stage.</p>
+
+  <h3>Lineage and provenance (organized from the paper's citations)</h3>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Where each component comes from (organized from inline citations; not a table from the paper)</caption>
+    <thead><tr><th>Component</th><th>Upstream as labeled by the paper</th><th>What this work changes</th></tr></thead>
+    <tbody>
+      <tr><td>Retrieval heads</td><td>Retrieval Head (Wu et al., 2024)</td><td>Used to rank heads in the sparsity sweep (NIAH scoring + progressive replacement)</td></tr>
+      <tr><td>Hybrid-head mechanism</td><td>DuoAttention (Xiao et al., 2024a; 2025), PruLong (Bhaskar et al., 2025)</td><td>Static ratio → input-conditioned per-head routing</td></tr>
+      <tr><td>Sparse-head computation</td><td>Streaming Sparse Attention (Xiao et al., 2024b), XAttention (Xu et al., 2025)</td><td>Pluggable SA implementations (FA-SSA / FA-XA / XA-SSA)</td></tr>
+      <tr><td>Sparse kernel</td><td>Block-Sparse-Attention (Guo et al., 2024)</td><td>Routing decisions passed as kernel metadata; single launch for mixed heads</td></tr>
+      <tr><td>Routing mechanism</td><td><abbr title="Mixture-of-Experts — token-conditioned routing over expert sub-networks">MoE</abbr> gating (Shazeer et al., 2017)</td><td>"Choose an expert" → "choose an attention mode", per KV head</td></tr>
+      <tr><td>Relaxation &amp; gradients</td><td>Gumbel-Softmax (Jang et al., 2016), STE (Bengio et al., 2013), reparameterization (Bhaskar et al., 2025)</td><td>Hard routing forward + soft gradients backward, with temperature annealing</td></tr>
+      <tr><td>Constrained optimization</td><td>Lagrangian multipliers (gradient ascent on $\lambda$)</td><td>Non-tight sparsity targets with bounds, letting tasks self-differentiate</td></tr>
+      <tr><td>Backbones</td><td>Qwen3 (Yang et al., 2025), Llama 3 (Grattafiori et al., 2024)</td><td>Three 4B/8B backbones, all frozen</td></tr>
+      <tr><td>Training data</td><td>ChatQA2 (Xu et al., 2024), MuSiQue (Trivedi et al., 2022), CoLT-132K (Li et al., 2025), GovReport (Huang et al., 2021), XSum (Narayan et al., 2018)</td><td>Blended into a ~0.74B-token dual-regime corpus</td></tr>
+      <tr><td>Evaluation &amp; baselines</td><td>LOOM-Eval (Tang et al., 2025); DuoAttention / PruLong / InfLLM-V2 (Zhao et al., 2025) / MoBA (Lu et al., 2025a) / NSA (Yuan et al., 2025) / LyChee (Lin et al., 2026)</td><td>All baselines retrained in one environment, evaluated in one harness</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted" style="font-size:13.5px">Note: citations follow the paper's inline labels; this page does not verify each bibliography entry.</p>
+
+  <h3>Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><b>Scale ceiling</b>: validation stops at 4B/8B; larger dense models and MoE architectures are untested — MoE is itself a dynamic per-token compute regime, and the interaction is unexamined;</li>
+    <li><b>Context ceiling</b>: RULER to 256K (trained at 64K); no 1M-scale extrapolation;</li>
+    <li><b>Decision granularity</b>: one routing decision per request at prefill — per-turn or per-step re-routing (and its cost/benefit) is left open;</li>
+    <li><b>Evaluation breadth</b>: three long-context suites only (no ∞Bench / multimodal long documents); the 0.74B-token training corpus is small, so the scaling curve of data is unknown;</li>
+    <li><b>Reproducibility details</b>: code is released (LCM-Lab/Elastic-Attention) but the paper pins no commit or seed protocol.</li>
+  </ul>
+
+  <h3>Editor's commentary</h3>
+  <p><strong>A paper with a well-posed question.</strong> Most sparse-attention work optimizes <i>which tokens to keep</i>; this one steps back and asks <i>whether to be sparse at all</i> — a decision that varies with the input. The chain is clean: a two-regime observation, a binary per-head route, done.</p>
+  <p><strong>The engineering closes the loop.</strong> Many dynamic schemes die on overhead: splitting tensors, launching kernels, fragmenting sequence parallelism. Passing routing as kernel metadata plus boundary-pooled routing (0.196 ms, length-invariant) makes the dynamism nearly free — and Figure 4 shows the fused kernel scaling to ~2.2×.</p>
+  <p><strong>Cost is the headline.</strong> Twelve hours on 8×A800, frozen backbone, 0.27M params/layer — an architectural capability delivered at fine-tuning cost. For teams without large compute, that leverage is the most transferable lesson.</p>
+  <p><strong>Reservations:</strong> ① "Elastic" is per-request, not per-token — a long chain-of-thought runs on one decision; ② the method does not solve token selection; it depends on the SA mechanism below it; ③ on Llama, FA-SSA still trails full attention by ~10 RULER points, and the fully sparse 8B variant degrades visibly — "approaching full attention" currently holds at the 4B scale and in sensitive-task regimes; ④ the orthogonality evidence is elegant, but the router likely captures only the task-type axis — whether it can exploit finer-grained input complexity is untested.</p>
+
+  <div class="note"><b>One line:</b> Elastic Attention turns the sparsity ratio from a pre-deployment hyperparameter into a runtime variable — two task regimes observed, a 0.27M-param-per-layer router doing per-head binary routing, and a fused kernel that makes dynamism cheap. Twelve hours of training buys a cost-quality curve that stretches with the input.</div>
+</section>
+
+<!-- ================= s9 glossary ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Reading glossary</h2>
+  <p class="muted">Abbreviations used above (dotted-underlined terms in the prose show tooltips too).</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Reading glossary (dotted-underlined abbreviations in the prose show hover definitions)</caption>
+    <thead><tr><th>Term</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>FA</td><td>Full Attention</td><td>Every token attends to all previous tokens — accuracy ceiling, cost ceiling</td></tr>
+      <tr><td>SA</td><td>Sparse Attention</td><td>Only a fraction of K/V is computed — cheaper but can drop detail</td></tr>
+      <tr><td>Ω_MSR</td><td>Model Sparsity Ratio</td><td>Share of KV heads assigned to SA (Definition 2.1)</td></tr>
+      <tr><td>Ω_ESR</td><td>Effective Sparsity Ratio</td><td>Sparsity weighted by each head's pruning rate ρ (Definition 2.2)</td></tr>
+      <tr><td>SSA</td><td>Streaming Sparse Attention</td><td>Attention-sink + sliding-window pattern (Xiao et al., 2024b)</td></tr>
+      <tr><td>XA</td><td>XAttention</td><td>Training-free block-sparse attention using antidiagonal scoring (Xu et al., 2025)</td></tr>
+      <tr><td>BSA</td><td>Block-Sparse-Attention</td><td>Kernel used here to execute mixed heads in one launch (Guo et al., 2024)</td></tr>
+      <tr><td>STE</td><td>Straight-Through Estimator</td><td>Hard values forward, soft gradients backward</td></tr>
+      <tr><td>DuoAttention / PruLong / InfLLM-V2</td><td>—</td><td>Training-based hybrid/KV-pruning baselines retrained in this paper</td></tr>
+      <tr><td>MoBA / NSA</td><td>Mixture of Block Attention / Native Sparse Attention</td><td>Representative sparse-attention architectures used as baselines</td></tr>
+      <tr><td>NIAH</td><td>Needle-in-a-Haystack</td><td>The classic long-context retrieval probe, RULER's main task family</td></tr>
+      <tr><td>RULER</td><td>—</td><td>Configurable synthetic long-context benchmark (Hsieh et al., 2024)</td></tr>
+      <tr><td>LongBench-E / -V2</td><td>—</td><td>Real-world long-context suites (14 tasks; and the 8K–2M-word reasoning upgrade)</td></tr>
+      <tr><td>FWE</td><td>Fuzzy Word Extraction</td><td>RULER's fine-grained extraction sub-task</td></tr>
+      <tr><td>LOOM-Eval</td><td>—</td><td>Long-context evaluation framework used here (Tang et al., 2025)</td></tr>
+      <tr><td>LyChee</td><td>—</td><td>Contemporaneous hybrid-head sparse decoding work (Lin et al., 2026)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    English reading notes for &ldquo;Elastic Attention: Test-time Adaptive Sparsity Ratios for Efficient Transformers&rdquo; (ICML 2026 submission). Images are cropped from the paper at 300 DPI and displayed without distortion; commentary is the editor's own. Data follow the original paper.<br>
+    Paper:<a href="https://openreview.net/forum?id=rLO2NTUHSW">OpenReview rLO2NTUHSW</a> · Code:<a href="https://github.com/LCM-Lab/Elastic-Attention">LCM-Lab/Elastic-Attention</a><br>
+    <span style="opacity:.75">Dark mode · click any figure for full resolution · print-friendly · <a href="Elastic-Attention论文精读_HTML.html" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">阅读中文版</a></span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

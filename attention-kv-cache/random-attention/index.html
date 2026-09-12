@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Random Attention 论文中文精读:KV cache 驱逐不需要打分——保住 prompt + 每头均匀随机驱逐,追平最强基线并快 32–43%。全部图表 300 DPI 高清内嵌。">
+<meta name="keywords" content="论文精读, KV cache, eviction, 推理模型, 长思维链, 高效推理, vLLM, Random Attention">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · Random Attention: 重新思考 KV Cache 驱逐">
+<meta property="og:description" content="KV cache 驱逐一直被当作排序问题——本文证明打分信号几乎不贡献精度,随机驱逐+保住 prompt 即可追平最强基线,吞吐再快 32–43%。">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · Random Attention: 重新思考 KV Cache 驱逐</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .algo{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:16px 22px; margin:14px auto; max-width:820px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13.5px; line-height:1.7}
+  .algo .algo-title{font-weight:700; font-family:inherit; margin-bottom:8px; color:var(--ink)}
+  .algo .cmt{color:var(--muted)}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">Random Attention<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">方法</a>
+      <a class="jump" href="#s4">实验</a>
+      <a class="jump" href="#s5">分析</a>
+      <a class="jump" href="#s6">效率</a>
+      <a class="jump" href="#s7">补充</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <a class="lang-toggle" href="en.html" title="Read in English" onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">EN</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.03430</div>
+    <h1>Random Attention:重新思考 KV Cache 驱逐<br>for 高效推理</h1>
+    <div class="subtitle">KV cache 驱逐一直被当作"打分排序"问题——给每个缓存 token 估计未来重要性,保住分最高的。本文直接检验这个前提并给出否定答案:保住 prompt + 每个 <abbr title="Grouped-Query Attention,多个查询头共享一组 KV 头">KV 头</abbr>内均匀随机驱逐、不打任何分,就能在 4 个模型 × 6 个推理任务上追平最强驱逐器,并在 vLLM 部署中以 32–43% 的吞吐优势胜出。两个控制实验解释了原因:prompt 才是 cache 的脆弱部分;推理轨迹靠"文本复述 + 跨头复制"两层冗余自我保护。</div>
+    <div class="meta">
+      <span>Salesforce AI Research + UIUC(Heng Wang 等)</span>
+      <span>论文:<a href="https://arxiv.org/abs/2609.03430">arXiv:2609.03430</a></span>
+      <span>代码:<a href="https://github.com/SalesforceAIResearch/Random-Attention">GitHub</a></span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">KV Cache 驱逐</span><span class="pill">推理模型</span><span class="pill">长思维链</span><span class="pill">高效推理</span><span class="pill">vLLM 部署</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图表按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:反直觉的结论与两张总览图</a></li>
+    <li><a href="#s2">背景:驱逐框架与"打分函数动物园"</a></li>
+    <li><a href="#s3">方法:两个结构性选择,四行算法</a></li>
+    <li><a href="#s4">实验:主结果网格与压缩压力</a></li>
+    <li><a href="#s5">分析:为什么打分信号几乎不买任何东西</a></li>
+    <li><a href="#s6">效率:免打分在服务里值 32–43%</a></li>
+    <li><a href="#s7">补充:keep-log 诊断、生成长度与波动</a></li>
+    <li><a href="#s8">点评:亮点、边界与对领域的启示</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<!-- ================= s1 速览 ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览</h2>
+
+  <p class="lead">推理模型靠生成数万 token 的思维链解决难题,<abbr title="Key-Value Cache,注意力机制中缓存的历史键值对">KV cache</abbr> 随生成长度线性膨胀,成为解码期的显存瓶颈。现有驱逐(eviction)方法共享一个范式:<strong>给每个已缓存 token 打一个"未来重要性"分数,保留分最高的 top-K</strong>。本文的检验结果近乎釜底抽薪——<strong>这个选择信号几乎不贡献任何精度</strong>。</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">方法本体</div><div class="v">保住 prompt + 每头随机驱逐<small>不打分、不校准、不调参;每轮一次 rand + 一次 topk</small></div></div>
+    <div class="item"><div class="k">精度(4 模型 × 6 任务)</div><div class="v">60 格中 31 格显著领先<small>仅 1 格显著落后(32B 代码任务,归因 prompt 长度)</small></div></div>
+    <div class="item"><div class="k">吞吐(vLLM, 32k 生成)</div><div class="v">比最强基线快 32–43%<small>免打分带来;同时是 full attention 的 1.6–2.7×</small></div></div>
+    <div class="item"><div class="k">单轮驱逐成本</div><div class="v">0.30 ms<small>纯压缩下限;最强基线 TriAttention 要 1.47–1.64 ms</small></div></div>
+  </div>
+
+  <p>作者把 Random Attention 同时定位为<strong>可部署的方法</strong>和<strong>零假设(null hypothesis)</strong>:任何打分式选择器如果在同等预算下打不过"随机",就说明它的信号没有提取到可用信息。两张总览图先把结论立住:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: 六任务平均精度对比(左)与 vLLM 服务吞吐(右)">
+    <figcaption>
+      <b>Figure 1:</b>(a) Mean accuracy over the six reasoning tasks of Tables 1 and 5 at ∼4× compression: Random Attention matches the strongest prior evictor on every model. (b) vLLM serving throughput at 32k-token generations; labels give Random Attention's multiple of full attention and its margin over TriAttention.
+      <span class="zh">左图:约 4× 压缩下,六个推理任务的平均精度——四个模型上 Random Attention(最右柱)与最强基线 TriAttention 基本持平(14B/32B 的小差距主要来自代码任务,那里超长 prompt 吃掉了预算,见 §4)。右图:32k 生成的 vLLM 服务吞吐——Random Attention 达到 full attention 的 1.58×/2.23×/1.97×/2.67×,比 TriAttention 高出 +37%/+43%/+40%/+32%,原因很简单:它从不运行打分过程。</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <div class="takeaway"><b>一句话结论:</b>驱逐器的精度由"<strong>它保护了什么</strong>"决定,而不是"它怎么给其余 token 排序"。保护住不可恢复的 prompt 之后,推理轨迹的冗余足以让随机抽取保留模型还需要的东西——打分信号剩下的用武之地,是"只说一次、从不复述"的稀有事实,而推理轨迹很少产生这种事实。</div>
+</section>
+
+<!-- ================= s2 背景 ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Preliminaries</div>
+  <h2 class="sec">背景:驱逐框架与"打分函数动物园"</h2>
+
+  <h3>为什么是解码期驱逐</h3>
+  <p>推理模型创造了一个特殊 regime:一个 200 token 的数学问题,可能触发 10,000+ token 的思维链。<strong>cache 的膨胀发生在解码阶段</strong>,而不是 prefill。这决定了问题形态——</p>
+  <ul class="tight">
+    <li><strong>驱逐(eviction)</strong>:cache 到达预算后永久丢弃键值对。内存有界,但丢弃不可恢复,风险由策略承担。</li>
+    <li><strong>稀疏注意力选择(sparse-attention selection)</strong>:每次只 attend 一个子集,但所有键值对都留在显存里——省算力,<strong>不省内存</strong>,峰值仍随序列长度线性增长。</li>
+  </ul>
+  <p>本文只讨论前者:要给内存封顶,驱逐是唯一的路。</p>
+
+  <h3>记号与周期性驱逐框架</h3>
+  <p>解码第 $t$ 步,一个注意力头持有 $N$ 对缓存 $(k_i, v_i)$,位置 $1,\ldots,\ell_p$ 是 prompt。输出由当前查询 $q_t$ 加权求和得到:</p>
+  <div class="math">$$o_t=\sum_{i\le N}\alpha_i^{(t)}v_i,\qquad \alpha_i^{(t)}=\frac{\exp\left(q_t^\top k_i/\sqrt{d}\right)}{\sum_{j\le N}\exp\left(q_t^\top k_j/\sqrt{d}\right)} \tag{1}$$</div>
+  <p>框架沿用近期工作的 decode-phase 设定:持久预算 $K$ + 近期缓冲 $r$( $r \ll K$,缓冲永不打分)。每步追加一对,每 $r$ 步缓冲填满触发一次驱逐——对候选集 $C_t$(缓冲之外的全部缓存位置)按策略分数 $s_i$ 保 top-K:</p>
+  <div class="math">$$S_t=\operatorname{top-}K_{i\in C_t}\; s_i \tag{2}$$</div>
+  <p>驱逐是单调的:丢掉的对永远消失。各驱逐方法的差异,几乎全部落在<strong>分数 $s_i$ 怎么定义</strong>上:</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>各驱逐策略 = 各自的打分函数 s<sub>i</sub>(按论文 §2 的统一记号整理;最后一行为本文方法)</caption>
+    <thead><tr><th>方法</th><th>分数 s<sub>i</sub> 的定义</th><th>一句话直觉</th><th>默认 prompt 处理</th></tr></thead>
+    <tbody>
+      <tr><td>StreamingLLM</td><td>无分数(结构规则)</td><td>保注意力sink + 近期窗口</td><td>仅 sink tokens</td></tr>
+      <tr><td>H2O</td><td>$\sum_{t'=i}^{t}\alpha_i^{(t')}$</td><td>入缓存以来累计注意力最高的留下</td><td>交给分数</td></tr>
+      <tr><td>SnapKV</td><td>$\sum_{t'=t-w+1}^{t}\alpha_i^{(t')}$,近邻 max-pool</td><td>只看最近 $w$ 个查询都关注谁</td><td>仅 sink tokens</td></tr>
+      <tr><td>R-KV</td><td>$\lambda s_i^{\text{Snap}}+(1-\lambda)(1-\bar c_i)$,$\bar c_i=\frac{1}{N-1}\sum_{j\ne i}\cos(k_i,k_j)$</td><td>注意力高且不冗余的留下(复述过的事实不存两份)</td><td>仅 sink tokens(实际保留最多)</td></tr>
+      <tr><td>VaSE</td><td>值幅值 $\max_j v_{ij}-\min_j v_{ij}$ 保 $n_{\text{large}}$ 个,其余按 SnapKV 分数采样填充</td><td>值向量"摆幅大"的位置更重要,其余随机补齐</td><td>仅 sink tokens</td></tr>
+      <tr><td>TriAttention</td><td>$f(t-i)$(逐头校准的三角级数,组合 $\lVert k_i\rVert$)</td><td>按"离当前查询的位置距离"打分</td><td><strong>默认保全部输入</strong></td></tr>
+      <tr class="hl"><td>Random Attention(本文)</td><td>$+\infty$(prompt)/ $u_i\sim\mathrm{Uniform}(0,1)$</td><td>问题绝不丢,轨迹随机撒</td><td><strong>整个 prefill 钉死</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note"><b>伏笔(§5.1 揭晓):</b>注意最后一列——各方法默认的 prompt 保护制度并不一致:TriAttention 默认保住整个输入,而 VaSE/R-KV/SnapKV 默认只保 sink tokens、把 prompt 的存亡交给分数。这意味着<b>跨论文比较精度时,其实同时在比较"保护制度"</b>。这个混淆变量是后文归因实验的主角。</div>
+</section>
+
+<!-- ================= s3 方法 ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Method</div>
+  <h2 class="sec">方法:两个结构性选择,四行算法</h2>
+
+  <p class="lead">Random Attention 是一个<strong>无信号(signal-free)</strong>的驱逐策略,全部内容是两个结构性选择。直觉是把"不可替换的输入"与"模型自己生成的轨迹"分开:问题只陈述一次,丢了就永远找不回来;而轨迹在生成过程中不断回访、复述自己的中间状态。</p>
+
+  <ul class="tight">
+    <li><strong>① 保护问题(Protect the question)</strong>:位置 $1,\ldots,\ell_p$——整个 prefill,包括系统提示、chat 模板和问题——<strong>永不驱逐</strong>。</li>
+    <li><strong>② 其余部分逐头随机撒(Scatter the rest, per head)</strong>:每个剩余缓存位置抽一个 i.i.d. 均匀随机分数,每个 KV 头<strong>独立</strong>保自己的 top-K。无信号的采样把保留预算均匀铺满整条轨迹,且每个头撒得都不一样。</li>
+  </ul>
+
+  <p>写成公式,整个方法就是:</p>
+  <div class="math">$$s_i=\begin{cases}+\infty, & i\le \ell_p \quad(\text{prompt})\\[2pt] u_i\sim\mathrm{Uniform}(0,1), & \text{otherwise}\end{cases} \tag{3}$$</div>
+
+  <p>每层逐头独立抽取,式 (2) 完成剩下的工作。算法全文四行:</p>
+
+  <div class="algo">
+    <div class="algo-title">Algorithm 1 · Random Attention 打分(一次驱逐事件,逐层运行)</div>
+    <div>Require: batch B · KV 头数 H<sub>kv</sub> · 缓存位置数 S · prompt 长度 ℓ<sub>p</sub> · 预算 K</div>
+    <div>1: s ← rand(B, H<sub>kv</sub>, S) <span class="cmt">▹ 每个缓存位置、每个 KV 头独立的均匀随机分数</span></div>
+    <div>2: s[:, :, 0:ℓ<sub>p</sub>] ← +∞ <span class="cmt">▹ 强制保住问题</span></div>
+    <div>3: keep ← topk(s, K) <span class="cmt">▹ 每个 KV 头独立的 top-K</span></div>
+    <div>4: return keep</div>
+  </div>
+
+  <p>每次驱逐的成本 = 一次 <code>rand</code> + 一次 <code>topk</code>。<strong>这是能写出来的最弱选择信号</strong>——因此该方法具有双重身份:既是可部署的方法,也是一个零假设。任何信号驱动的选择器,如果在同等预算下赢不了它,就没有从自己的信号里提取到可用信息。</p>
+
+  <div class="note"><b>隐式的年龄偏好(§7 展开):</b>虽然没有计算任何分数,这个策略并不是"年龄盲"的。一个位置每活过一次驱逐,下一轮就要重新抽签,存活 $n$ 轮的概率约为 $\left(\frac{K-\ell_p}{K+r-\ell_p}\right)^n\approx 0.94^n$(取 $K=1024$、$r=64$)。所以 Random Attention 实际是一个<strong>软近期窗 + 逐头不同的长尾</strong>:近期位置几乎总在,老位置以薄尾存活、且各头的尾不同。</div>
+</section>
+
+<!-- ================= s4 实验 ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Experiments</div>
+  <h2 class="sec">实验:主结果网格与压缩压力</h2>
+
+  <h3>设置</h3>
+  <ul class="tight">
+    <li><strong>模型</strong>:Qwen3-4B / 14B / 32B 与 Phi-4-reasoning(14B)。</li>
+    <li><strong>任务</strong>(六项,覆盖数学/科学/代码):MATH500(500 题)、GPQA-Diamond(198)、AIME 2025+2026 合并(30+30)、HMMT(60)、LiveCodeBench-v6 medium(383,真实测试执行判 pass@1)。</li>
+    <li><strong>预算</strong>:各任务按典型 trace 的 ~4× 压缩定 K(LiveCodeBench ~3×):MATH500 $K=1024$、GPQA-D $K=2048$、AIME/HMMT $K=4096$、LiveCodeBench $K=3072$;生成长度上限 32k。</li>
+    <li><strong>采样</strong>:各模型官方设置(Qwen3 温度 0.6、Phi-4 0.8,核采样 $p=0.95$),每格独立重复 2 次(MATH500)/ 4 次(GPQA-D、LCB)/ 16 次(AIME、HMMT)。</li>
+    <li><strong>统计</strong>:每个声称的差距都要过"按题聚类的配对 percentile bootstrap 95% CI + 精确符号检验"双重关卡;显著低于 Random Attention 的格子标灰。</li>
+    <li><strong>引擎</strong>:FlashAttention-2 内核、无 PagedAttention;基线(SnapKV/R-KV/VaSE/TriAttention)全部按发布配置在同等预算下运行。</li>
+  </ul>
+
+  <h3>主结果:数学与科学上信号不买任何东西</h3>
+  <p>Table 1 给出主网格(14B 的复制在 Table 5)。配对检验下,Random Attention 在 60 个基线格中<strong>31 格显著领先、仅 1 格显著落后</strong>:</p>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: 三模型 × 五任务主结果网格">
+    <figcaption>
+      <b>Table 1:</b>Accuracy under KV cache eviction at each task's ∼4× compression (LiveCodeBench: ∼3×); the header gives each task's per-head KV budget K. Bold: best eviction method per column; grayed: significantly below Random Attention.
+      <span class="zh">读表三个层次:① MATH500/GPQA-D——Random Attention 在每个模型上显著超过 VaSE 与 SnapKV,在 Qwen3-4B 上还显著超过 R-KV;没有任何选择器在这里显著超过它(TriAttention 在两个 GPQA-D 格的名义领先只有 0.3–0.6 分,在噪声之内)。② AIME/HMMT——竞赛数学样本小而难(16 次采样/题),SnapKV 在每个模型上仍显著落后,R-KV 在 Qwen3 系、VaSE 在 Phi-4 上也显著落后;VaSE 在 32B 上的 +1.7/+1.5 名义领先,对照两种方法 ±5 分的 run-to-run 标准差,只是噪声。③ LiveCodeBench 是唯一拉开大差距的任务——SnapKV 每个模型掉 20–35 分,VaSE 在 Phi-4 上塌到 0.373(落后 29 分)——原因见下面的 prompt 长度分析。</span>
+    </figcaption>
+  </figure>
+
+  <p>Qwen3-14B 在中间规模上复制了同样的图景(Table 5),其中出现 3 个基线显著领先的格子:TriAttention 在 LiveCodeBench(+2.6 分,$p=.007$)与 MATH500(+2.1 分,$p=.02$),VaSE 在 AIME(+2.6 分,$p=.007$)——与它们在 32B 上的名义领先一致,下文 prompt 长度账本能解释代码任务上的那一格。</p>
+
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: Qwen3-14B 主网格复制">
+    <figcaption>
+      <b>Table 5:</b>Performance of Qwen3-14B with the same setting as in Table 1.
+      <span class="zh">14B 的复制网格:Random Attention 在 MATH500(0.870)与 GPQA-D(0.628)上显著超过 VaSE 与 SnapKV,整体仍与 TriAttention 胶着(五任务各有胜负、差距都在 2 分级)。注意 LiveCodeBench 上 TriAttention 0.843 vs Random Attention 0.820——这是它在代码任务上跨 14B/32B 稳定出现的小优势,§4 末尾与 §5.1 会说明这更多是"长 prompt 预算"而非"选择信号"的故事。</span>
+    </figcaption>
+  </figure>
+
+  <h3>压缩越紧,差距越大——而且对每个家族都一样</h3>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: 2× 到 16× 压缩下的精度曲线">
+    <figcaption>
+      <b>Figure 2:</b>Accuracy from 2× to 16× compression on Qwen3-4B and Phi-4-reasoning, on the four math and science tasks; dashed lines mark full attention.
+      <span class="zh">四个数学/科学任务上从 2× 压到 16×:2× 时所有方法都贴着 full attention(虚线);预算收紧后,Random Attention 与 TriAttention 继续并肩下行,而两者的领先带对 VaSE 逐渐拉开(如 Qwen3-4B MATH500 16× 处 0.39 vs 0.09)。"随机"并没有在压力下崩掉——它跟住了最强的打分基线。LiveCodeBench 不参与扫描,因为它的 prompt 在小预算下本身就放不下。</span>
+    </figcaption>
+  </figure>
+
+  <h3>代码任务为何特殊:prompt 是六倍长</h3>
+  <p>LiveCodeBench 是唯一出现大分差的任务,而账本指向 <strong>prompt 长度而非选择信号</strong>:</p>
+  <ul class="tight">
+    <li>LCB 的 prompt 平均 <strong>557 token</strong>,同一 tokenizer 下是 MATH500 的 <strong>6 倍</strong>;最长的能吃掉 $K=3072$ 预算的<strong>一半</strong>。</li>
+    <li>于是一个"抓不住 prompt"的选择器在这里损失最大——SnapKV 在所有模型上掉 20–35 分、VaSE 在 Phi-4 上塌掉,都是这个机制(§5.1 的保护规则会把这些差距补上)。</li>
+    <li>TriAttention 在 Qwen3-32B 代码上领先约 3 分,是主网格中<strong>唯一</strong>显著的基线胜绩——同样与 prompt 长度相关,而非其信号在轨迹上更会挑。</li>
+    <li>Random Attention 自己把整个 prompt 钉死,所以代码任务上它有相当比例的预算在"选择开始之前"就已花掉;代码 prompt 里有大量脚手架(I/O 格式、harness 指令)本可以被更聪明的规则<strong>压缩</strong>而不是整个<strong>钉死</strong>——作者把它留给未来工作,因为本文方法的价值恰恰在于"没有任何可调的东西"。</li>
+  </ul>
+
+  <div class="takeaway"><b>主结果读法:</b>在打分信号声称最擅长的地方(数学/科学推理),随机+保 prompt 与最强基线统计上不可区分;唯一输的一格(长 prompt 代码)输在预算分配,不在排序质量。下一节把"为什么"拆开。</div>
+</section>
+<!-- ================= s5 分析 ================= -->
+<section id="s5">
+  <div class="sec-no">05 · Analysis</div>
+  <h2 class="sec">分析:为什么打分信号几乎不买任何东西</h2>
+
+  <p class="lead">推理时的 cache 内容天然分成两类:<strong>prompt</strong>(陈述一次,之后不再出现)与<strong>工作状态 working state</strong>(解题过程中不断书写、重写的中间步骤)。两个控制实验分别证明:第一类是脆弱的,而各方法的差距大部分只是"分数弄丢了多少问题";第二类冗余到随机抽签就能留住模型还需要的东西。</p>
+
+  <h3>5.1 prompt 才是脆弱的部分</h3>
+  <p>§2 的伏笔在这里揭晓:各方法对 prompt 的默认处理不一(TriAttention 保全部输入;VaSE/R-KV/SnapKV 只保 sink、把 prompt 交给分数)。让<strong>每个方法都拿到同一条规则("保住 prompt")</strong>,就能把"分数"与"保护"两个变量拆开:</p>
+
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: 加 prompt 保护规则前后的成绩对比">
+    <figcaption>
+      <b>Table 2:</b>Performance before and after protecting the prompt. R-KV never gains more than 1.9 points, SnapKV gains everywhere, VaSE gains materially only on Phi-4-reasoning.
+      <span class="zh">规则给每个方法"发钱",发得刚好等于它的分数此前弄丢的问题量:SnapKV(默认保留 prompt 最少)处处大涨,Phi-4 GPQA-D 上 +22.5 分;VaSE 只在其保留失败的地方涨(Phi-4 的 prompt 比 Qwen3-4B 长 2–3 倍,+4.2/+10.2);R-KV 本来就保留得最多,涨幅从未超过 +1.9 分。规则之后,三个基线在每个设置里彼此差距 ≤2.2 分。更扎心的是两行"无信号"对照:没有规则时,纯近期窗低到 0.093、Random Attention(那时 prompt 只按均匀概率存活)掉到 0.23–0.76;有规则后,Random Attention 在每个设置都是最优,连纯近期窗都距最佳基线不到 2 分。<b>丢 prompt 是灾难性的,随机砍轨迹不是——这就是"prompt 是脆弱部分"的含义。</b></span>
+    </figcaption>
+  </figure>
+
+  <p>Table 6 把同样的控制推广到 Table 2 没覆盖的设置(代码任务、竞赛数学、32B 的 GPQA-D),结论在全部十五个受保护格子上成立:</p>
+
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: 其余设置下的 matched protection 对照">
+    <figcaption>
+      <b>Table 6:</b>Matched protection in the settings Table 2 does not cover (LiveCodeBench: pass@1; others: accuracy; AIME pools 2025+2026). Small numbers give the gain from the rule; bold marks the best protected method. TriAttention and Random Attention keep the prompt by construction and appear only in the protected column.
+      <span class="zh">两个事实贯穿全部设置:① 回报跟随保留缺口——SnapKV 最大涨 +35.2(Phi-4 代码),R-KV 全程 −1.4~+0.9 约等于零;② 保护补上大分差但不补全部——在 32B GPQA-D 上,三个受保护的基线仍比 Random Attention 低 4–6 分,而"什么都不排序"的均匀抽取 + 规则在那里赢了每个受保护的学习型分数。另注意:TriAttention 与 Random Attention 构造上就保 prompt,所以 Table 1 里两者的每一格本来就是 matched-protection 对比——混淆变量只影响其余基线的"账面劣势"。</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>§5.1 结论:</b>基线之间的差距大部分是 prompt。把 prompt 保护对齐之后,剩下的差距不但小,还往往是<b>负的</b>——每个学习型分数都追不上一个不排序的策略。这个混淆也解释了此前文献里"随机/近期基线远逊于打分选择"的普遍报道:那些随机基线把 prompt 丢了。</div>
+
+  <h3>5.2 工作状态自我保护:两层冗余</h3>
+  <p>cache 的其余部分是模型自己的推理轨迹,它以两个层面冗余存储:</p>
+  <ul class="tight">
+    <li><strong>文本层</strong>:推理轨迹会复述自己正在使用的内容(此前工作已观察到),要紧的值很少只活在一个位置;</li>
+    <li><strong>跨头层</strong>:每个 KV 头都缓存自己那份副本,驱逐是逐头决策——一个 token 只有在<strong>所有</strong>头都碰巧丢掉它时才真正丢失。</li>
+  </ul>
+  <p>作者用<strong>植入事实探针(planted-fact probe)</strong>量化第二层:往真实的 MATH500 推理轨迹里植入一个合成事实(如 "Let zq = 4729",每次全新的变量名与值),植入点距末尾的问题 1,536 token——中间隔着 15 次驱逐。实验控制"哪些头保住了这个事实"(在指定 (层,头) 位置钉住,其余头一律驱逐),用两个指标度量存活:<strong>Retrieval</strong>(贪心解码能否复现该值)与分级召回 <strong>R</strong>:</p>
+  <div class="math">$$R=\frac{\sum_i\left(LP_i-LP_i^{\text{del}}\right)}{\sum_i\left(LP_i^{\text{kept}}-LP_i^{\text{del}}\right)} \tag{4}$$</div>
+  <p>其中 $LP_i$ 是模型在条件设置下赋予轨迹 $i$ 正确值的对数概率,$LP^{\text{kept}}$/ $LP^{\text{del}}$ 分别是"全保留/全删除"两个端点。$R=1$ 意味着幸存副本与"从不驱逐"一样好,$R=0$ 意味着一文不值。每个条件在同一批 250–500 条植入轨迹上评分。</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: 跨头池化与副本形状无关性">
+    <figcaption>
+      <b>Figure 3:</b>(a) A fact held in one head is almost never retrieved; held in several it is. (b) Two facts in different heads are worth more together than the sum of each alone (dashed). (c) Real MATH500: contiguous blocks cost nothing up to size 64; accuracy drops only once a head is left with 4 (K=1024) or 2 (K=512) blocks.
+      <span class="zh">(a) 头是专门化的:Qwen3-4B 的 8 个 KV 头里只有 3 个能独立留住事实的可用痕迹,而且单头极弱——最好的单头检索率 0.03、次好 0.01;但读出不在乎是哪个头:同样两个头一起就是 0.60,三个 0.83,八个 0.99——<b>池化强超可加</b>,一对头的价值是两个单头之和的许多倍。(b) 池化甚至跨事实:答案需要两个值、分别放在不同头时,合并召回 R=0.31,远超单独 0.10 与 0.16 之和(虚线)。(c) 副本的<b>形状</b>无关紧要:把事实逐 token 摊到不同头(相邻 token 不同头、没有可读跨度),检索率 0.33 vs 完整句 0.39,R 0.75 vs 0.76;真实 MATH500 上把历史按 1→64 token 的连续块保留毫无损失,块长 256 才掉——且掉的原因是每头只剩 4(K=1024)或 2(K=512)个块:要紧的是<b>每头块数</b>,不是块长。对驱逐策略的直接推论:一个值只要<b>有些头</b>留着副本就仍可用——而"逐头独立抽取"恰好最大化这一点。</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>共享抽取对照(shared draw):</b>最直接的任务级检验是把跨头多样性删掉——所有头共用同一份随机 keep-set。在真实 MATH500 上它只比 Random Attention 低 0.3 分($K=1024$:0.871 vs 0.874;$K=512$:0.788 vs 0.789)。也就是说:<strong>文本层冗余在真实轨迹上已经够用</strong>(要紧的东西被复述过,撒一次就撒中);跨头层承载的是"文本不复述"的部分——那正是植入探针构造出来的 regime。两层冗余互为替代,而 Random Attention 恰好两层都保。</div>
+
+  <h3>5.3 打分信号还剩下什么:只说一次的事实</h3>
+  <p>无信号策略唯一无法覆盖的场景:<strong>一个事实只陈述一次、从不复述、很久之后才被用到</strong>。作者为此构造"密码实验":宣布一个 passcode,57 轮压缩之后才提问,让各策略自行保留,报告复现率(Retr.)与平均对数概率(log p):</p>
+
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: 密码实验——各策略对一次性事实的保留">
+    <figcaption>
+      <b>Table 3:</b>A passcode stated once, 57 compression rounds before the question.
+      <span class="zh">结果整齐得像教科书:检索率恰好跟踪各信号打分所用的统计量——R-KV(对全历史累计注意力)84% 找回 passcode、log p −0.71;VaSE(按注意力比例采样)找回三分之一;SnapKV 与 TriAttention(近窗信号)几乎从不;Random Attention 从不(0.000,−18.35,等于 passcode 彻底蒸发)。理论侧,Wang (2026) 证明无冗余时随机 cache 在 pointer-chasing 上必输——找针是真实的选择技能。<b>但它与总体强度互不蕴含</b>:最好的找针者 R-KV 在 Table 1 只赢一列,总体最强的 TriAttention 在这里几乎一无所获。真实推理轨迹里"说一次不复述"的情况罕见——模型会不断复述正在使用的东西。</b></span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>§5 总账:</b>精度差距 ≈ prompt 保护制度 + (负的)残余选择效应;轨迹靠双层冗余自我保护,随机抽取天然契合"逐头独立";选择信号真正不可替代的场景(一次性事实)存在、可测,但推理轨迹很少生产它。这就是"打分几乎不买任何东西"的完整机制账。</div>
+</section>
+
+<!-- ================= s6 效率 ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Efficiency</div>
+  <h2 class="sec">效率:免打分在服务里值 32–43%</h2>
+
+  <p>效率在两个设置下评测:① <strong>vLLM + PagedAttention</strong>(沿用 TriAttention 的协议,与 TriAttention 同插件同内核,只换选择器);② <strong>HuggingFace Transformers + FlashAttention-2、无分页</strong>(精度实验同款引擎,单卡最大 batch)。</p>
+
+  <h3>vLLM 分页服务:同内核下快 32–43%</h3>
+  <p>单张 H200,$K=2048$、1k prompt、32k 生成、128 个并发请求(Qwen3-32B 权重占 64 GB、KV 池小,压缩运行封顶 96 并发;Phi-4 因 32k 上下文实际生成 31.5k)。32k 长度下限制并发数的是 KV cache 而非算力——cache 越小,同时在飞的请求越多:</p>
+
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: vLLM 吞吐对比">
+    <figcaption>
+      <b>Table 4:</b>Serving throughput (output tok/s, and the multiple of full attention) under vLLM with PagedAttention on one H200 (K=2048, 1k-token prompts, 32k-token generations).
+      <span class="zh">Random Attention 服务 2046/1737/1819/923 tok/s,达 full attention 的 1.58×/2.23×/1.97×/2.67×;比同内核的 TriAttention 快 +37%/+43%/+40%/+32%——它唯一的区别就是不打分。该差距不挑工况:8k 短生成上 +35%~+42%,容量上限处(Qwen3-4B 224 并发、14B 满)仍 +41%/+42%;单请求时两者只差 1%(115.8 vs 117.0 s)——<b>服务差距是同步点放大的批量成本,不是单流内核差</b>。</span>
+    </figcaption>
+  </figure>
+
+  <h3>为什么跳过打分在服务里值 32–43%</h3>
+  <p>单看一轮驱逐,打分并不贵(Table 9):Random Attention 一轮 0.30 ms(纯压缩下限),TriAttention 1.47–1.64 ms。单流下这几毫秒只占解码时间几个百分点。<strong>服务把它放大了两重</strong>:</p>
+
+  <figure class="fig">
+    <img src="figs/table9.png" alt="Table 9: 单轮驱逐成本">
+    <figcaption>
+      <b>Table 9:</b>Cost of one eviction round (scoring + compaction), measured with CUDA events on an otherwise idle H200: K=1024, 4096 decode steps, single stream. Random Attention performs no scoring, so its round time is the compaction floor every evictor pays.
+      <span class="zh">逐轮成本阶梯:Random Attention 0.30 ms = 所有驱逐器都要付的压缩下限;SnapKV 0.37、R-KV 0.58、VaSE 0.74、TriAttention 1.47–1.64 ms(4B/14B)——超出下限的部分就是"选择信号的价格"。排序不变,且模型大小变 3.5× 也不变(每调用成本差 &lt;12%)。</span>
+    </figcaption>
+  </figure>
+
+  <ul class="tight">
+    <li><strong>压缩次数堆积</strong>:128 个并发请求、每个每 64 个自有 token 压缩一次 → 一个负载里约 62,000 次压缩,而 vLLM 在 batched step 之间的同步点上执行压缩——<strong>压谁,128 个请求就一起等谁</strong>。Qwen3-14B 上 TriAttention 多花的 910 秒,折合每次压缩约 15 ms 的全批等待,对照 Random Attention 的远低于 1 ms。</li>
+    <li><strong>分页让内容依赖打分更贵</strong>:融合注意力核不物化注意力权重——要读权重的分数(SnapKV/R-KV 的注意力项、VaSE 的采样)必须重算窗口-查询乘积或改内核;只读 cache 的分数(VaSE 的值幅值、TriAttention 的键统计)也要经 block table 逐层 gather。Random Attention 什么都不读:keep-set 是槽位下标的随机置换,运行时现成的压缩路径就是全部集成——作者把它加进 TriAttention 插件只用了<strong>一个函数</strong>(对比:R-KV 的官方移植约 849 行接线、跨 13 个上游文件)。</li>
+  </ul>
+
+  <h3>等显存对比:容量红利人人有份,排序跟着打分开销走</h3>
+  <p>第二个设置给每个方法"能塞进 143 GB H200 的最大 batch"($K=3072$、32k 生成)。full attention 只装得下 28(4B)/ 20(14B)个序列;压缩后的 cache 装得下 109–200 个——<strong>3–10× 的加速主要来自这份容量</strong>,每个驱逐器都有份,残余的排序由打分开销决定:</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: 等显存下各方法最大 batch 的解码吞吐">
+    <figcaption>
+      <b>Figure 5:</b>Equal-memory serving: decode throughput relative to full attention at each method's largest batch on one H200 (K=3072, 32k generations). ∗TriAttention here is an unfused re-implementation of its scorer, far slower than the vLLM version.
+      <span class="zh">柱高排序:Random Attention 10.0×(batch 200)/ 8.8×(batch 120)居首,SnapKV 与 VaSE 9.1× 一档,R-KV 6.9×/5.7×,TriAttention 行(带 ∗)3.8×/3.0×——注意这是作者 PyTorch 复现的未融合打分器,远慢于其发布内核;在 vLLM 上它与 Random Attention 的差距是 1.4× 而非这里的 2.7–3.0×。所以方法层面的公平结论以 Table 4 为准,本图用于隔离"打分开销"这一个变量。</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table10.png" alt="Table 10: 等显存吞吐精确值">
+    <figcaption>
+      <b>Table 10:</b>Serving throughput when each method runs at the largest batch that fits one 143 GB H200, at K=3072 with 32k generations. The small cache is what buys the batch, so every evictor collects most of the win; the ordering among them follows the cost of their scoring pass.
+      <span class="zh">精确数字:full 178/164 tok/s(batch 28/20);Random Attention 以最大 batch(200/120)与最小峰值显存(101/89 GB)拿到 1779/1436 tok/s = 10.01×/8.78×;同代码路径的 SnapKV 1624、VaSE 1617、R-KV 1223(4B)——排序完全跟随打分开销。16k 生成时排序不变。</span>
+    </figcaption>
+  </figure>
+
+  <p>预算越紧,容量倍数越大。把同一协议搬到 MATH500 的预算 $K=1024$ 上(Table 11):压缩 cache 塞进 544–584 个序列(对照 full 的 28),Random Attention 达到 full attention 的 <strong>28.8×</strong>(5110 tok/s),比 SnapKV 多 16%、比 VaSE 多 20%。</p>
+
+  <figure class="fig">
+    <img src="figs/table11.png" alt="Table 11: K=1024 等显存吞吐">
+    <figcaption>
+      <b>Table 11:</b>Equal-memory serving at K=1024 (Qwen3-4B, 32k generations, one 143 GB H200): the tighter budget fits a batch of 584 against 28 for full attention, and Random Attention reaches 28.8× full-attention throughput.
+      <span class="zh">紧预算的放大效应:batch 584 vs 28,Random Attention 5110 tok/s = 28.79× full attention——压缩带来的容量红利随预算收紧继续增长,而"免打分"在每一档都再多拿一截。R-KV 与 TriAttention 未在此预算下测量。</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>工程侧两个坑(作者实录,值得抄走):</b>① vLLM 自带吞吐 benchmark 忽略请求的输出长度——默认 128 token 输出根本触不到压缩阈值,等于在测 full attention;② 该压缩集成的去重保护会在一次良性的"预算内"轮次后悄悄禁用之后的所有压缩。两者都用只动记账、不动选择/内核语义的改动修正,每次运行以"实际压缩事件计数"验证。</div>
+</section>
+
+<!-- ================= s7 补充 ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Diagnostics</div>
+  <h2 class="sec">补充:keep-log 诊断、生成长度与波动</h2>
+
+  <h3>每个策略把预算花在哪:keep-log</h3>
+  <p>§5 的"保留量"数字全部来自对真实运行的逐轮日志:19 个策略-格子日志、每份 16 条 trace、每份 10<sup>4</sup>–10<sup>5</sup> 轮,记录每轮每个(层, KV 头)的 keep-set 与保留位置的车龄。三个量:槽位覆盖率(至少一个头保留的候选比例)——Random Attention 与 VaSE 0.999–1.000、TriAttention 0.993、共享抽取对照 0.938;prompt 存活率(并集/单头)——Random Attention 0.994–0.999 且逐头相同,R-KV 0.55–0.91 / 0.26–0.67,VaSE 0.56–0.70 / 0.20–0.29,SnapKV 0.32–0.42 / 0.11–0.22(四个模型-任务设置里全都最低)。按车龄看则是一张很有信息量的图:</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: 各策略保留概率随车龄的分布(对数轴)">
+    <figcaption>
+      <b>Figure 4:</b>Fraction of positions of a given age that a head still holds (log scale; Qwen3-4B MATH500, K=1024). Random Attention decays geometrically with age; VaSE concentrates and freezes a tail of old favourites; TriAttention spends almost uniformly across ages.
+      <span class="zh">三种"花钱形状"一目了然:Random Attention 随车龄几何衰减(软近期窗,各头的尾巴互不相同);VaSE 集中在少数"旧爱"上并冻结成尾;TriAttention 几乎均匀铺在各年龄段——单头保留不比 Random Attention 少多少,但各头几乎保同样的位置(1–2k 带跨头并集只有 0.199,是所有逐头策略里跨头多样性最低的),而 Random Attention 同带并集 0.776。"推理回看带"约为 2.2× 车龄范围——各策略都在这段带内做文章,但形状并不决定精度(§5.2),决定性的是有没有副本幸存。</span>
+    </figcaption>
+  </figure>
+
+  <h3>驱逐会拉长生成——但 Random Attention 拉得最少</h3>
+
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: 每格平均生成 token 数(千)">
+    <figcaption>
+      <b>Table 7:</b>Mean generated tokens (thousands) per cell of Tables 1 and 5, measured over every run of the cell; Avg = unweighted mean over the five tasks.
+      <span class="zh">两个观察:① 驱逐普遍让生成变长(丢东西→重新想),最弱的选择器拉得最多(SnapKV 平均 17.0k vs full 12.1k,4B);② Random Attention 是 Qwen3-4B/14B 上<b>生成最短</b>的驱逐器(4B 平均 13.9k,14B 13.1k),另两个模型也只比最短者多 ~5%——它的精度持平不是靠更长的生成买回来的。32B 的 LiveCodeBench 例外(18.4k,该格生成最长),与其代码预算紧张一致。</span>
+    </figcaption>
+  </figure>
+
+  <h3>波动有多大:为什么每个结论都要过配对检验</h3>
+
+  <figure class="fig">
+    <img src="figs/table8.png" alt="Table 8: 每格 run-to-run 精度标准差(分)">
+    <figcaption>
+      <b>Table 8:</b>Run-to-run variability: standard deviation of per-run accuracy (points) across each cell's independent sampled runs.
+      <span class="zh">波动量级:MATH500 在 1 分内,GPQA-D 与 LiveCodeBench 1–3 分,竞赛数学 2–5 分(AIME 只有 30 题)。这解释了论文的纪律:所有差距都由按题聚类的配对 bootstrap + 符号检验裁决,而不是看格子里的名义差——例如 VaSE 在 32B AIME 的 +1.7 领先,对照 ±5 分的波动只是噪声。MATH500 每格只有 2 次采样,其标准差是两样本估计。</span>
+    </figcaption>
+  </figure>
+
+  <p>硬件与口径:精度生成跑在混合 H200 集群;§6 与附录 G 的全部效率测量单卡 H200、单作业占满节点。所有格子以最终 boxed 答案在 32k 上限判分(LiveCodeBench 按真实测试执行),没有任何半途格进入表格。</p>
+</section>
+
+<!-- ================= s8 点评 ================= -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">点评:亮点、边界与对领域的启示</h2>
+
+  <h3>值得学习的地方</h3>
+  <ul class="tight">
+    <li><strong>零假设方法论</strong>:把"随机"从被动的 baseline 升格为主动的 null hypothesis——"打不过随机 = 信号没用"。这个论证结构比任何单个数字都有迁移价值,适用于所有"堆启发式"的研究领域。</li>
+    <li><strong>实验纪律</strong>:matched budget(同预算/触发/缓冲)+ matched protection(同 prompt 规则)+ 按题聚类的配对检验。§2 末尾那张表的"默认 prompt 处理"一列,是识别混淆变量的钥匙——跨论文比较前先问"你们保护的东西一样吗"。</li>
+    <li><strong>归因链完整</strong>:规则实验(差距消失)→ 探针实验(冗余量化:单头 0.03 → 八头 0.99 的超可加)→ 边界实验(密码:各信号恰好按其统计量找回)。三个实验环环相扣,结论不是"随机也很好",而是"为什么随机也很好,以及它在哪里不行"。</li>
+    <li><strong>系统层做实</strong>:吞吐结论能拆到"每次压缩 15 ms 全批等待 vs &lt;1 ms"的粒度,并诚实记录两个测量工具坑与 TriAttention 未融合复现的适用范围(方法级对比用 vLLM 版,隔离打分开销用复现版)。</li>
+  </ul>
+
+  <h3>边界与保留意见</h3>
+  <ul class="tight">
+    <li><strong>代码任务仍是软肋</strong>:把整个 prompt 钉死在长 prompt 场景浪费预算(最长吃掉一半),TriAttention 在 32B/14B 代码上的小胜是主网格唯一的基线显著胜绩。"压缩脚手架而非钉死脚手架"是显然的下一步,但一旦这么做,方法就不再"零调参"。</li>
+    <li><strong>一次性事实真的会输</strong>:密码实验里 0.000 vs R-KV 的 0.836 不是小差距。R-KV 的累计注意力机制在"针"场景有真实价值——只是推理轨迹很少造针。如果你的 workload 有"一次性声明、从不复述、远距离使用"的结构(法律条款?代码依赖?),随机驱逐不适合你。</li>
+    <li><strong>只覆盖驱逐</strong>:稀疏注意力选择(省算力不省内存)与量化(全保留、降精度)是正交路线;本文结论不外推到它们。</li>
+    <li><strong>结论绑定"推理轨迹"这一语料形态</strong>:论文的机制解释(复述 + 跨头复制)恰好在长思维链上最充分。短输出长输入的 long-context 场景,working state 很薄,结论未必照搬(作者也在相关工作里明确了这一区分)。</li>
+  </ul>
+
+  <h3>与并行工作的关系</h3>
+  <p>同期独立工作拼出了同一幅图:Prefix Sliding(保留 prompt + 近期窗,即本文 §5.1 里"距最佳基线不到 2 分"的 recency+prompt 行)从训练侧到达类似策略;Garcia (2026) 在长上下文 QA 的全局容量限制下发现"守住 prompt 边界后,打分是二阶的";Wang (2026) 从理论上证明无冗余时随机 cache 必输 pointer-chasing——而本文的经验发现(推理轨迹双层冗余)正是绕开该下界的现实条件。三条线合起来:在冗余丰富的语料上,<strong>保护结构 ≫ 排序质量</strong>。</p>
+
+  <h3>对后续研究的启示</h3>
+  <ul class="tight">
+    <li><strong>驱逐研究的重心应该移动</strong>:从"更好的分数"移到"更好的保护"——长 prompt 的预算分配(尤其代码任务)、稀有一次性事实的内容依赖保存,才是保护仍可能增值的地方。</li>
+    <li><strong>新选择信号的验收标准</strong>:matched budget + matched prompt protection 下赢过 Random Attention,才算证明了信号本身的价值——而不是赢在一个把 prompt 弄丢的弱基线上。</li>
+    <li><strong>部署侧的实用建议</strong>:显存预算下服务推理模型,Random Attention 是合理默认——无校准、无调参、无打分,同精度下最快;它同时是所有新方法必须先翻过的那道门槛。</li>
+  </ul>
+
+  <div class="takeaway"><b>总评:</b>这是一篇"用最简单的方法推翻一整个范式前提"的论文。它的价值不在 Random Attention 本身有多精巧(它故意不精巧),而在它把 KV 驱逐的问题定义从"怎么排序"改写为"保护什么 + 什么根本不用保护"——并用三个控制实验把这个改写钉死。读它最大的收获是一种研究品味:<strong>先找到你所在领域的 null hypothesis,再谈改进。</strong></div>
+</section>
+
+<!-- ================= s9 术语 ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>术语</th><th>全称/含义</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>KV cache</td><td>Key-Value Cache</td><td>注意力里缓存的历史键值对;解码时随生成长度线性增长,是本文要压的显存瓶颈</td></tr>
+      <tr><td>驱逐 / eviction</td><td>KV cache eviction</td><td>cache 超预算时永久丢弃键值对;内存有界但不可恢复,区别于只选不丢的稀疏注意力</td></tr>
+      <tr><td>K / r</td><td>预算 / 缓冲</td><td>每头持久保留的 KV 对数 K;缓冲 r 是最近 r 个位置,永不参与打分</td></tr>
+      <tr><td>prefill / prompt / ℓ<sub>p</sub></td><td>—</td><td>生成开始前注入的全部输入(系统提示+模板+问题);Random Attention 将其整体钉死</td></tr>
+      <tr><td>working state</td><td>工作状态</td><td>推理轨迹中不断书写/重写的中间状态;靠文本复述与跨头复制两层冗余自我保护</td></tr>
+      <tr><td>attention sink</td><td>注意力沉没</td><td>序列开头的少数位置会持续获得高注意力;StreamingLLM 等默认只保它们</td></tr>
+      <tr><td>top-K keep-set</td><td>保留集合 S<sub>t</sub></td><td>每轮驱逐后每头存活的 K 个位置;驱逐逐层、逐 KV 头独立决策</td></tr>
+      <tr><td>KV 头 / GQA</td><td>Grouped-Query Attention</td><td>多个查询头共享一组 KV 头;同组查询共享该 KV 头的 keep-set</td></tr>
+      <tr><td>planted-fact probe</td><td>植入事实探针</td><td>往真实轨迹植入合成事实并控制哪些头保住它的实验;度量跨头冗余的价值</td></tr>
+      <tr><td>Retr. / R</td><td>Retrieval / graded Recall</td><td>复现率(贪心解码复现该值)与分级召回(式 4;1=与从未驱逐等价,0=一文不值)</td></tr>
+      <tr><td>passcode 实验</td><td>—</td><td>宣布一次密码、57 轮压缩后才提问;检验"只说一次的事实"对各策略的存活</td></tr>
+      <tr><td>slot coverage / prompt survival</td><td>keep-log 指标</td><td>至少一个头保留的候选比例 / prompt 位置仍被持有的比例;§5 归因的量化基础</td></tr>
+      <tr><td>shared draw</td><td>共享抽取对照</td><td>所有头共用同一随机 keep-set 的消融;删掉跨头多样性,在真实 MATH500 上只掉 0.3 分</td></tr>
+      <tr><td>隐式年龄偏好</td><td>implicit age bias</td><td>存活 n 轮的概率 ≈0.94<sup>n</sup>:随机驱逐天然是软近期窗+逐头不同的长尾</td></tr>
+      <tr><td>先占 / preemption</td><td>vLLM preemption</td><td>KV 池超订时 vLLM 静默驱逐请求;压缩状态无法在先占后存活,故压缩运行需并发上限</td></tr>
+      <tr><td>同步点 / barrier</td><td>synchronisation point</td><td>batched step 之间执行压缩的时刻;压谁,整批就一起等谁——打分成本在此被放大</td></tr>
+      <tr><td>vLLM / PagedAttention</td><td>—</td><td>分页式 LLM 服务运行时;块表管理 KV,使内容依赖打分需额外遍历分页状态</td></tr>
+      <tr><td>FlashAttention-2</td><td>—</td><td>融合注意力内核;不物化注意力权重,故"读权重打分"的选择器必须重算或改内核</td></tr>
+      <tr><td>clustered bootstrap / sign test</td><td>按题聚类自助法 / 符号检验</td><td>本文的双重显著性关卡:按题聚类的配对 percentile bootstrap 95% CI + 精确符号检验</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2609.03430《Random Attention: Rethinking KV Cache Eviction for Efficient Reasoning》的人工精读笔记。图片以 300 DPI 摘自论文原文并按比例缩放展示(未裁剪);解读为编者观点。<br>
+    原文:<a href="https://arxiv.org/abs/2609.03430">arXiv:2609.03430</a> · 代码:<a href="https://github.com/SalesforceAIResearch/Random-Attention">SalesforceAIResearch/Random-Attention</a> · <a href="en.html">Read in English →</a><br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好 · 中英双语</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'} }); 
+})();
+</script>
+
+</body>
+</html>

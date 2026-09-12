@@ -4,23 +4,34 @@ import re, urllib.request, urllib.parse
 BASE = "https://qqtang-code.github.io/Paper-Reading-Collection"
 PAGES = [
     "/",
-    "/efficient-inference/declarative-attention/",
-    "/efficient-inference/declarative-attention/Declarative-Attention论文精读_HTML.html",
-    "/efficient-inference/declarative-attention/en.html",
+    "/attention-kv-cache/declarative-attention/",
+    "/attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html",
+    "/attention-kv-cache/declarative-attention/en.html",
+    "/attention-kv-cache/random-attention/",
+    "/attention-kv-cache/random-attention/en.html",
+    "/attention-kv-cache/elastic-attention/",
+    "/attention-kv-cache/elastic-attention/Elastic-Attention论文精读_HTML.html",
+    "/attention-kv-cache/elastic-attention/en.html",
     "/efficient-inference/freetoken/",
     "/efficient-inference/freetoken/en.html",
     "/efficient-inference/reset/",
     "/efficient-inference/reset/en.html",
-    "/efficient-inference/random-attention/",
-    "/efficient-inference/random-attention/en.html",
     "/efficient-inference/deepseek-v41-flash/",
     "/efficient-inference/deepseek-v41-flash/DeepSeek-V4.1-Flash论文精读_HTML.html",
     "/efficient-inference/deepseek-v41-flash/en.html",
+    "/benchmarks/mmlongembed/",
+    "/benchmarks/mmlongembed/en.html",
+]
+# moved pages keep old URLs alive via redirect stubs
+REDIRECTS = [
+    "/efficient-inference/declarative-attention/",
+    "/efficient-inference/declarative-attention/Declarative-Attention论文精读_HTML.html",
+    "/efficient-inference/declarative-attention/en.html",
+    "/efficient-inference/random-attention/",
+    "/efficient-inference/random-attention/en.html",
     "/efficient-inference/elastic-attention/",
     "/efficient-inference/elastic-attention/Elastic-Attention论文精读_HTML.html",
     "/efficient-inference/elastic-attention/en.html",
-    "/benchmarks/mmlongembed/",
-    "/benchmarks/mmlongembed/en.html",
 ]
 
 def get(url, tries=3):
@@ -60,4 +71,15 @@ for p in PAGES:
     print(f"OK  {code} {p:70s} imgs={len(imgs)} bad={len(bad)}")
     for im, ic in bad:
         print(f"    !! {im} -> {ic}")
+
+for p in REDIRECTS:
+    url = BASE + urllib.parse.quote(p)
+    code, body = get(url)
+    total += 1
+    ok = code == 200 and b"location.replace" in body
+    if not ok:
+        fail += 1
+        print(f"!! REDIRECT {code} {p}")
+    else:
+        print(f"OK  {code} {p:70s} redirect-stub")
 print(f"=== TOTAL requests={total}, failures={fail} ===")

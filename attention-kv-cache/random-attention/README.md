@@ -10,6 +10,6 @@
 - 英文速读版:[`en.html`](en.html) — 完整论证摘要 + 全部 5 图 11 表原文图注与解读
 - 图片:`figs/` — 5 图 + 11 表,300 DPI 高清提取,中英文页共用
 - 分类:高效推理 · KV Cache 驱逐 / 推理模型 / 服务系统
-- [在线阅读(中文)](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/) · [Read in English](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/en.html) · [论文原文](https://arxiv.org/abs/2609.03430) · [代码](https://github.com/SalesforceAIResearch/Random-Attention)
+- [在线阅读(中文)](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/) · [Read in English](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/en.html) · [论文原文](https://arxiv.org/abs/2609.03430) · [代码](https://github.com/SalesforceAIResearch/Random-Attention)
 
 返回[分类目录](../README.md) · [总索引](../../README.md)

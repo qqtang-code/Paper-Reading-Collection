@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>论文精读 · 语言模型能控制自己的注意力(Declarative Attention)</title>
+<script>
+/* Language-aware redirect: saved preference wins, else follow the browser */
+(function(){
+  var ZH = 'Declarative-Attention论文精读_HTML.html', EN = 'en.html';
+  var lang = null;
+  try{ lang = localStorage.getItem('pr-lang'); }catch(e){}
+  if (lang !== 'zh' && lang !== 'en') {
+    lang = String(navigator.language || navigator.userLanguage || 'en').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+  }
+  location.replace(lang === 'en' ? EN : ZH);
+})();
+</script>
+</head>
+<body>
+<p>正在跳转到精读页…… Redirecting to the reading page…</p>
+<p>
+  <a href="Declarative-Attention论文精读_HTML.html">中文精读版</a> ·
+  <a href="en.html">English edition</a>
+</p>
+</body>
+</html>

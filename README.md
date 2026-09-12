@@ -12,15 +12,15 @@
 
 | # | 论文 | 分类 | 主题标签 | 语言 | 精读时间 | 图表 | 原文 |
 |---|------|------|----------|------|----------|------|------|
-| 1 | **Declarative Attention** — Language Models Can Control Their Own Attention | [高效推理](efficient-inference/) | 稀疏注意力 · KV Cache · 长上下文 · CoT · vLLM | [中](efficient-inference/declarative-attention/) · [EN 完整版](efficient-inference/declarative-attention/en.html) | 2026-09 | 10 图 10 表 | [arXiv:2609.02737](https://arxiv.org/abs/2609.02737) |
+| 1 | **Declarative Attention** — Language Models Can Control Their Own Attention | [注意力与 KV Cache](attention-kv-cache/) | 稀疏注意力 · KV Cache · 长上下文 · CoT · vLLM | [中](attention-kv-cache/declarative-attention/) · [EN 完整版](attention-kv-cache/declarative-attention/en.html) | 2026-09 | 10 图 10 表 | [arXiv:2609.02737](https://arxiv.org/abs/2609.02737) |
 | 2 | **FreeToken** — 边缘原生的 MoE 服务系统(Bandwidth-Adaptive Execution) | [高效推理](efficient-inference/) | MoE · 边缘部署 · 服务系统 · 带宽自适应 | [中](efficient-inference/freetoken/) · [EN 速读](efficient-inference/freetoken/en.html) | 2026-09 | 5 图 1 表 | [arXiv:2608.16157](https://arxiv.org/abs/2608.16157) |
 | 3 | **ReSET** — Accurate Latency-Critical NVFP4 Reasoning via Step-Aware Temperature Scaling | [高效推理](efficient-inference/) | 量化 · NVFP4 · 低精度推理 · 温度缩放 | [中](efficient-inference/reset/) · [EN 速读](efficient-inference/reset/en.html) | 2026-08 | 8 图 16 表 | [arXiv:2606.13233](https://arxiv.org/abs/2606.13233) |
-| 4 | **Random Attention** — Rethinking KV Cache Eviction for Efficient Reasoning | [高效推理](efficient-inference/) | KV Cache 驱逐 · 推理模型 · 长思维链 · vLLM | [中](efficient-inference/random-attention/) · [EN 速读](efficient-inference/random-attention/en.html) | 2026-09 | 5 图 11 表 | [arXiv:2609.03430](https://arxiv.org/abs/2609.03430) |
+| 4 | **Random Attention** — Rethinking KV Cache Eviction for Efficient Reasoning | [注意力与 KV Cache](attention-kv-cache/) | KV Cache 驱逐 · 推理模型 · 长思维链 · vLLM | [中](attention-kv-cache/random-attention/) · [EN 速读](attention-kv-cache/random-attention/en.html) | 2026-09 | 5 图 11 表 | [arXiv:2609.03430](https://arxiv.org/abs/2609.03430) |
 | 5 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
 | 6 | **DeepSeek-V4.1-Flash** — 552B 多模态 MoE 高效推理技术报告 | [高效推理](efficient-inference/) | KV Cache 压缩 · MoE · 多模态 · 长上下文 · FP4 | [中](efficient-inference/deepseek-v41-flash/) · [EN 完整版](efficient-inference/deepseek-v41-flash/en.html) | 2026-09 | 12 图 5 表 | [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page) |
-| 7 | **Elastic Attention** — Test-time Adaptive Sparsity Ratios for Efficient Transformers | [高效推理](efficient-inference/) | 混合注意力 · 测试时自适应 · Attention Router · 长上下文 | [中](efficient-inference/elastic-attention/) · [EN 速读](efficient-inference/elastic-attention/en.html) | 2026-09 | 17 图 14 表 | [OpenReview](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention) |
+| 7 | **Elastic Attention** — Test-time Adaptive Sparsity Ratios for Efficient Transformers | [注意力与 KV Cache](attention-kv-cache/) | 混合注意力 · 测试时自适应 · Attention Router · 长上下文 | [中](attention-kv-cache/elastic-attention/) · [EN 速读](attention-kv-cache/elastic-attention/en.html) | 2026-09 | 17 图 14 表 | [OpenReview](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention) |
 
-点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑦ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/elastic-attention/)**
+点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑦ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)**
 
 ## 目录结构
 
@@ -28,14 +28,15 @@
 Paper-Reading-Collection/
 ├── README.md                    ← 本文件(总索引)
 ├── index.html                   ← 在线门户页(GitHub Pages 首页,中英双语切换)
-├── efficient-inference/         ← 分类一:高效推理与部署
+├── attention-kv-cache/          ← 分类一:注意力与 KV Cache
 │   ├── declarative-attention/   ← arXiv:2609.02737(10 图 10 表)
+│   ├── random-attention/        ← arXiv:2609.03430(5 图 11 表)
+│   └── elastic-attention/       ← OpenReview rLO2NTUHSW(17 图 14 表)
+├── efficient-inference/         ← 分类二:高效推理与部署
 │   ├── freetoken/               ← arXiv:2608.16157(5 图 1 表)
 │   ├── reset/                   ← arXiv:2606.13233(8 图 16 表)
-│   ├── random-attention/        ← arXiv:2609.03430(5 图 11 表)
-│   ├── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
-│   └── elastic-attention/       ← OpenReview rLO2NTUHSW(17 图 14 表)
-└── benchmarks/                  ← 分类二:评测基准
+│   └── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
+└── benchmarks/                  ← 分类三:评测基准
     └── mmlongembed/             ← 多模态长上下文嵌入基准(6 图 16 表)
 
 每个论文目录:中文精读页(index.html 或 <论文名>精读_HTML.html)
@@ -43,14 +44,26 @@ Paper-Reading-Collection/
             + figs/(300 DPI 图表原图,中英文页共用)
 ```
 
+分类按"优化的层次"组织:**注意力与 KV Cache** 解决注意力层怎么看、KV 怎么留;**高效推理与部署** 解决模型与系统层怎么更快更省(量化、架构压缩、服务系统);**评测基准** 度量模型真实能力。
+
 ## 分类与各篇速览
+
+### 🎯 attention-kv-cache/ · 注意力与 KV Cache
+
+让注意力本身更省:看得更少(稀疏化)、留得更少(KV Cache 驱逐)、稀疏比按输入自适应。
+
+**① Declarative Attention(2026-09 · KAIST AI × Google DeepMind)**
+让模型在思维链里用 `<global>` / `<focus>` / `<local>` 标签**声明自己要看哪里**,推理引擎像解析工具调用一样解析声明并跳过大部分 KV cache 读取——零训练、零样本。15 项长上下文任务上注意力读取降 **52.0% / 31.1%**(Gemma-4-31B / Qwen-3.6-27B),精度仅降 1.27pp / 2.75pp;roofline 估算解码墙钟降至 **0.71× / 0.77×**。→ [精读页](attention-kv-cache/declarative-attention/) · [原文](https://arxiv.org/abs/2609.02737)
+
+**④ Random Attention(2026-09 · Salesforce AI Research + UIUC)**
+KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐、不打任何分,4 模型 × 6 推理任务追平最强基线(**60 格中 31 格显著领先**、仅 1 格落后),vLLM 部署吞吐再快 **32–43%**。机制账:prompt 是 cache 的脆弱部分;推理轨迹靠"文本复述 + 跨头复制"两层冗余自我保护——选择信号真正剩下的用武之地,是"只说一次、从不复述"的稀有事实。→ [精读页](attention-kv-cache/random-attention/) · [原文](https://arxiv.org/abs/2609.03430)
+
+**⑦ Elastic Attention(2026-09 · 苏州大学 LCM Lab × 百度,ICML 2026 投稿)**
+混合注意力(FA + 稀疏注意力 SA)的 FA/SA 比例从静态超参数变成**输入自适应**:每层挂一个 **0.27M 参数**的轻量 Attention Router(Gumbel-Softmax + STE 训练),推理时按输入把每个 KV 头分配到 FA 或 SA——摘要/代码任务稀疏到 ~0.82、问答任务守住 0.63–0.68。**8×A800 训练 12 小时、骨干完全冻结**,Qwen3-4B/8B 与 Llama-3.1-8B 在 LongBench-E 平均分全部第一,RULER 外推 256K 优势最大;融合 kernel 让同层不同模式的头一次前向算完,加速 **1.51×–3.28×**,路由器延迟仅 **0.196 ms** 且与序列长度无关。→ [精读页](attention-kv-cache/elastic-attention/) · [原文](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention)
 
 ### ⚡ efficient-inference/ · 高效推理与部署
 
-让 LLM 推理更快、更省、能部署到更小硬件的研究。
-
-**① Declarative Attention(2026-09 · KAIST AI × Google DeepMind)**
-让模型在思维链里用 `<global>` / `<focus>` / `<local>` 标签**声明自己要看哪里**,推理引擎像解析工具调用一样解析声明并跳过大部分 KV cache 读取——零训练、零样本。15 项长上下文任务上注意力读取降 **52.0% / 31.1%**(Gemma-4-31B / Qwen-3.6-27B),精度仅降 1.27pp / 2.75pp;roofline 估算解码墙钟降至 **0.71× / 0.77×**。→ [精读页](efficient-inference/declarative-attention/) · [原文](https://arxiv.org/abs/2609.02737)
+在模型与系统层让 LLM 推理更快、更省、能部署到更小硬件:低精度量化、架构与 KV 压缩、服务系统。
 
 **② FreeToken(2026-09)**
 把个人电脑变成统一的弹性推理平台:带宽自适应执行(Bandwidth-Adaptive Execution)让 **8GB 显存笔记本跑 35B 模型**、游戏台式机跑 284B、单张工作站 GPU 跑 **753B GLM-5.2**,且快到能支撑真实 agent 负载。→ [精读页](efficient-inference/freetoken/) · [原文](https://arxiv.org/abs/2608.16157)
@@ -58,14 +71,8 @@ Paper-Reading-Collection/
 **③ ReSET(2026-08)**
 NVFP4 低精度推理在延迟敏感(交互式)场景下的精度救星:**步骤感知温度缩放**(Step-Aware Temperature Scaling)按解码步骤动态调整 softmax 温度,在不牺牲延迟的前提下恢复量化精度。→ [精读页](efficient-inference/reset/) · [原文](https://arxiv.org/abs/2606.13233)
 
-**④ Random Attention(2026-09 · Salesforce AI Research + UIUC)**
-KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐、不打任何分,4 模型 × 6 推理任务追平最强基线(**60 格中 31 格显著领先**、仅 1 格落后),vLLM 部署吞吐再快 **32–43%**。机制账:prompt 是 cache 的脆弱部分;推理轨迹靠"文本复述 + 跨头复制"两层冗余自我保护——选择信号真正剩下的用武之地,是"只说一次、从不复述"的稀有事实。→ [精读页](efficient-inference/random-attention/) · [原文](https://arxiv.org/abs/2609.03430)
-
 **⑥ DeepSeek-V4.1-Flash(2026-09 · DeepSeek 技术报告)**
 552B 多模态 MoE:Causal Encoder-Decoder 让 prefill 只激活 8B(decode 16B);CSA2 跨层 KV 复用 + FP4(MXFP4)量化把全局 KV Cache 压到**每 token 890 字节**(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代的 1/8;配 196B 条件记忆 Engram 与 45T 多模态 token 预训练,性能反超更大的 V4-Flash——DeepSWE v1.1 **74.2**、Terminal-Bench 2.1 **90.6**、Codeforces **3471**。→ [精读页](efficient-inference/deepseek-v41-flash/) · [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page)
-
-**⑦ Elastic Attention(2026-09 · 苏州大学 LCM Lab × 百度,ICML 2026 投稿)**
-混合注意力(FA + 稀疏注意力 SA)的 FA/SA 比例从静态超参数变成**输入自适应**:每层挂一个 **0.27M 参数**的轻量 Attention Router(Gumbel-Softmax + STE 训练),推理时按输入把每个 KV 头分配到 FA 或 SA——摘要/代码任务稀疏到 ~0.82、问答任务守住 0.63–0.68。**8×A800 训练 12 小时、骨干完全冻结**,Qwen3-4B/8B 与 Llama-3.1-8B 在 LongBench-E 平均分全部第一,RULER 外推 256K 优势最大;融合 kernel 让同层不同模式的头一次前向算完,加速 **1.51×–3.28×**,路由器延迟仅 **0.196 ms** 且与序列长度无关。→ [精读页](efficient-inference/elastic-attention/) · [原文](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention)
 
 ### 📏 benchmarks/ · 评测基准
 
@@ -92,4 +99,5 @@ KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱�
 ## 说明
 
 - 各精读页此前以独立仓库发布(`ReSET-Project-Page`、`MMLongEmbed-PaperReading-Page`、`FreeToken-Project-Page`、`Declarative-Attention-Project-Page`、`DeepSeek-V4.1-Flash-Project-Page`、`Elastic-Attention-Project-Page`),现已整合至本仓库;旧仓库与其 Pages 链接暂时保留,后续可归档。
+- 分类调整:注意力层的工作(Declarative / Random / Elastic Attention)已从 `efficient-inference/` 移至 `attention-kv-cache/`,旧链接留有自动重定向页面。
 - 精读页中的解读文字为编者观点,关键数字均与论文原文核对;图片以 300 DPI 摘自原文,版权归原作者所有,仅供学习研究。

@@ -119,6 +119,7 @@
       <span class="i18n-en">Paper Reading<span> Collection</span></span>
     </a>
     <div class="links">
+      <a href="#attention"><span class="i18n-zh">注意力与 KV Cache</span><span class="i18n-en">Attention &amp; KV Cache</span></a>
       <a href="#inference"><span class="i18n-zh">高效推理</span><span class="i18n-en">Efficient Inference</span></a>
       <a href="#benchmark"><span class="i18n-zh">评测基准</span><span class="i18n-en">Benchmarks</span></a>
       <a href="https://github.com/qqtang-code/Paper-Reading-Collection">GitHub</a>
@@ -150,7 +151,7 @@
     <div class="stats">
       <div class="s"><span class="i18n-zh">论文 <b>7</b> 篇</span><span class="i18n-en"><b>7</b> papers</span></div>
       <div class="s"><span class="i18n-zh">图表 <b>63</b> 图 + <b>73</b> 表</span><span class="i18n-en"><b>63</b> figures + <b>73</b> tables</span></div>
-      <div class="s"><span class="i18n-zh">分类 <b>2</b> 大类</span><span class="i18n-en"><b>2</b> categories</span></div>
+      <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
   </div>
@@ -158,19 +159,19 @@
 
 <div class="wrap">
 
-<section id="inference">
+<section id="attention">
   <div class="sec-no">Category 01</div>
   <h2 class="sec">
-    <span class="i18n-zh">⚡ 高效推理与部署</span>
-    <span class="i18n-en">⚡ Efficient Inference &amp; Deployment</span>
+    <span class="i18n-zh">🎯 注意力与 KV Cache</span>
+    <span class="i18n-en">🎯 Attention &amp; KV Cache</span>
   </h2>
   <div class="cards">
 
-    <div class="pcard">
+<div class="pcard">
       <span class="cat"><span class="i18n-zh">稀疏注意力 · KV Cache · 长上下文</span><span class="i18n-en">Sparse Attention · KV Cache · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/declarative-attention/Declarative-Attention论文精读_HTML.html">① Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
-        <a class="i18n-en" href="efficient-inference/declarative-attention/en.html">① Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
+        <a class="i18n-zh" href="attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html">① Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
+        <a class="i18n-en" href="attention-kv-cache/declarative-attention/en.html">① Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">让模型在思维链里用标签声明"自己要看哪里",引擎解析声明并跳过大部分 KV cache 读取。零训练零样本:注意力读取降 <b>52.0% / 31.1%</b>,精度仅降 1.27pp / 2.75pp,解码墙钟 <b>0.71× / 0.77×</b>。</span>
@@ -181,12 +182,63 @@
         <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="efficient-inference/declarative-attention/Declarative-Attention论文精读_HTML.html">开始阅读 →</a>
-        <a class="i18n-en" href="efficient-inference/declarative-attention/en.html">Read in English →</a>
+        <a class="i18n-zh" href="attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/declarative-attention/en.html">Read in English →</a>
       </div>
     </div>
 
-    <div class="pcard">
+<div class="pcard">
+      <span class="cat"><span class="i18n-zh">KV Cache 驱逐 · 推理模型 · 高效服务</span><span class="i18n-en">KV Cache Eviction · Reasoning Models · Efficient Serving</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/random-attention/">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">重新思考面向高效推理的 KV Cache 驱逐</span></a>
+        <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Rethinking KV Cache Eviction for Efficient Reasoning</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐,4 模型 × 6 任务追平最强基线、<b>60 格中 31 格显著领先</b>,vLLM 吞吐再快 <b>32–43%</b>——一篇把"选择信号几乎不贡献精度"钉死的机制论文。</span>
+        <span class="i18n-en">KV cache eviction needs no score: pin the prompt and evict uniformly at random within each head — matching the strongest evictor across 4 models × 6 reasoning tasks (<b>significantly ahead in 31 of 60 cells</b>) while serving <b>32–43% higher throughput</b> in vLLM, with a full mechanistic account of why the selection signal buys almost nothing.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">5 图 11 表</span><span class="i18n-en">5 figures · 11 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.03430">2609.03430</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/random-attention/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">Read in English →</a>
+      </div>
+    </div>
+
+<div class="pcard">
+      <span class="cat"><span class="i18n-zh">混合注意力 · 测试时自适应 · 长上下文</span><span class="i18n-en">Hybrid Attention · Test-time Adaptation · Long Context</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/elastic-attention/">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">让模型的稀疏比随输入"伸缩"</span></a>
+        <a class="i18n-en" href="attention-kv-cache/elastic-attention/en.html">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Test-time Adaptive Sparsity Ratios for Efficient Transformers</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">混合注意力的 FA/SA 比例从静态超参数变成<b>输入自适应</b>:每层一个 0.27M 参数的 Attention Router,推理时把每个 KV 头分到全注意力或稀疏注意力——摘要/代码任务稀疏到 ~0.82,问答任务守住 0.63–0.68。8×A800 训练 <b>12 小时</b>、骨干完全冻结,3 个骨干在 LongBench-E 平均分全部第一,RULER 256K 外推优势最大;路由器延迟 <b>0.196 ms</b> 且与序列长度无关。</span>
+        <span class="i18n-en">The FA/SA ratio stops being a static hyper-parameter and becomes <b>input-adaptive</b>: a 0.27M-parameter Attention Router per layer assigns each KV head to full or sparse attention at inference — sparsity ~0.82 for summarization/code, 0.63–0.68 for QA. Trained in <b>12 hours on 8×A800</b> with the backbone frozen, it tops LongBench-E on all three backbones and leads most on RULER at 256K, with router latency of <b>0.196 ms</b> independent of sequence length.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">17 图 14 表</span><span class="i18n-en">17 figures · 14 tables</span></span><span><a href="https://github.com/qqtang-code/Elastic-Attention-Project-Page">GitHub</a> · <a href="https://openreview.net/forum?id=rLO2NTUHSW">OpenReview</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/elastic-attention/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/elastic-attention/en.html">Read in English →</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section id="inference">
+  <div class="sec-no">Category 02</div>
+  <h2 class="sec">
+    <span class="i18n-zh">⚡ 高效推理与部署</span>
+    <span class="i18n-en">⚡ Efficient Inference &amp; Deployment</span>
+  </h2>
+  <div class="cards">
+
+        <div class="pcard">
       <span class="cat"><span class="i18n-zh">MoE · 边缘部署 · 带宽自适应</span><span class="i18n-en">MoE · Edge Deployment · Bandwidth-Adaptive</span></span>
       <h3>
         <a class="i18n-zh" href="efficient-inference/freetoken/">② FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">边缘原生的 MoE 服务系统</span></a>
@@ -226,27 +278,7 @@
       </div>
     </div>
 
-    <div class="pcard">
-      <span class="cat"><span class="i18n-zh">KV Cache 驱逐 · 推理模型 · 高效服务</span><span class="i18n-en">KV Cache Eviction · Reasoning Models · Efficient Serving</span></span>
-      <h3>
-        <a class="i18n-zh" href="efficient-inference/random-attention/">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">重新思考面向高效推理的 KV Cache 驱逐</span></a>
-        <a class="i18n-en" href="efficient-inference/random-attention/en.html">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Rethinking KV Cache Eviction for Efficient Reasoning</span></a>
-      </h3>
-      <p class="one">
-        <span class="i18n-zh">KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐,4 模型 × 6 任务追平最强基线、<b>60 格中 31 格显著领先</b>,vLLM 吞吐再快 <b>32–43%</b>——一篇把"选择信号几乎不贡献精度"钉死的机制论文。</span>
-        <span class="i18n-en">KV cache eviction needs no score: pin the prompt and evict uniformly at random within each head — matching the strongest evictor across 4 models × 6 reasoning tasks (<b>significantly ahead in 31 of 60 cells</b>) while serving <b>32–43% higher throughput</b> in vLLM, with a full mechanistic account of why the selection signal buys almost nothing.</span>
-      </p>
-      <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">5 图 11 表</span><span class="i18n-en">5 figures · 11 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.03430">2609.03430</a></span>
-        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
-      </div>
-      <div class="go">
-        <a class="i18n-zh" href="efficient-inference/random-attention/">开始阅读 →</a>
-        <a class="i18n-en" href="efficient-inference/random-attention/en.html">Read in English →</a>
-      </div>
-    </div>
-
-    <div class="pcard">
+        <div class="pcard">
       <span class="cat"><span class="i18n-zh">KV Cache 压缩 · MoE · 多模态 · 长上下文</span><span class="i18n-en">KV Cache Compression · MoE · Multimodal · Long Context</span></span>
       <h3>
         <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">⑥ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">552B 多模态 MoE 高效推理技术报告</span></a>
@@ -266,31 +298,11 @@
       </div>
     </div>
 
-    <div class="pcard">
-      <span class="cat"><span class="i18n-zh">混合注意力 · 测试时自适应 · 长上下文</span><span class="i18n-en">Hybrid Attention · Test-time Adaptation · Long Context</span></span>
-      <h3>
-        <a class="i18n-zh" href="efficient-inference/elastic-attention/">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">让模型的稀疏比随输入"伸缩"</span></a>
-        <a class="i18n-en" href="efficient-inference/elastic-attention/en.html">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Test-time Adaptive Sparsity Ratios for Efficient Transformers</span></a>
-      </h3>
-      <p class="one">
-        <span class="i18n-zh">混合注意力的 FA/SA 比例从静态超参数变成<b>输入自适应</b>:每层一个 0.27M 参数的 Attention Router,推理时把每个 KV 头分到全注意力或稀疏注意力——摘要/代码任务稀疏到 ~0.82,问答任务守住 0.63–0.68。8×A800 训练 <b>12 小时</b>、骨干完全冻结,3 个骨干在 LongBench-E 平均分全部第一,RULER 256K 外推优势最大;路由器延迟 <b>0.196 ms</b> 且与序列长度无关。</span>
-        <span class="i18n-en">The FA/SA ratio stops being a static hyper-parameter and becomes <b>input-adaptive</b>: a 0.27M-parameter Attention Router per layer assigns each KV head to full or sparse attention at inference — sparsity ~0.82 for summarization/code, 0.63–0.68 for QA. Trained in <b>12 hours on 8×A800</b> with the backbone frozen, it tops LongBench-E on all three backbones and leads most on RULER at 256K, with router latency of <b>0.196 ms</b> independent of sequence length.</span>
-      </p>
-      <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">17 图 14 表</span><span class="i18n-en">17 figures · 14 tables</span></span><span><a href="https://github.com/qqtang-code/Elastic-Attention-Project-Page">GitHub</a> · <a href="https://openreview.net/forum?id=rLO2NTUHSW">OpenReview</a></span>
-        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
       </div>
-      <div class="go">
-        <a class="i18n-zh" href="efficient-inference/elastic-attention/">开始阅读 →</a>
-        <a class="i18n-en" href="efficient-inference/elastic-attention/en.html">Read in English →</a>
-      </div>
-    </div>
-
-  </div>
 </section>
 
 <section id="benchmark">
-  <div class="sec-no">Category 02</div>
+  <div class="sec-no">Category 03</div>
   <h2 class="sec">
     <span class="i18n-zh">📏 评测基准</span>
     <span class="i18n-en">📏 Benchmarks</span>

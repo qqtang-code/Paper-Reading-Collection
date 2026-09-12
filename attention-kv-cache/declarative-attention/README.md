@@ -10,6 +10,6 @@
 - **英文完整版:[`en.html`](en.html)** — 9 个章节全部翻译,20 张图表全内嵌
 - 图片:`figs/` — 10 图 + 10 表,300 DPI 高清提取,中英文页共用
 - 分类:高效推理 · 稀疏注意力 / KV Cache / 长上下文
-- [在线阅读(中文)](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/) · [Read in English](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/en.html) · [论文原文](https://arxiv.org/abs/2609.02737)
+- [在线阅读(中文)](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/) · [Read in English](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/en.html) · [论文原文](https://arxiv.org/abs/2609.02737)
 
 返回[分类目录](../README.md) · [总索引](../../README.md)
