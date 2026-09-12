@@ -2,7 +2,7 @@
 
 我的论文中文精读页合集。每篇论文一个**图文配合**的单文件 HTML 精读页:全部 Figure / Table 以 **300 DPI 高清 PNG** 内嵌在对应讲解段落中(等比缩放、不裁剪),配中文逐点解读,支持深色模式、点击看原图、KaTeX 公式渲染、打印友好。
 
-> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——两篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash)为**完整英译**(`en.html`),其余四篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
+> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——两篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash)为**完整英译**(`en.html`),其余五篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
 >
 > This collection ships a **full Chinese deep-read plus an English edition for every paper** — complete English translations for the two flagship papers (Declarative Attention, DeepSeek-V4.1-Flash), and English quick-read editions (full digest of the argument + every figure with its original caption) for the rest. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
 
@@ -18,8 +18,9 @@
 | 4 | **Random Attention** — Rethinking KV Cache Eviction for Efficient Reasoning | [高效推理](efficient-inference/) | KV Cache 驱逐 · 推理模型 · 长思维链 · vLLM | [中](efficient-inference/random-attention/) · [EN 速读](efficient-inference/random-attention/en.html) | 2026-09 | 5 图 11 表 | [arXiv:2609.03430](https://arxiv.org/abs/2609.03430) |
 | 5 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
 | 6 | **DeepSeek-V4.1-Flash** — 552B 多模态 MoE 高效推理技术报告 | [高效推理](efficient-inference/) | KV Cache 压缩 · MoE · 多模态 · 长上下文 · FP4 | [中](efficient-inference/deepseek-v41-flash/) · [EN 完整版](efficient-inference/deepseek-v41-flash/en.html) | 2026-09 | 12 图 5 表 | [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page) |
+| 7 | **Elastic Attention** — Test-time Adaptive Sparsity Ratios for Efficient Transformers | [高效推理](efficient-inference/) | 混合注意力 · 测试时自适应 · Attention Router · 长上下文 | [中](efficient-inference/elastic-attention/) · [EN 速读](efficient-inference/elastic-attention/en.html) | 2026-09 | 17 图 14 表 | [OpenReview](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention) |
 
-点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)**
+点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑦ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/elastic-attention/)**
 
 ## 目录结构
 
@@ -32,7 +33,8 @@ Paper-Reading-Collection/
 │   ├── freetoken/               ← arXiv:2608.16157(5 图 1 表)
 │   ├── reset/                   ← arXiv:2606.13233(8 图 16 表)
 │   ├── random-attention/        ← arXiv:2609.03430(5 图 11 表)
-│   └── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
+│   ├── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
+│   └── elastic-attention/       ← OpenReview rLO2NTUHSW(17 图 14 表)
 └── benchmarks/                  ← 分类二:评测基准
     └── mmlongembed/             ← 多模态长上下文嵌入基准(6 图 16 表)
 
@@ -62,6 +64,9 @@ KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱�
 **⑥ DeepSeek-V4.1-Flash(2026-09 · DeepSeek 技术报告)**
 552B 多模态 MoE:Causal Encoder-Decoder 让 prefill 只激活 8B(decode 16B);CSA2 跨层 KV 复用 + FP4(MXFP4)量化把全局 KV Cache 压到**每 token 890 字节**(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代的 1/8;配 196B 条件记忆 Engram 与 45T 多模态 token 预训练,性能反超更大的 V4-Flash——DeepSWE v1.1 **74.2**、Terminal-Bench 2.1 **90.6**、Codeforces **3471**。→ [精读页](efficient-inference/deepseek-v41-flash/) · [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page)
 
+**⑦ Elastic Attention(2026-09 · 苏州大学 LCM Lab × 百度,ICML 2026 投稿)**
+混合注意力(FA + 稀疏注意力 SA)的 FA/SA 比例从静态超参数变成**输入自适应**:每层挂一个 **0.27M 参数**的轻量 Attention Router(Gumbel-Softmax + STE 训练),推理时按输入把每个 KV 头分配到 FA 或 SA——摘要/代码任务稀疏到 ~0.82、问答任务守住 0.63–0.68。**8×A800 训练 12 小时、骨干完全冻结**,Qwen3-4B/8B 与 Llama-3.1-8B 在 LongBench-E 平均分全部第一,RULER 外推 256K 优势最大;融合 kernel 让同层不同模式的头一次前向算完,加速 **1.51×–3.28×**,路由器延迟仅 **0.196 ms** 且与序列长度无关。→ [精读页](efficient-inference/elastic-attention/) · [原文](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention)
+
 ### 📏 benchmarks/ · 评测基准
 
 度量模型真实能力的研究。
@@ -86,5 +91,5 @@ KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱�
 
 ## 说明
 
-- 各精读页此前以独立仓库发布(`ReSET-Project-Page`、`MMLongEmbed-PaperReading-Page`、`FreeToken-Project-Page`、`Declarative-Attention-Project-Page`、`DeepSeek-V4.1-Flash-Project-Page`),现已整合至本仓库;旧仓库与其 Pages 链接暂时保留,后续可归档。
+- 各精读页此前以独立仓库发布(`ReSET-Project-Page`、`MMLongEmbed-PaperReading-Page`、`FreeToken-Project-Page`、`Declarative-Attention-Project-Page`、`DeepSeek-V4.1-Flash-Project-Page`、`Elastic-Attention-Project-Page`),现已整合至本仓库;旧仓库与其 Pages 链接暂时保留,后续可归档。
 - 精读页中的解读文字为编者观点,关键数字均与论文原文核对;图片以 300 DPI 摘自原文,版权归原作者所有,仅供学习研究。

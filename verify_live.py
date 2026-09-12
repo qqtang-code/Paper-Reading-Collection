@@ -16,6 +16,9 @@ PAGES = [
     "/efficient-inference/deepseek-v41-flash/",
     "/efficient-inference/deepseek-v41-flash/DeepSeek-V4.1-Flash论文精读_HTML.html",
     "/efficient-inference/deepseek-v41-flash/en.html",
+    "/efficient-inference/elastic-attention/",
+    "/efficient-inference/elastic-attention/Elastic-Attention论文精读_HTML.html",
+    "/efficient-inference/elastic-attention/en.html",
     "/benchmarks/mmlongembed/",
     "/benchmarks/mmlongembed/en.html",
 ]

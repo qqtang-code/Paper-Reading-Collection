@@ -9,5 +9,6 @@
 | ReSET(2026-08) | 量化 · NVFP4 · 温度缩放 | [reset/](reset/) | [en.html(英文速读)](reset/en.html) |
 | Random Attention(2026-09) | KV Cache 驱逐 · 推理模型 · 高效服务 | [random-attention/](random-attention/) | [en.html(英文速读)](random-attention/en.html) |
 | DeepSeek-V4.1-Flash(2026-09) | KV Cache 压缩 · MoE · 多模态 · 长上下文 | [deepseek-v41-flash/](deepseek-v41-flash/) | [en.html(完整英译)](deepseek-v41-flash/en.html) |
+| Elastic Attention(2026-09) | 混合注意力 · 测试时自适应 · Attention Router · 长上下文 | [elastic-attention/](elastic-attention/) | [en.html(英文速读)](elastic-attention/en.html) |
 
 返回[总索引](../README.md)。

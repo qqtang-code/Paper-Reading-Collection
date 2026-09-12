@@ -148,8 +148,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>6</b> 篇</span><span class="i18n-en"><b>6</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>46</b> 图 + <b>59</b> 表</span><span class="i18n-en"><b>46</b> figures + <b>59</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>7</b> 篇</span><span class="i18n-en"><b>7</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>63</b> 图 + <b>73</b> 表</span><span class="i18n-en"><b>63</b> figures + <b>73</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>2</b> 大类</span><span class="i18n-en"><b>2</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -263,6 +263,26 @@
       <div class="go">
         <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">开始阅读 →</a>
         <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">混合注意力 · 测试时自适应 · 长上下文</span><span class="i18n-en">Hybrid Attention · Test-time Adaptation · Long Context</span></span>
+      <h3>
+        <a class="i18n-zh" href="efficient-inference/elastic-attention/">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">让模型的稀疏比随输入"伸缩"</span></a>
+        <a class="i18n-en" href="efficient-inference/elastic-attention/en.html">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Test-time Adaptive Sparsity Ratios for Efficient Transformers</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">混合注意力的 FA/SA 比例从静态超参数变成<b>输入自适应</b>:每层一个 0.27M 参数的 Attention Router,推理时把每个 KV 头分到全注意力或稀疏注意力——摘要/代码任务稀疏到 ~0.82,问答任务守住 0.63–0.68。8×A800 训练 <b>12 小时</b>、骨干完全冻结,3 个骨干在 LongBench-E 平均分全部第一,RULER 256K 外推优势最大;路由器延迟 <b>0.196 ms</b> 且与序列长度无关。</span>
+        <span class="i18n-en">The FA/SA ratio stops being a static hyper-parameter and becomes <b>input-adaptive</b>: a 0.27M-parameter Attention Router per layer assigns each KV head to full or sparse attention at inference — sparsity ~0.82 for summarization/code, 0.63–0.68 for QA. Trained in <b>12 hours on 8×A800</b> with the backbone frozen, it tops LongBench-E on all three backbones and leads most on RULER at 256K, with router latency of <b>0.196 ms</b> independent of sequence length.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">17 图 14 表</span><span class="i18n-en">17 figures · 14 tables</span></span><span><a href="https://github.com/qqtang-code/Elastic-Attention-Project-Page">GitHub</a> · <a href="https://openreview.net/forum?id=rLO2NTUHSW">OpenReview</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="efficient-inference/elastic-attention/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/elastic-attention/en.html">Read in English →</a>
       </div>
     </div>
 
