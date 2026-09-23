@@ -12,6 +12,8 @@ PAGES = [
     "/attention-kv-cache/elastic-attention/",
     "/attention-kv-cache/elastic-attention/Elastic-Attention论文精读_HTML.html",
     "/attention-kv-cache/elastic-attention/en.html",
+    "/attention-kv-cache/hysparse2/",
+    "/attention-kv-cache/hysparse2/en.html",
     "/efficient-inference/freetoken/",
     "/efficient-inference/freetoken/en.html",
     "/efficient-inference/reset/",

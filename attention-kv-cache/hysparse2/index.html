@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HySparse2 论文中文精读:两级 KV 共享的混合稀疏注意力架构,self-decoder/cross-decoder 的 KV Bridging + hybrid block 内的 KV Reuse,全部图表 300 DPI 高清内嵌。">
+<meta name="keywords" content="论文精读, HySparse2, 稀疏注意力, KV cache, YOCO, 长上下文, agentic, Xiaomi LLM-Core">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · HySparse2:两级 KV 共享的混合稀疏注意力">
+<meta property="og:description" content="图文配合的 HySparse2 中文精读:KV Bridging / KV Reuse 两级共享、token-level 稀疏选择与强制局部窗口,以及 prefill 提前退出为何能成立。">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · HySparse2:Hybrid Sparse Attention with Two-Level KV Sharing</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:900px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:860px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    table.data tr{break-inside:avoid}
+    table.data thead{display:table-header-group}
+    section{break-inside:auto}
+    h2.sec,h3,h4{break-after:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">HySparse2<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">出发点</a>
+      <a class="jump" href="#s4">方法</a>
+      <a class="jump" href="#s5">系统</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">消融</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <a class="lang-toggle" href="en.html" title="Read in English"
+         onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">EN</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.26368v1 [cs.CL]</div>
+    <h1>HySparse2:Hybrid Sparse Attention with Two-Level KV Sharing</h1>
+    <div class="subtitle">把「跨层共享 KV」从 hybrid block 内部一路推到 self-decoder 与 cross-decoder 之间,并让局部窗口不再需要一条独立分支 —— 于是 prefill 只要跑完半个模型就能收工。</div>
+    <div class="meta">
+      <span>作者:Jianyu Wei*、Yizhao Gao*、Qihao Zhang、Shimao Chen、Zhengju Tang、Yu Cheng、Shengjie Zhou、Zihan Jiang、Yifan Song、Hailin Zhang、Liang Zhao、Bo Yang、Gang Wang、Shijie Cao⋄、Fuli Luo⋄,†(*同等贡献,⋄通讯,†组长)</span>
+      <span>机构:LLM-Core, Xiaomi</span>
+      <span>论文:<a href="https://arxiv.org/abs/2609.26368">arXiv:2609.26368</a></span>
+      <span>发布:2026-09-22</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">稀疏注意力</span><span class="pill">KV cache 压缩</span><span class="pill">长上下文</span>
+      <span class="pill">Agentic 推理</span><span class="pill">Prefill 提前退出</span><span class="pill">MoE</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图表按讲述顺序穿插,不是单独的图表库)</h2>
+  <ol>
+    <li><a href="#s1">速览:论文一句话与关键数字</a></li>
+    <li><a href="#s2">背景与动机:prefill、KV cache 四轴、稀疏粒度</a></li>
+    <li><a href="#s3">设计出发点:三个取舍</a></li>
+    <li><a href="#s4">方法:两级 KV 共享怎么回事</a></li>
+    <li><a href="#s5">推理系统:分离式部署与推测解码</a></li>
+    <li><a href="#s6">实验:设置、预训练、后训练与成本账</a></li>
+    <li><a href="#s7">消融:粒度、局部窗口、KV Bridging</a></li>
+    <li><a href="#s8">点评:亮点、局限、技术来源与待补测</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<!-- ============ s1 速览 ============ -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览</h2>
+
+  <p class="lead">这篇论文解决的是一个很具体的工程痛点:长程、多轮的 <abbr title="Agent,智能体:反复「思考 → 调用工具 → 读回观测」的推理形态">agentic</abbr> 推理里,模型生成的 action 很短,但工具返回的观测(trace、文档、搜索结果)很长。上下文因此被输入主导 —— 既要把这些新 token 高效地 <abbr title="Prefill,预填充:对已有输入序列做一次前向,建立 KV cache 的阶段">prefill</abbr> 进网络,又要把历史 KV cache 压得足够小,还要能精确地检索回很远的证据。</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">模型规模与层数</div><div class="v">80B-A3B MoE / 49 层<small>hidden 2048;HySparse2 只用 5 个全注意力层</small></div></div>
+    <div class="item"><div class="k">Prefill 计算(1M tokens)</div><div class="v">↓2.92× / ↓5.02×<small>相对 HySparse / Hybrid SWA,论文口径</small></div></div>
+    <div class="item"><div class="k">KV cache(1M tokens,FP8)</div><div class="v">2.69 GB<small>HySparse 6.72 GB,Hybrid SWA 12.09 GB</small></div></div>
+    <div class="item"><div class="k">后训练检索增益</div><div class="v">MRCR-v2 +11.30 / RULER-v2 +19.81<small>相对 HySparse,单位为百分点</small></div></div>
+    <div class="item"><div class="k">Prefill 部署成本</div><div class="v">只需前 25 层<small>49 层里只部署 self-decoder,显存需求近乎减半</small></div></div>
+    <div class="item"><div class="k">训练配方</div><div class="v">500B @32k + 100B<small>后训练延展到 256k;Muon 优化器</small></div></div>
+  </div>
+
+  <p>一句话概括它的做法:HySparse2 = <b>YOCO 式的 self-decoder / cross-decoder 骨架</b> + <b>两级 KV 共享</b>。外层 <b>KV Bridging</b> 让 cross-decoder 的全注意力层直接用 self-decoder 全注意力层的<b>输入隐状态</b>投影出自己的 K/V;内层 <b>KV Reuse</b> 让同一 block 内的稀疏层复用全注意力层的 KV cache 与选择索引。两级合起来的效果是:<b>cross-decoder 的每一份 KV cache 都能由 self-decoder 的隐状态造出来</b>,所以 prefill 建完 cache 就可以直接退出,不必再跑 cross-decoder 的 24 层。</p>
+
+  <p>论文的四个图分别对应"质量"和"成本"两条主线,先看这张总览:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1:HySparse2 在长上下文质量、prefill 计算与 KV cache 体积上的总体对比">
+    <figcaption>
+      <b>Figure 1:</b> HySparse2 delivers better long-context performance at lower prefill cost and smaller KV-cache storage.
+      <span class="zh">四个小面板,左列是质量、右列是成本。<b>左上 RULER-v2</b>:HySparse2 从 16k 的约 71 分一路缓降到 256k 的约 59 分,而两个 baseline 在 32k 之后就掉到 55 分以下并持续走低 —— 差距随上下文变长而拉开。<b>左下 AgentPPL</b>:三条线都随长度上升(多轮轨迹里干扰项变多),但 HySparse2 在整个 64k–256k 区间都贴着最低的那条线。<b>右上 prefill</b>:横轴到 1M,Hybrid SWA 斜率最陡(约 200 GFLOPs/token),HySparse 居中(约 115),HySparse2 几乎压平在约 40。<b>右下 KV cache</b>:同样的排序,1M 处分别约 12 GB / 6.7 GB / 2.7 GB。<i>读图数值为目测量级,论文只在正文给出关键点的精确值。</i></span>
+          <span class="pgref">报告 p.1</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看 300 DPI 原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <div class="note"><b>读数约定:</b>本页全部数字以论文原文为准;凡由本页依据论文给出的配置整理、归纳或换算得到的内容,均以「<b>整理</b>」「<b>推算</b>」显式标注,便于与论文口径区分。记号沿用论文:$L$ 为总层数,$H_i^{\text{self}}$ 为 self-decoder 第 $i$ 层的输入隐状态,$H_j^{\text{cross}}$ 为 cross-decoder 第 $j$ 层的输入隐状态,$k$ 为 top-$k$ 的 $k$。本页所引上游方法的行内引用口径取自论文自身的标注,未逐条核对参考文献条目。</div>
+
+  <div class="takeaway"><b>一句话记住它:</b>HySparse2 的关键不是"又省了多少 FLOPs",而是 <b>把"局部性"从一条需要自己隐状态的独立分支,改写成"稀疏选择集合里固定包含最近窗口"</b>。这一改写让 cross-decoder 不再依赖自身逐层的隐状态后缀,才有了"prefill 只跑半个模型"这个结构性收益。</div>
+</section>
+
+<!-- ============ s2 背景与动机 ============ -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Motivation</div>
+  <h2 class="sec">背景与动机:三条需求线</h2>
+
+  <p>论文的第 2 章把动机铺成三条线,后面所有设计都能对回这三条线上。</p>
+
+  <h3>2.1 高效 prefill:光省注意力还不够</h3>
+  <p>多轮 agentic 推理让<abbr title="Inference,推理:模型前向计算的统称,分 prefill 与 decode 两阶段">推理</abbr>越来越"输入主导"——一次工具返回可能比触发它的 action 长出几个数量级。论文特别强调一点:<b>只降低注意力本身的计算量,并不能消除把这些 token 传播过整个 backbone 的代价</b>。也就是说,即使每层的注意力算子变便宜了,层数 × 每层的前馈仍然要一遍遍算过去。</p>
+  <p>已有的跨层 KV-cache 共享是对着这个问题的:<abbr title="You Only Cache Once,一种 decoder-decoder 架构:用 self-decoder 构造全局 KV cache,供 cross-decoder 层共享">YOCO</abbr>(Sun et al., 2024)用 self-decoder 构造一份全局 KV cache 给 cross-decoder 复用,于是 <b>prefill 的 cache 构造可以在 self-decoder 之后退出</b>;Gemma 3n(Sanseviero and Ballantyne, 2025)采用了相关的跨层 KV 共享来改善 prefill 效率。HySparse(Gao et al., 2026)则在 hybrid 稀疏块<b>内部</b>做跨层共享:每个全注意力层把自己的全局 KV cache 与 top-$k$ 块索引交给后续的稀疏层,但 —— 论文点明这句 —— <b>prefill 仍然要执行全部层</b>。</p>
+
+  <h3>2.2 KV cache 压缩的四个维度</h3>
+  <p>论文把 KV cache 压缩归成四条轴,这个分类法本身值得记下来,因为它决定了本文站在哪一格:</p>
+  <ul class="tight">
+    <li><b>Head 维</b>:用 GQA/MQA 让多个 query 头共享 KV 头(Ainslie et al., 2023;Shazeer, 2019),或如 MLA 把 KV 压进隐状态(Liu et al., 2024a);</li>
+    <li><b>Sequence 维</b>:把多个 token 压成更少的 cache 条目(DeepSeek-AI et al., 2026);</li>
+    <li><b>Layer 维</b>:跨层共享 KV cache(Brandon et al., 2024;Sun et al., 2024);</li>
+    <li><b>Precision 维</b>:降低缓存键值的数值精度(Hooper et al., 2024;Liu et al., 2024b)。</li>
+  </ul>
+  <p>论文的判断是:先前工作集中在 head / sequence / precision 三条轴上的<b>层内</b>压缩,而 HySparse2 要推的是<b>跨层共享</b>这一格 —— 而且不是单指一层,而是"外层 KV Bridging + 内层 KV Reuse"两级同时做。</p>
+
+  <h3>2.3 稀疏选择的粒度:一个精度与效率的固有取舍</h3>
+  <p>稀疏注意力把每个 query 限制到一部分 KV 条目上(Child et al., 2019),<b>选择粒度</b>决定精度/效率的平衡点。HySparse 当初选 <abbr title="Block-level sparsity,块级稀疏:以固定长度(本文 64)的连续 token 块为最小选择单位">block-level</abbr> 是实用主义折中:评测显示精度没有明显劣势,而且规则的块结构利于高效 kernel。</p>
+  <p>但论文指出,现代 agentic 负载是<b>长程多轮轨迹</b>,需要从很长的历史里<b>精确</b>检索。在这种模式下,块级选择表现出明显的精度劣势,而 <abbr title="Token-level sparsity,词元级稀疏:以单个 token 为最小选择单位">token-level</abbr> 选择能更忠实地取回相关证据。同时,近期稀疏 kernel 的进展(Wang et al., 2025)让 token 级实现变得可行 —— 这两条合起来,构成了本文从 block 改到 token 的理由。</p>
+
+  <div class="note"><b>注意这条论证的结构:</b>论文并没有说"block-level 在预训练上更差",而是说它在<b>agentic 任务形态下</b>更差。第 4.3 节的消融正是为了把这句话变成可测的命题 —— 而且论文自己加了一句限定:这些增益是在 <b>32k 训练上下文内</b>就已出现的。</div>
+</section>
+
+<!-- ============ s3 设计出发点 ============ -->
+<section id="s3">
+  <div class="sec-no">03 · Design Rationale</div>
+  <h2 class="sec">设计出发点:三个取舍</h2>
+
+  <p>第 3 章的技术内容可以读成三次取舍。把取舍读清楚,比记住架构图更重要 —— 因为其中第二个取舍是整篇论文里<b>最不可替代</b>的一步。</p>
+
+  <h3>取舍一:外层共享只发生在全注意力层之间</h3>
+  <p>KV Bridging 有一条硬边界:<b>只在 self-decoder 与 cross-decoder 的全注意力层之间建立</b>,不碰 SWA 层、也不碰稀疏层。原因写在式 (1) 旁边的措辞里 —— 每一对 $(i, j)$ 是全注意力层对全注意力层。这样做的直接好处是:两个 decoder 可以采用<b>不同的混合比例</b>,一个 self-decoder 全注意力层可以同时供给多个 cross-decoder 全注意力层(下面的 Figure 2 里就是 1 供 4)。</p>
+
+  <h3>取舍二:去掉独立 SWA 分支,把最近窗口"塞进"稀疏选择</h3>
+  <p>这是全文最关键的论证,值得完整复述一遍。HySparse 的稀疏层里有一条<b>独立的 gated SWA 分支</b>来做局部建模。论文指出:如果 cross-decoder 里保留这样一条独立 SWA 分支,cross-decoder 就必须<b>用自己的隐状态</b>做投影,来构造一个窗口大小的 KV cache 后缀;而这个后缀所依赖的隐状态,又取决于更早层的隐状态集合 —— 论文称之为 <b>级联的 SWA 依赖(cascading SWA dependency)</b>,它所需的 token 后缀会<b>随深度线性增长</b>,远长于窗口本身。</p>
+  <p>于是只有两条路:要么在 prefill 时把这些状态算出来(那 cross-decoder 就<b>完全无法跳过</b>),要么用 bounded replay 之类的方法去近似(DeepSeek-AI, 2026)。HySparse2 选了第三条路:<b>按结构消除这个依赖</b> —— 把"最近 128 个 token"直接强制写进稀疏选择集合,局部性由复用同一份全注意力 KV cache 来提供,不再需要自己的隐状态。论文顺带指出,这一改动还省掉了门控 baseline 里那条分支的独立投影参数量。</p>
+
+  <div class="takeaway"><b>为什么这一步不可替代:</b>它把"局部建模"从一个<b>需要新隐状态的分支</b>,变成一个<b>对已有 cache 的固定选择</b>。前者深度相关、无法在半个模型处截断;后者只依赖全注意力层已有的输出。这就是 prefill 能提前退出的充分前提 —— 不是工程优化,而是结构性质。</div>
+
+  <h3>取舍三:保留少量全注意力层,并且让它们兼任 indexer</h3>
+  <p>HySparse2 和 HySparse 都保留少量全注意力层,论文的理由有两层。其一,<b>全注意力对模型质量仍然重要</b>。其二,这些层同时充当 <abbr title="Indexer,索引器:预测哪些 token/KV 值得被稀疏注意力选中的模块">indexer</abbr>:用<b>精确的注意力分数</b>为后续稀疏层提供 oracle 式的 token 选择。这带来一个很干净的训练属性 —— <b>端到端原生训练,不需要单独的 indexer 模块,也不需要为此训练一个辅助蒸馏目标</b>(对比 SeerAttention(Gao et al., 2024)、DeepSeek-AI et al. (2025)需要蒸馏 indexer 的路线)。</p>
+  <p>但全注意力终究昂贵,所以比例要压得低。论文还给出了两个未来方向:一是在后训练阶段用轻量 indexer + 稀疏注意力去近似那些保留下来的全注意力层;二是让计算分配更偏稀疏 —— 例如<b>减少全注意力层的 query 头数、增加稀疏层的 query 头数</b>。论文同时强调了一个部署事实:HySparse2 里 <b>prefill 的 KV-cache 构造只需要一个全注意力层</b>。</p>
+
+  <div class="note"><b>整理:</b>这三条取舍互相咬合 —— 取舍二让 cross-decoder 可跳过,取舍一让"一个全注意力层供给多个"成为可能,取舍三用极少量的全注意力层同时保住质量和选择信号。任何一条单独拿出来都只是局部改动,合起来才得到"prefill 跑一半层"这个结论。</div>
+</section><!-- ============ s4 方法 ============ -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">方法:两级 KV 共享到底怎么共享</h2>
+
+  <p>HySparse2 的骨架沿用 YOCO:backbone 被切成 <b>self-decoder</b> 和 <b>cross-decoder</b> 两段,两段都用混合注意力。区别在于混合的配方 —— self-decoder 是<b>全注意力 + 滑窗注意力</b>,负责局部建模;cross-decoder 是<b>全注意力 + 稀疏注意力</b>,负责全局检索。共享则分两层:外层 <b>KV Bridging</b> 跨两个 decoder,内层 <b>KV Reuse</b> 落在每个 hybrid block 内部。下面这张图同时画了这两层:</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2:HySparse2 的两级 KV 共享,左为整体架构,右为单个 block 内 token 级稀疏注意力的数据流">
+    <figcaption>
+      <b>Figure 2:</b> Two-level KV sharing in HySparse2. FA, SWA, and SA denote full attention, sliding-window attention, and sparse attention, respectively. Left: the overall architecture with KV Bridging between the self-decoder and cross-decoder. Prefill cache construction can exit after the self-decoder. Right: a HySparse2 block with token-level sparse attention and a forced local window. Through KV Reuse, SA layers reuse the block's FA KV cache and selection indices.
+      <span class="zh"><b>左图</b>从下往上读:Embedding → SWA×12 → FA → SWA×12 构成 self-decoder;蓝色箭头(KV Bridging)从 self-decoder 那个 FA 层的<b>输入隐状态</b>出发,一次性扇出到 cross-decoder 的四个 FA 层;红色虚线是 <b>Prefill Exit</b>,位置就在 self-decoder 结束处 —— 线以上的层 prefill 阶段不必执行。<b>右图</b>放大一个 hybrid block:下半是 FA 层,先用本层 KV 投影得到 KV,再算 Full Attention 得到 token scores,交给 Token Top-k 产出 indices,Token KV Selection 据此筛出 KV 条目,向上以"KV + token indices"交给上半的稀疏层;稀疏层用自己的 Q 投影读出查询,做 Token Sparse Attention。中间那两条色块带就是 token 选择的可视化:<b>绿色</b>是被 top-k 选中的全局 token,<b>黄色</b>是强制加入的最近局部窗口(位置固定在序列右端),<b>空心</b>是未入选的位置 —— 稀疏层与全注意力层读的是同一份 KV cache,只是可见集合不同。<i>颜色含义为本页据图面与正文的归纳。</i></span>
+          <span class="pgref">报告 p.4</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.1 外层:KV Bridging</h3>
+  <p>取一对全注意力层 $(i, j)$,$i$ 在 self-decoder、$j$ 在 cross-decoder。论文定义 cross-decoder 层的 K、V、Q 为:</p>
+
+  <div class="math">$$K_j^{\text{cross}} = \operatorname{Proj}_j^{K}\!\left(H_i^{\text{self}}\right),\qquad V_j^{\text{cross}} = \operatorname{Proj}_j^{V}\!\left(H_i^{\text{self}}\right),\qquad Q_j^{\text{cross}} = \operatorname{Proj}_j^{Q}\!\left(H_j^{\text{cross}}\right) \tag{1}$$</div>
+
+  <p>读这个式子有三处要点。第一,<b>桥接的来源是 $H_i^{\text{self}}$,也就是 self-decoder 全注意力层的输入隐状态</b>,不是它的输出 —— 图 2 里的标注也正是 "FA input hidden"。第二,<b>K 和 V 的来源是别人的隐状态,但 projection 是自己的</b>:$j$ 层有自己的 $\operatorname{Proj}_j^{K}$、$\operatorname{Proj}_j^{V}$,所以即便多层共享同一个隐状态来源,各层构造出的 KV cache 依然是不同的。第三,<b>Q 仍然来自自己的当前隐状态</b> $\operatorname{Proj}_j^{Q}(H_j^{\text{cross}})$,注意力算的仍是本届 token 与共享历史之间的关系。</p>
+
+  <p>这三点的组合让"一个 self-decoder 全注意力层供给多个 cross-decoder 全注意力层"在数学上无歧义 —— 供给的是<b>源隐状态</b>,而不是已经被投影好的 K/V,所以每一层仍然可以有自己的 KV 表示。</p>
+
+  <h3>4.2 内层:KV Reuse 的两处改造</h3>
+  <p>HySparse2 对 HySparse 的 KV Reuse 做了两处修改,两处都在第 3.3 节说明。</p>
+
+  <h4>改造一:选择粒度从 block 换成 token</h4>
+  <p>做法很直接:在全注意力层上对<b>单个 token</b> 做 top-$k$ 选择,后续稀疏层复用这些被选中 token 的 KV 条目。动机来自 2.3 节的判断 —— 长程多轮的 agentic 任务需要更精确的检索。第 4.3 节的消融专门验证这件事。</p>
+
+  <h4>改造二:删掉独立 SWA 分支,改为强制局部窗口</h4>
+  <p>在一个 block 内,选择集合由两部分拼成:先是<b>最近的若干 token 构成的局部窗口(永远入选)</b>,然后是<b>窗口之外得分最高的若干个 token</b>。两个集合都从全注意力层的 KV cache 里读,再被后续的稀疏层复用。论文给出的配置是 <b>128 个强制局部 token + 1,024 个全局 token</b>(即 $k_{\text{local}} = 128$、$k_{\text{global}} = 1024$)。</p>
+  <p>这里可以对照三个模型的局部性处理方式:Hybrid SWA 用 128 token 的滑动窗口;HySparse 用"64-token 块里选 1,024 个全局 token + 一条独立的 128-token SWA 分支,靠门控融合";HySparse2 则把 128 token 直接放进选择集合里。</p>
+
+  <h3>4.3 把配置落到层号上:49 层的走查「整理」</h3>
+  <p>论文没有画层号表,但把 Figure 2 的方框数与正文的 49 层对上,可以得到一个很能说明问题的读数:</p>
+  <ul class="tight">
+    <li><b>self-decoder = 25 层</b>:SWA×12 → FA → SWA×12;其中只有 <b>1 个全注意力层</b>;</li>
+    <li><b>cross-decoder = 24 层</b>:(FA + SA×5) 重复 4 组,即 <b>4 个全注意力层 + 20 个稀疏层</b>;</li>
+    <li>合计 $25 + 24 = 49$ 层,其中 SWA 24 层、SA 20 层、FA 5 层 —— <b>FA 层的总数 5 与 Table 1 给出的"#Full = 5"一致</b>。</li>
+  </ul>
+  <p>把这几个数字连起来读:全模型只有 5 个全注意力层,而 self-decoder 那 1 个要同时供给 cross-decoder 的 4 个 —— 这就是"不同混合比例、一对多桥接"在图上的样子;prefill 需要跑的 25 层里,真正做全注意力的只有 1 层。</p>
+
+  <div class="note"><b>一句话小结本节:</b>两级共享的角色并不对称 —— <b>KV Bridging 决定"能不能跳过半个模型"</b>(它把 cross-decoder 的 KV 来源搬到了 self-decoder),<b>KV Reuse 决定"稀疏层要不要维护自己的 cache"</b>(不要,它借用同 block 全注意力层的)。而 token 级选择与强制窗口决定的,是<b>稀疏层看得见什么</b>。</div>
+</section>
+
+<!-- ============ s5 推理系统 ============ -->
+<section id="s5">
+  <div class="sec-no">05 · Inference System</div>
+  <h2 class="sec">推理系统:分离式部署与推测解码</h2>
+
+  <p>第 3.5 节把架构性质翻译成部署方案,这部分很短但信息密度高,直接关系到"这个设计在真实服务里值多少钱"。</p>
+
+  <h3>5.1 Prefill–Decode 分离:prefill 节点只装半个模型</h3>
+  <p>在 <abbr title="Prefill–Decode Disaggregation,把预填充与逐 token 解码拆到不同节点上,各自按自己的资源特征优化">prefill–decode 分离</abbr>部署下,HySparse2 的 prefill 节点只需要承载 <b>self-decoder 加 KV Bridging 的投影</b>。对 Figure 2 那个 49 层模型,这意味着<b>只部署前 25 层,prefill 节点的显存需求近乎减半</b>。又因为 self-decoder 的 SWA-to-full-attention 比例很高,这 25 层里只有 1 层做全注意力。</p>
+  <p>还有一个容易忽略的细节:论文选择<b>在 prefill 节点上把 cross-decoder 的全注意力 KV cache 也算出来</b>,再传给 decode 节点 —— 理由是<b>投影后的 KV cache 比源隐状态更小</b>,传 KV 比传隐状态划算。这是一个典型的"用计算换传输"的取舍,也解释了为什么 KV Bridging 要用各自的投影而不是简单地传隐状态。</p>
+
+  <h3>5.2 推测解码:预训练用 MTP,后训练可换更大 drafter</h3>
+  <p>预训练阶段,HySparse2 使用<b>单个 <abbr title="Multi-Token Prediction,多 token 预测:额外的一层,一次预测多个未来 token">MTP</abbr> 层</b>,条件在 <b>self-decoder / cross-decoder 边界处的隐状态</b>上,用来帮助收敛。到了后训练阶段,这一层可以被替换成一个更大的 <b>DFlash 式 drafter</b>(Chen et al., 2026),条件仍然是同一处边界隐状态。论文指出,这些隐状态<b>很早就可用</b>,因此有可能支撑异步起草与验证(Zhang et al., 2025)。</p>
+  <p>不过论文把话收得很紧:训练这个更大的 drafter、以及把异步执行与验证反馈协调好,<b>都仍是未来工作</b>。也就是说,5.2 节目前是一条设计上的可能性论证,不是已验证的结果。</p>
+
+  <div class="takeaway"><b>读这一节要注意的分寸:</b>论文给出的成本收益都是<b>静态账面量</b> —— FLOPs 与 KV cache 字节数。分离式部署省下的显存、边界隐状态对 drafter 的可用性,都是这一账面收益的<b>落地条件</b>,但论文没有给出端到端的实测吞吐或时延。</div>
+</section><!-- ============ s6 实验 ============ -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">实验:设置、预训练、后训练与成本账</h2>
+
+  <p>评测分三块:总体对比(模型质量 + prefill FLOPs + KV cache 体积),以及三组消融(稀疏粒度、强制局部窗口、KV Bridging)。论文的编排逻辑很清晰 —— <b>token 级选择换长上下文精度,强制窗口与 KV Bridging 换 prefill 成本,同时要求质量不掉</b>。</p>
+
+  <h3>6.1 设置:三个模型只差注意力设计</h3>
+  <p>除非特别说明,实验都用 80B-A3B 的 MoE 模型:49 层 Transformer、hidden size 2,048,并使用一个简化版 <abbr title="Manifold-constrained Hyper-Connections,一种残差连接改造;此处残差混合矩阵固定为单位阵">mHC</abbr> 变体(Xie et al., 2026;Zhu et al., 2025)。<b>三个模型之间唯一的差别就是注意力设计</b>:</p>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1:Hybrid SWA、HySparse 与 HySparse2 三种注意力设计的配置对比">
+    <figcaption>
+      <b>Table 1:</b> Configurations of the three attention designs.
+      <span class="zh">三行三列就能读完全文的对比前提。<b>#Full</b> 列:Hybrid SWA 保留 9 个全注意力层,HySparse 与 HySparse2 都只有 5 个。论文解释了 9 与 5 的来历 —— 全注意力每层是最强参照,选混合模型的全注意力层数时要避免与这个参照出现实质精度差距;Hybrid SWA 需要 9 层,更少会明显掉精度,而 HySparse 系列用 5 层就能保持可比。<b>Heads (Q/KV)</b> 列是最容易被忽略的一处变量:两个 baseline 用 GQA 的 64/4,而 HySparse2 用 MQA 的 64/1;head dim (QK/V) 也从 192/128 变成 256/256。论文给 MQA 的理由是"KV cache 更小 + token 稀疏注意力 kernel 效率更好"。<i>这一点在比较 KV cache 体积时要记在心里,第 6.4 节的账本走查会用到。</i></span>
+          <span class="pgref">报告 p.6</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>还有几处配置细节值得记下来。HySparse2 的 self-decoder 里,SWA 层用<b>部分 <abbr title="Rotary Position Embedding,旋转位置编码">RoPE</abbr></b>(64 个旋转维度,base 10,000),而全注意力与稀疏注意力层用 <b><abbr title="No Positional Embedding,不使用显式位置编码">NoPE</abbr></b> —— 因此论文强调,HySparse2 <b>在长上下文扩展时不需要调整 RoPE</b>。另外三个配置里所有稀疏层与 SWA 层都使用 <b>sigmoid 输出门</b>(Qiu et al., 2025)与<b>可学习的 per-head sink bias</b>(Agarwal et al., 2025)。</p>
+  <p>训练上,预训练约 <b>500B tokens、上下文 32k</b>;轻量后训练再加约 <b>100B tokens</b>,向数据混合中引入 agentic 数据,并把上下文延展到 <b>256k</b>。三个阶段内三个模型共享同一数据混合与训练日程。<abbr title="Muon:一种对矩阵参数做正交化更新的优化器">Muon</abbr> 优化器(Jordan et al., 2024)+ WSD 日程,峰值学习率预训练 $10^{-3}$、后训练 $5\times10^{-5}$。<b>总体对比同时报预训练与后训练结果,消融只报预训练结果。</b></p>
+
+  <p>评测分为四类:知识(MMLU、MMLU-Redux、C-Eval、CMMLU、TriviaQA)、推理(BBH、MATH、DROP、GSM8K、ARC-C、HellaSwag、WinoGrande)、代码(HumanEval+、MBPP+、Repo Code PPL)与长上下文(RULER、NoLiMa)。其中 <b>Repo Code PPL 是内部基准</b>,对含跨文件依赖的长代码仓库报告 byte perplexity,因此也间接探测长上下文建模能力。后训练阶段则聚焦两类指标:<b>多轮检索</b>(MRCR-v2、RULER-v2、GraphWalks)与<b>长上下文似然</b>(AgentPPL、LongPPL)。AgentPPL 是建立在多轮 agent 轨迹上的内部基准,对 1,000 条轨迹的 reasoning / tool-call / response 三段分别报告 byte perplexity;LongPPL(Fang et al., 2024)只在依赖长程上下文的被选 token 上算 perplexity,用了 349 个样本;MRCR-v2(Vodrahalli et al., 2024)是多轮检索,含 2/4/8 needle 三种设置;RULER-v2(Hsieh et al., 2025)覆盖 12 个子任务;GraphWalks(OpenAI, 2025)考多跳图遍历。检索类平均分对报告的各上下文长度<b>等权</b>平均。</p>
+
+  <h3>6.2 预训练:长上下文最强,通用能力是笔"混账"</h3>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2:三个 80B-A3B 模型的预训练性能对比,覆盖知识、推理、代码与长上下文">
+    <figcaption>
+      <b>Table 2:</b> Pretraining performance of the 80B-A3B models. HySparse2 improves long-context performance while remaining broadly comparable to both baselines on general capabilities.
+      <span class="zh">按论文自己的总结读:<b>长上下文两项它最强</b> —— RULER 90.77(比 HySparse 高 5.88,也是三者最高)、NoLiMa 49.76(比 HySparse 高 9.49,而 Hybrid SWA 只有 30.13),Repo Code PPL 1.1570 也是三者最低。<b>通用能力则是混合结果</b>:HySparse2 在 BBH(64.29)与 MMLU-Pro(37.56)上更强,而 HySparse 在 DROP 上占优。<i>本页提醒:表格里还有一批论文正文未逐项评论的差额 —— 相对 HySparse,DROP 58.99 vs 63.78(−4.79)、GSM8K 61.94 vs 64.14(−2.20)、MATH 34.32 vs 36.14(−1.82)、WinoGrande 71.82 vs 74.19(−2.37)、MMLU 63.92 vs 64.48。相对 Hybrid SWA,它在 MMLU 上高 2.44 分,但 DROP(−1.91)、GSM8K(−2.50)、MATH(−1.86)、MBPP+(−2.91)都更低。</i>换句话说,"broadly comparable"是成立的,但代价主要落在推理与代码类任务上,这是读这篇论文时应有的心理预期。</span>
+          <span class="pgref">报告 p.7</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>6.3 后训练:四个指标、所有长度全面领先</h3>
+  <p>经过同样约 100B tokens 的轻量后训练之后,结果变得干净得多:</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3:后训练之后的长上下文性能,四个面板分别为 MRCR-v2、RULER-v2、AgentPPL 与 LongPPL">
+    <figcaption>
+      <b>Figure 3:</b> Long-context performance after a light post-training stage. HySparse2 achieves higher retrieval scores and lower perplexity than both baselines across all evaluated context lengths.
+      <span class="zh"><b>(a) MRCR-v2</b>:HySparse2 从 8k 的约 39 缓降到 256k 的约 22,全程压住两条 baseline;Hybrid SWA 在 64k 处有一次明显回升(约 29),但除 32k 外始终低于 HySparse2。<b>(b) RULER-v2</b> 是差距最大的一块:HySparse2 从 16k 的约 72 一路到 256k 的约 58,而两条 baseline 从 16k 之后就一路下滑,到 256k 只剩约 35 与 33 —— 论文给出的精确值是 256k 处 <b>58.45 vs 32.61(HySparse)vs 35.74(Hybrid SWA)</b>。<b>(c) AgentPPL</b>:三条线都随长度上升,HySparse2 最低。<b>(d) LongPPL</b>:三条线都随长度<b>下降</b>,HySparse2 同样最低。注意 (c) 与 (d) 的走向相反 —— 论文解释这是上下文变长的两个相反效应:更长的上下文为 LongPPL 关注的关键 token 暴露了更多相关信息,但也引入了更多中间轮次与工具输出,使多轮轨迹里的证据更难被检索到。这正是"AgentPPL 上升、LongPPL 下降"能同时成立的原因。<i>图内数值为目测读图。</i></span>
+          <span class="pgref">报告 p.8</span>
+    </figcaption>
+  </figure>
+
+  <p>论文给出的平均增益:相对 HySparse,mean <b>MRCR-v2 +11.30</b>、<b>RULER-v2 +19.81</b> 个百分点;相对 Hybrid SWA 则是 <b>+6.44</b> 与 <b>+18.65</b>。并且 HySparse2 在整个评测范围内都取得更低的 AgentPPL 与 LongPPL,说明检索上的增益<b>同时也伴随着</b>长 agent 轨迹与上下文依赖 token 上更好的似然。</p>
+
+  <h3>6.4 成本:prefill FLOPs 与 KV cache</h3>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4:80B-A3B 模型的 prefill 计算量与 KV cache 体积,横轴 1k 到 1M tokens">
+    <figcaption>
+      <b>Figure 4:</b> Prefill computation and KV-cache storage for the 80B-A3B models. HySparse2 reduces both costs relative to HySparse and Hybrid SWA.
+      <span class="zh">两个面板都是 1k 到 1M tokens、FP8 KV cache。<b>左:prefill FLOPs</b>。HySparse2 的曲线增长最缓,到 1M 处压平在约 40 GFLOPs/token 的量级,HySparse 约 115,Hybrid SWA 约 200 —— 与论文给出的比值 2.92×(相对 HySparse)和 5.02×(相对 Hybrid SWA)自洽。<b>右:KV cache 体积</b>。1M 处 HySparse2 为 <b>2.69 GB</b>,HySparse 为 <b>6.72 GB</b>,Hybrid SWA 为 <b>12.09 GB</b>。两条曲线在 1M 处几乎线性 —— 因为常驻 cache 随序列长度线性增长,窗口类缓存是常数项。<i>左图数值为目测读图;右图的三个数值来自论文正文。</i></span>
+          <span class="pgref">报告 p.9</span>
+    </figcaption>
+  </figure>
+
+  <h4>KV cache 账本走查「推算」</h4>
+  <p>论文只给了三个总数,没给分项账本。但用 Table 1 的 KV head 配置可以自己核一遍,而核出来的结果恰好能验证一个重要的设计主张:</p>
+  <ul class="tight">
+    <li><b>每 token 每层的 KV 字节数</b> = KV head 数 × (head dim K + head dim V) × 1 byte(FP8);</li>
+    <li>HySparse2(MQA 64/1,head dim 256/256):$1 \times (256+256) = 512$ bytes/层/token;有 5 个 FA 层 → <b>2,560 bytes/token</b>;</li>
+    <li>HySparse(GQA 64/4,head dim 192/128):$4 \times (192+128) = 1{,}280$ bytes/层/token;5 个 FA 层 → <b>6,400 bytes/token</b>;</li>
+    <li>Hybrid SWA(同 GQA 配置):1,280 bytes/层/token;9 个 FA 层 → <b>11,520 bytes/token</b>。</li>
+  </ul>
+  <p>乘 1M token 得到 <b>2.56 / 6.40 / 11.52 GB</b>,对照论文的 <b>2.69 / 6.72 / 12.09 GB</b>。</p>
+  <p>三个数都对不上零头,但<b>差的是同一个倍数(约 1.05×)</b> —— 说明这是统一的口径或记账差异,不是结构差异。真正有信息量的是<b>两两比值</b>:推算的 $6{,}400/2{,}560 = 2.50$ 与 $11{,}520/2{,}560 = 4.50$,和论文数字算出的 $6.72/2.69 = 2.50$、$12.09/2.69 = 4.49$ <b>几乎完全吻合</b>。</p>
+  <p>这验证了两件事:其一,三个模型的 KV cache 体积<b>基本由「FA 层数 × KV head 配置」决定</b>;其二,稀疏层<b>没有引入任何常驻 KV cache</b> —— 它们读的确实是同 block 全注意力层的那一份,这正是 KV Reuse 想要的账面效果。同时也要看清:HySparse2 相对 HySparse 的 2.50× 体积优势中,<b>一部分来自 FA 层数之外的 MQA 改造</b>;若把 KV head 也统一成 GQA 64/4,单靠 5 层 FA 对 9 层 FA 只能解释 $9/5 = 1.8\times$。</p>
+
+  <div class="note"><b>整理:三处"省"的来源要分清。</b>① <b>prefill FLOPs 的大幅下降</b>主要来自"跳过 24 层 cross-decoder"(KV Bridging);② <b>KV cache 的倍数级下降</b>来自"稀疏层不带 cache"(KV Reuse)+ MQA + FA 层数少;③ <b>长上下文精度提升</b>来自 token 级选择与强制窗口。三组收益的机制不同,消融也分三组做,不能互相代替。</div>
+</section>
+
+<!-- ============ s7 消融 ============ -->
+<section id="s7">
+  <div class="sec-no">07 · Ablations</div>
+  <h2 class="sec">消融:三组对照回答三个问题</h2>
+
+  <p>三组消融分别对应三个设计决定,而且都<b>只报预训练结果</b>(32k 训练上下文内),这一点在解读时很重要 —— 尤其是第一组,它的动机本来是 256k 的 agentic 场景。</p>
+
+  <h3>7.1 粒度:token 级 vs block 级(同预算)</h3>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3:token 级与 block 级稀疏选择在预训练后的对比">
+    <figcaption>
+      <b>Table 3:</b> Token-level versus block-level sparse selection after pretraining. Token-level selection improves long-context retrieval and graph reasoning under the same attention budget.
+      <span class="zh">这组对照控制得很干净:两者用<b>相同的 backbone 布局、相同的 1,024 全局 token 预算、相同的 128 token 局部窗口</b>,唯一变量是选择单位(block 大小 64)。<b>token 级赢在检索与图推理</b>:RULER-v2 49.56 → 56.13(+6.57)、2-needle MRCR-v2 12.94 → 21.08(+8.14)、GraphWalks 29.38 → 34.92(+5.55),MMLU-Pro 也从 35.74 升到 36.97。<b>但 block 级在两项上更好</b>:BBH 61.93 vs 60.70、NoLiMa 40.27 vs 38.43。<i>论文正文只强调了 token 的增益,没有讨论这两项反向结果 —— 读的时候应自己补上这笔账。</i></span>
+          <span class="pgref">报告 p.9</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>论文对增益的解释值得单独记一句:agent 轨迹反复交织着 reasoning、tool call 和返回的观测,回答所需的信息可能散布在好几轮里,还夹杂着<b>角色分隔符与其他特殊 token</b>(正是这些 token 标出了相关边界)。在固定预算下,<b>为了保住其中一个 token 而选中一整个 block,也要为它的邻居付出容量</b>;token 级选择则可以把这份预算分配到横跨上下文的单个位置上。检索与图推理的增益与这个解释是一致的。</p>
+
+  <h3>7.2 局部窗口:强制入选 vs 独立分支</h3>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4:稀疏层里三种局部上下文处理方式的对照">
+    <figcaption>
+      <b>Table 4:</b> Local-attention ablation in sparse layers. Forced SWA remains competitive with Gated SWA.
+      <span class="zh">三列分别是:独立的门控 128-token SWA 分支(<b>Gated SWA</b>)、完全去掉局部分支(<b>No SWA</b>)、把最近 128 token 强制塞进稀疏选择(<b>Forced SWA</b>)。三者共享同一 backbone、KV Bridging 与 hybrid SWA self-decoder,<b>只差 cross-decoder 稀疏注意力如何处理局部性</b>。读法:<b>No SWA 普遍退化</b>,证明稀疏注意力里局部信息是必需的;<b>Forced SWA 拿到最好的 RULER(89.84)、RULER-v2(55.98)与 GraphWalks(37.13)</b>,BBH 上甚至以 62.25 微超 Gated SWA 的 62.23(No SWA 只有 60.11),在多项任务上与 Gated SWA 竞争力相当。<b>但代价也很明确</b>:GSM8K 低 5.08 分(64.52 → 59.44)、MRCR-v2 低 4.99 分(27.66 → 22.67)、LongPPL 高 1.50%(6.8807 → 6.9838)。论文判定这是可接受的交换,理由是 Forced SWA 不需要额外的投影参数、也不需要本地 KV cache,<b>从而让 early-exit prefill 变得可行</b>。<i>注意 MRCR-v2 正是本文主推的检索指标之一,在这一项上 Forced SWA 明显低于 Gated SWA —— 这是"用精度买结构"的一处真实敞口。</i></span>
+          <span class="pgref">报告 p.10</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>7.3 KV Bridging:能不能白拿 prefill 收益</h3>
+  <p>最关键的验证是:KV Bridging 主要为加速 prefill 而设计,那它会不会伤质量?论文直接做了两个方向的对照。</p>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5:290B-A8B 规模下 KV Bridging 的有无对照">
+    <figcaption>
+      <b>Table 5:</b> KV Bridging ablation at the 290B-A8B scale. Models with and without KV Bridging achieve broadly comparable quality.
+      <span class="zh">这组对照的价值在于<b>规模</b>:不是 80B,而是 <b>290B-A8B、约 1.8T tokens、32k 上下文</b>,有/无 KV Bridging 各训一个。结果:MMLU 72.68 → 72.80、TriviaQA 73.32 → 74.10 略升;RULER 只变化 0.31 分(96.32 → 96.01);Repo Code PPL 几乎不动(1.1351 → 1.1353);<b>LongPPL 反而改善</b>(3.6053 → 3.4202)。代价侧:BBH 与 GSM8K 各降约 1 分(70.65 → 69.57、77.63 → 76.65),<b>DROP 从 71.37 掉到 68.17(−3.20)</b> 是最大的一处退让。</span>
+          <span class="pgref">报告 p.11</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>第二个方向是"连接方案本身"的选择。论文把 KV Bridging 与 <b>KV Mirror</b>(Liu et al., 2026)在同一条 hybrid backbone、同一套预训练配方下对比:</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5:预训练过程中 KV Bridging 与 KV Mirror 的 RULER 分数曲线">
+    <figcaption>
+      <b>Figure 5:</b> KV Bridging versus KV Mirror during pretraining. KV Bridging achieves higher RULER scores.
+      <span class="zh">横轴是训练 token 数(0–500B),纵轴 RULER 分数。两种方案的差别在<b>配对方式</b>:KV Mirror 用 U 型连接,把早层与晚层反序配对($1 \rightarrow n$、$2 \rightarrow n-1$ ……);KV Bridging 则只连 self-decoder 与 cross-decoder 里的<b>全注意力层</b>。两者都通过重投影源隐状态来构造目标的 KV 表示。曲线显示 KV Bridging 在训练的大部分时间里更强,终点 <b>87.65 vs 81.28</b>。论文给出的假设是:<b>全注意力层的隐状态是更好的来源</b>,因为全注意力的梯度会经由注意力分数回传到整个可见上下文,而 SWA 把这些直接连接限制在局部窗口内;这种更密集的监督产生的表示,保留了更多可供投影的全局信息。<i>这是一个机理性假设,论文未给出验证该假设的额外实验。</i></span>
+          <span class="pgref">报告 p.11</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>三组消融合起来说明:</b>token 级选择在<b>同一预算下</b>换到更好的检索(7.1);强制窗口以约 5 分的 GSM8K / MRCR-v2 换取结构上的可提前退出(7.2);KV Bridging 本身几乎不伤质量,且在 290B 规模上仍然成立(7.3)。换言之,"prefill 跑半个模型"这个最大收益<b>不是靠牺牲质量换来的</b> —— 真正付出精度代价的是 7.2 那一步。</div>
+</section><!-- ============ s8 点评 ============ -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">点评:亮点、局限与要留意的账</h2>
+
+  <h3>亮点</h3>
+  <ul class="tight">
+    <li><b>论证是闭合的,不是技巧堆叠。</b>论文没有停在"我们省了 FLOPs",而是把因果链走完:独立 SWA 分支 → 依赖 cross-decoder 自身隐状态 → 级联依赖使 token 后缀随深度增长 → cross-decoder 无法跳过 → 因此必须把局部性改写成"选择集合的固定成员"。这个次序让"prefill 只跑半个模型"成为可推导的结论,而不是一句断言。</li>
+    <li><b>消融的控制条件干净。</b>7.1 的两组做到同 backbone、同 1,024 全局预算、同 128 局部窗口,只动选择单位;7.2 的三组共享 backbone、KV Bridging 与 self-decoder,只动 cross-decoder 的局部性处理方式。这类"一次只动一个变量"的对照在小节里并不多见。</li>
+    <li><b>关键机制在更大规模上复验。</b>KV Bridging 的消融放在 290B-A8B / 约 1.8T tokens 上做,而不是只在 80B 上 —— 架构类论文里这一步常被省略。</li>
+    <li><b>对参照基线足够诚实。</b>论文明确写出"每层全注意力是最强参照""Hybrid SWA 需要 9 个全注意力层,更少会明显掉精度""HySparse2 在 DROP 上不如 HySparse",没有回避反向结果。</li>
+    <li><b>架构约束与部署约束讲的是同一套语言。</b>prefill 节点只装 25 层、因为投影后的 KV 比源隐状态小所以传 KV —— 设计决策直接对应到部署决策,读者能算出它值多少钱。</li>
+    <li><b>留了可测的下一步。</b>提出在 <abbr title="Full Attention,全注意力">FA</abbr> 层减少 query 头数、在 <abbr title="Sparse Attention,稀疏注意力">SA</abbr> 层增加 query 头数,把计算进一步推向稀疏端 —— 这是一个明确、可证伪的方向。</li>
+  </ul>
+
+  <h3>局限与读时要注意的账</h3>
+  <ul class="tight">
+    <li><b>"broadly comparable" 的真实内容。</b>Table 2 里 HySparse2 相对 HySparse 在 DROP 上低 4.79 分、GSM8K 低 2.20、MATH 低 1.82、WinoGrande 低 2.37;相对 Hybrid SWA 在 MBPP+ 上低 2.91、DROP 低 1.91。通用能力的代价主要落在推理与代码类任务上,论文只用"a mixed picture"一句概括。</li>
+    <li><b>精度代价集中在它自己主推的指标上。</b>7.2 显示 Forced SWA 相比 Gated SWA 在 MRCR-v2 上低 4.99 分、GSM8K 低 5.08 分、LongPPL 差 1.50%。而 MRCR-v2 正是本文用来证明检索更强的两个核心指标之一,GSM8K 又属推理能力。论文称这个交换可接受,理由是把"参数与本地 KV cache"换成了"可提前退出",但读者需要自己判断这笔交易是否划算。</li>
+    <li><b>粒度消融里的反向结果未被讨论。</b>Table 3 中 NoLiMa(40.27 vs 38.43)与 BBH(61.93 vs 60.70)都是 block 级更好,正文未提及这两项。</li>
+    <li><b>KV cache 优势里混着 head 配置的功劳。</b>HySparse2 用 MQA 64/1 而两个 baseline 用 GQA 64/4(Table 1),因此 6.4 节的体积优势并非纯粹来自跨层共享。论文未提供同为 MQA 或同为 GQA 的分离对照。按本页推算,若忽略 head 配置差异,"5 层 FA 对 9 层 FA"只能解释 $9/5 = 1.8\times$,而非观测到的 4.49×。</li>
+    <li><b>消融的上下文长度与动机不匹配。</b>7.1 的动机是长程多轮的 agentic 检索,但消融只在 32k 训练上下文内做(论文自己也写明 "These gains are present within the 32k training context")。256k 下的同一对照仍待补测。</li>
+    <li><b>成本全是账面量。</b>全文的成本结论建立在 FLOPs 与 KV cache 字节数上,<b>没有端到端的吞吐或时延实测</b>;token 级稀疏声称的 kernel 效率优势同样没有实测支撑。5.2 的推测解码部分是一条可能性论证,论文明确标注为未来工作。</li>
+    <li><b>部分指标不可跨论文比较。</b>AgentPPL 与 Repo Code PPL 是内部基准;LongPPL 使用了 349 个样本的具体选法、MRCR-v2 的 needle 组合方式,论文只给了粗粒度描述。这些数字在本篇内部对照是有效的,但不宜直接与其他论文的同类指标并列。</li>
+  </ul>
+
+  <h3>技术来源一览</h3>
+  <p class="muted">本页把论文正文里出现的技术来源按组件整理成一张表,便于看清"哪些是这一代新做的、哪些是继承并改造的"。</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>技术来源与改造一览(据论文行内引用整理,非论文原表)</caption>
+    <thead><tr><th>组件 / 决定</th><th>论文标注的上游</th><th>这一代的改造</th></tr></thead>
+    <tbody>
+      <tr><td>双解码器骨架 + prefill 提前退出</td><td>YOCO(Sun et al., 2024);Gemma 3n 的相关跨层共享(Sanseviero and Ballantyne, 2025)</td><td>KV Bridging <b>只连全注意力层</b>,允许两个 decoder 用不同混合比例,一个 self-decoder FA 层供给 4 个 cross-decoder FA 层</td></tr>
+      <tr><td>hybrid block 内的跨层 KV / 索引共享</td><td>HySparse(Gao et al., 2026)</td><td>保留为内层 KV Reuse;选择单位由 64-token block 改为<b>单个 token</b></td></tr>
+      <tr><td>无独立 indexer 的 oracle 选择</td><td>HySparse(Gao et al., 2026);对照路线:SeerAttention(Gao et al., 2024)、DeepSeek-AI et al. (2025)</td><td>对单 token 做 top-$k$;<b>不需要蒸馏 auxiliary indexer</b>,端到端原生训练</td></tr>
+      <tr><td>局部性处理</td><td>HySparse 的独立 gated SWA 分支(Gao et al., 2026)</td><td><b>删除该分支</b>,改为把最近 128 token 强制纳入稀疏选择;局部性由共享 KV cache 提供</td></tr>
+      <tr><td>被明确否定的替代方案</td><td>bounded replay(DeepSeek-AI, 2026)</td><td>不用近似,而是<b>从结构上消除</b> cross-decoder 对自身隐状态的依赖</td></tr>
+      <tr><td>token 级稀疏的 kernel 可行性</td><td>TileLang(Wang et al., 2025)</td><td>以此论证 token 级选择在工程上已经可行</td></tr>
+      <tr><td>KV head 配置</td><td>MQA(Shazeer, 2019);GQA(Ainslie et al., 2023)</td><td>改用 <b>MQA 64/1</b>(baseline 为 GQA 64/4),换更小 KV cache 与更好的 token 稀疏 kernel 效率</td></tr>
+      <tr><td>位置编码</td><td>RoFormer / 部分 RoPE(Su et al., 2024);NoPE</td><td>SWA 层用 64 维部分 RoPE(base 10,000);全与稀疏层用 <b>NoPE</b> → 长上下文扩展不需调 RoPE</td></tr>
+      <tr><td>注意力后处理</td><td>sigmoid 输出门(Qiu et al., 2025);per-head sink bias(Agarwal et al., 2025)</td><td>所有稀疏层与 SWA 层统一使用</td></tr>
+      <tr><td>骨干与残差</td><td>mHC(Xie et al., 2026;Zhu et al., 2025)</td><td>简化变体,残差混合矩阵<b>固定为单位阵</b></td></tr>
+      <tr><td>优化与日程</td><td>Muon(Jordan et al., 2024)</td><td>WSD 日程;峰值学习率 $10^{-3}$(预训练)/ $5\times10^{-5}$(后训练)</td></tr>
+      <tr><td>跨层连接方案对照</td><td>KV Mirror 的 U 型配对(Liu et al., 2026)</td><td>改为<b>只连全注意力层</b>;论文报告终值 RULER 87.65 vs 81.28</td></tr>
+      <tr><td>推测解码 / MTP</td><td>DFlash(Chen et al., 2026);异步起草与验证(Zhang et al., 2025)</td><td>MTP 层条件在 <b>self/cross 边界隐状态</b>上;换更大 drafter 属未来工作</td></tr>
+      <tr><td>长上下文似然指标</td><td>LongPPL(Fang et al., 2024)</td><td>沿用;AgentPPL 为本文内部基准</td></tr>
+      <tr><td>评测集</td><td>MRCR(Vodrahalli et al., 2024);RULER-v2(Hsieh et al., 2025);GraphWalks(OpenAI, 2025);NoLiMa(Modarressi et al., 2025)</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">引用为论文行内标注口径,本页未逐条核对参考文献条目。</p>
+
+  <h3>未披露、值得补测的点</h3>
+  <ul class="tight">
+    <li><b>token score 的算法。</b>论文说全注意力层用"精确注意力分数"为后续稀疏层提供 oracle 选择,Figure 2 也只标注 "token scores" 与 "Token Top-k"。但<b>跨 query 位置、跨 query 头如何聚合成每个 KV token 的单一分数</b>(用哪种统计量、是否只取特定 query、是否做额外归一)未见披露 —— 这直接决定 indexer 的开销,也是复现时的第一个卡点。</li>
+    <li><b>端到端吞吐与时延。</b>全文只给 FLOPs 与 KV cache 字节数(全文检索未见 throughput / latency / TTFT 等字样),值得补一组真实 kernel 上的 prefill 时延与 decode 吞吐,尤其是在 1M 上下文、prefill 节点只装 25 层的分离式部署下。</li>
+    <li><b>prefill → decode 的 KV 传输开销。</b>论文选择在 prefill 节点算出 cross-decoder FA 的 KV 再传给 decode 节点,理由是"投影后的 KV 比源隐状态小"。传输量、带宽受限时的实际收益、以及它与"prefill 只装 25 层"的<b>联合</b>收益,均未见量化。</li>
+    <li><b>强制窗口的敏感性。</b>窗口固定 128、全局 1,024,论文未给窗口大小与预算的敏感性扫描。考虑到 Forced SWA 在 MRCR-v2 上比 Gated SWA 低 4.99 分,值得试更长的窗口、或窗口内加门的变体,看能否把这一项补回来。</li>
+    <li><b>256k 上的粒度消融。</b>token vs block 的对照只在 32k 训练上下文内完成,而设计的动机是 256k 的多轮 agentic 检索;把同一对照搬到长上下文、并复现 Table 3 中 NoLiMa 与 BBH 的反向结果,是判断"token 级是否普遍更优"的关键一步。</li>
+    <li><b>分离 head 配置与跨层共享的贡献。</b>值得补一组"同为 MQA"或"同为 GQA"的对照,把 KV cache 与 kernel 效率的收益拆成"跨层共享"与"KV head 数"两部分。</li>
+  </ul>
+
+  <div class="note"><b>一句话总评:</b>如果只看摘要,这是一篇"又快又省又准"的架构论文;但把表格里的反向数字读完,它更像一篇<b>把成本账算得很细、把精度代价交代得不够充分</b>的系统论文。它的核心贡献 —— 用"强制局部窗口"消灭独立 SWA 分支,从而让 prefill 真正能退出 —— 是扎实且可复用的结构性洞察;而"通用能力大致可比"这个结论,在推理与代码类任务上留有可观测的缺口。</div>
+</section>
+
+<!-- ============ s9 术语速查 ============ -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写可随时回到这里;正文里带虚线下划线的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>本页术语表(按主题分组,解释为本页据原文的归纳)</caption>
+    <thead><tr><th>缩写 / 术语</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>FA</td><td>Full Attention</td><td>全注意力:每个 query 可以看到全部历史,精度最高、成本最高;本文中只有 5 层</td></tr>
+      <tr><td>SWA</td><td>Sliding-Window Attention</td><td>滑窗注意力:只关注最近固定窗口,负责局部建模;本文 self-decoder 有 24 层</td></tr>
+      <tr><td>SA</td><td>Sparse Attention</td><td>稀疏注意力:每个 query 只关注被选中的一部分 KV 条目;本文 cross-decoder 有 20 层</td></tr>
+      <tr><td>KV Bridging</td><td>—</td><td>本文外层共享:cross-decoder 的 FA 层用 self-decoder FA 层的输入隐状态,经各自投影构造自己的 K/V</td></tr>
+      <tr><td>KV Reuse</td><td>—</td><td>本文内层共享:同一 hybrid block 里,SA 层复用 FA 层的 KV cache 与选择索引</td></tr>
+      <tr><td>KV Mirror</td><td>—</td><td>对照的跨层连接方案:早层与晚层反序 U 型配对($1 \rightarrow n$、$2 \rightarrow n-1$);Figure 5 中 RULER 低于 KV Bridging</td></tr>
+      <tr><td>hybrid block</td><td>—</td><td>本文中指 "FA + SA×5" 这样一段混合注意力的层组;cross-decoder 由 4 组构成</td></tr>
+      <tr><td>cascading SWA dependency</td><td>—</td><td>级联 SWA 依赖:独立 SWA 分支的 KV 需要自己的隐状态后缀,而该后缀又依赖更早层,所需长度随深度线性增长 —— 这是 cross-decoder 不能跳过的根因</td></tr>
+      <tr><td>block-level / token-level</td><td>—</td><td>稀疏选择的粒度:以 64 token 的块为单位,还是以单个 token 为单位。本文从前者改为后者</td></tr>
+      <tr><td>forced local window</td><td>—</td><td>强制局部窗口:把最近 128 个 token 无条件纳入稀疏选择集合,替代独立的 SWA 分支</td></tr>
+      <tr><td>indexer</td><td>—</td><td>索引器:预测哪些 KV 值得被选中的模块。本文由 FA 层兼任,无需单独训练</td></tr>
+      <tr><td>oracle token selection</td><td>—</td><td>用精确注意力分数(而非近似模块)给出的选择信号</td></tr>
+      <tr><td>gated fusion</td><td>—</td><td>门控融合:HySparse 把稀疏注意力与独立 SWA 分支的输出按门控加权合并;HySparse2 取消了这一结构</td></tr>
+      <tr><td>sink bias</td><td>—</td><td>可学习的 per-head 偏置,缓解注意力汇聚(attention sink)现象</td></tr>
+      <tr><td>YOCO</td><td>You Only Cache Once</td><td>用 self-decoder 构造一份全局 KV cache 供 cross-decoder 复用的架构;prefill 可在 self-decoder 后退出</td></tr>
+      <tr><td>MQA / GQA / MLA</td><td>Multi-Query / Grouped-Query / Multi-head Latent Attention</td><td>三种 head 维 KV 压缩方式:全部 query 头共享 1 组 KV / 分组共享 / 压进隐状态。本文 HySparse2 用 MQA 64/1</td></tr>
+      <tr><td>RoPE / NoPE</td><td>Rotary / No Positional Embedding</td><td>旋转位置编码 / 不用显式位置编码。本文仅 SWA 用 64 维部分 RoPE</td></tr>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>混合专家;80B-A3B 指总参数 80B、每 token 激活约 3B</td></tr>
+      <tr><td>mHC</td><td>Manifold-constrained Hyper-Connections</td><td>残差连接的一种改造;本文用简化变体,残差混合矩阵固定为单位阵</td></tr>
+      <tr><td>MTP</td><td>Multi-Token Prediction</td><td>多 token 预测层,可作推测解码的 drafter;本文条件在 self/cross 边界隐状态上</td></tr>
+      <tr><td>Prefill / Decode</td><td>—</td><td>推理的两个阶段:对已有输入做一次前向建 KV cache / 逐 token 自回归生成</td></tr>
+      <tr><td>Prefill–Decode Disaggregation</td><td>—</td><td>把两阶段拆到不同节点,各自按资源特征优化;本文 prefill 节点只需装 25 层</td></tr>
+      <tr><td>FP8</td><td>8-bit Floating Point</td><td>本文 KV cache 体积数字的精度口径(1 字节/元素)</td></tr>
+      <tr><td>GFLOPs / token</td><td>—</td><td>每 token 的十亿次浮点运算数,prefill 计算量的度量</td></tr>
+      <tr><td>PPL</td><td>Perplexity</td><td>困惑度,越低越好;AgentPPL / LongPPL / Repo Code PPL 为三种不同口径</td></tr>
+      <tr><td>AgentPPL</td><td>—</td><td>本文内部基准:对 1,000 条多轮 agent 轨迹的 reasoning / tool-call / response 三段报告 byte perplexity</td></tr>
+      <tr><td>LongPPL</td><td>—</td><td>只在依赖长程上下文的被选 token 上算 perplexity(Fang et al., 2024);本文用 349 个样本</td></tr>
+      <tr><td>needle</td><td>—</td><td>检索评测里埋进长文档的"针";MRCR-v2 用 2/4/8 needle 的多轮设置</td></tr>
+      <tr><td>RULER / RULER-v2</td><td>—</td><td>长上下文基准;v2 覆盖 12 个检索与问答子任务</td></tr>
+      <tr><td>MRCR-v2</td><td>—</td><td>多轮检索基准(Vodrahalli et al., 2024 的 MRCR 后续口径)</td></tr>
+      <tr><td>GraphWalks</td><td>—</td><td>多跳图遍历评测(OpenAI, 2025),探测跨段落的多步推理式检索</td></tr>
+      <tr><td>bounded replay</td><td>—</td><td>一种用有限长度重放来近似所需隐状态的方法;本文选择从结构上避免它的需要</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2609.26368v1《HySparse2: Hybrid Sparse Attention with Two-Level KV Sharing》(LLM-Core, Xiaomi)的人工精读笔记。<br>
+    全部 5 张 Figure 与 5 张 Table 均以 300 DPI 从论文原文提取、按比例完整展示(未裁剪);解读与「整理 / 推算」标注为编者内容,请以论文原文为准。<br>
+    原文:<a href="https://arxiv.org/abs/2609.26368">arXiv:2609.26368</a> · English edition:<a href="en.html">Read in English</a><br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

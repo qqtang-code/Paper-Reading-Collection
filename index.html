@@ -149,8 +149,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>7</b> 篇</span><span class="i18n-en"><b>7</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>63</b> 图 + <b>73</b> 表</span><span class="i18n-en"><b>63</b> figures + <b>73</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>8</b> 篇</span><span class="i18n-en"><b>8</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>68</b> 图 + <b>78</b> 表</span><span class="i18n-en"><b>68</b> figures + <b>78</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -224,6 +224,26 @@
       <div class="go">
         <a class="i18n-zh" href="attention-kv-cache/elastic-attention/">开始阅读 →</a>
         <a class="i18n-en" href="attention-kv-cache/elastic-attention/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">混合稀疏注意力 · 两级 KV 共享 · 长上下文 · Agentic</span><span class="i18n-en">Hybrid Sparse Attention · Two-Level KV Sharing · Long Context · Agentic</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/hysparse2/">⑧ HySparse2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">两级 KV 共享的混合稀疏注意力</span></a>
+        <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">⑧ HySparse2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Hybrid Sparse Attention with Two-Level KV Sharing</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">把"局部性"从一条需要自身隐状态的独立 SWA 分支,改写成"最近窗口永远入选"的固定选择——cross-decoder 从此不再依赖自己的逐层隐状态,<b>prefill 只要跑完半个模型就能退出</b>。1M 上下文 prefill FLOPs 降 <b>2.92×/5.02×</b>、KV cache 压到 <b>2.69 GB</b>,后训练检索 MRCR-v2 <b>+11.30</b>、RULER-v2 <b>+19.81</b> 个百分点。</span>
+        <span class="i18n-en">Rewrites locality from a branch needing its own hidden states into "the recent window is always selected", so the cross-decoder no longer depends on its own layer-by-layer hidden suffix — <b>prefill can exit after half the model</b>. At 1M context: prefill FLOPs down <b>2.92×/5.02×</b>, KV cache down to <b>2.69 GB</b>, post-training retrieval up <b>+11.30</b> MRCR-v2 and <b>+19.81</b> RULER-v2 points.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">5 图 5 表</span><span class="i18n-en">5 figures · 5 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.26368">2609.26368</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/hysparse2/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">Read in English →</a>
       </div>
     </div>
 

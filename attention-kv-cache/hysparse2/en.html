@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HySparse2 deep-read: a hybrid sparse attention architecture with two-level KV sharing — KV Bridging across the self/cross-decoder plus KV Reuse inside each hybrid block. Every figure and table embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, HySparse2, sparse attention, KV cache, YOCO, long context, agentic, Xiaomi LLM-Core">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · HySparse2: Two-Level KV Sharing">
+<meta property="og:description" content="An illustrated English deep-read of HySparse2: KV Bridging and KV Reuse, token-level sparsity with a forced local window, and why prefill can exit after half the model.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · HySparse2: Hybrid Sparse Attention with Two-Level KV Sharing</title>
+<style>
+  /* ===== Illustrated deep-read styles (paper-reading-html skill v2) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:900px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:860px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    table.data tr{break-inside:avoid}
+    table.data thead{display:table-header-group}
+    section{break-inside:auto}
+    h2.sec,h3,h4{break-after:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">HySparse2<span> · notes</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Rationale</a>
+      <a class="jump" href="#s4">Method</a>
+      <a class="jump" href="#s5">Systems</a>
+      <a class="jump" href="#s6">Experiments</a>
+      <a class="jump" href="#s7">Ablations</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文精读版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark/light" title="Toggle dark/light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.26368v1 [cs.CL]</div>
+    <h1>HySparse2: Hybrid Sparse Attention with Two-Level KV Sharing</h1>
+    <div class="subtitle">Pushes cross-layer KV sharing from inside a hybrid block all the way up to the self-decoder / cross-decoder boundary — and removes the separate local-attention branch entirely, so prefill can stop after half the model.</div>
+    <div class="meta">
+      <span>Authors: Jianyu Wei*, Yizhao Gao*, Qihao Zhang, Shimao Chen, Zhengju Tang, Yu Cheng, Shengjie Zhou, Zihan Jiang, Yifan Song, Hailin Zhang, Liang Zhao, Bo Yang, Gang Wang, Shijie Cao⋄, Fuli Luo⋄,† (*equal contribution, ⋄corresponding, †team lead)</span>
+      <span>Affiliation: LLM-Core, Xiaomi</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2609.26368">arXiv:2609.26368</a></span>
+      <span>Posted: 2026-09-22</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Sparse attention</span><span class="pill">KV-cache compression</span><span class="pill">Long context</span>
+      <span class="pill">Agentic inference</span><span class="pill">Early-exit prefill</span><span class="pill">MoE</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents (exhibits appear inline, in narrative order — not in a separate gallery)</h2>
+  <ol>
+    <li><a href="#s1">Overview: the one-liner and the key numbers</a></li>
+    <li><a href="#s2">Background: prefill, the four KV axes, selection granularity</a></li>
+    <li><a href="#s3">Design rationale: three trade-offs</a></li>
+    <li><a href="#s4">Method: what two-level KV sharing actually shares</a></li>
+    <li><a href="#s5">Inference system: disaggregation and speculative decoding</a></li>
+    <li><a href="#s6">Experiments: setup, pretraining, post-training, cost</a></li>
+    <li><a href="#s7">Ablations: granularity, local window, KV Bridging</a></li>
+    <li><a href="#s8">Commentary: strengths, limits, lineage, what to test next</a></li>
+    <li><a href="#s9">Glossary (keep this open while reading)</a></li>
+  </ol>
+</nav>
+
+<!-- ============ s1 ============ -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview</h2>
+
+  <p class="lead">The paper attacks a concrete engineering pain point. In long-horizon, multi-turn <abbr title="Agentic: the repeated loop of think → call a tool → read the observation back">agentic</abbr> inference the model's own actions are short, but the observations returned by tools (traces, documents, search results) are long. The context therefore becomes input-dominated: those new tokens must be <abbr title="Prefill: the single forward pass over the existing input that builds the KV cache">prefilled</abbr> efficiently, the historical KV cache has to stay small, and evidence from far back still has to be retrieved accurately.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">Model and depth</div><div class="v">80B-A3B MoE / 49 layers<small>hidden size 2,048; HySparse2 uses only 5 full-attention layers</small></div></div>
+    <div class="item"><div class="k">Prefill compute (1M tokens)</div><div class="v">↓2.92× / ↓5.02×<small>vs HySparse / Hybrid SWA, paper's figures</small></div></div>
+    <div class="item"><div class="k">KV cache (1M tokens, FP8)</div><div class="v">2.69 GB<small>HySparse 6.72 GB, Hybrid SWA 12.09 GB</small></div></div>
+    <div class="item"><div class="k">Retrieval gain after post-training</div><div class="v">MRCR-v2 +11.30 / RULER-v2 +19.81<small>percentage points vs HySparse</small></div></div>
+    <div class="item"><div class="k">Prefill deployment cost</div><div class="v">First 25 layers only<small>only the self-decoder is deployed; nearly half the memory</small></div></div>
+    <div class="item"><div class="k">Training recipe</div><div class="v">500B @32k + 100B<small>post-training extends context to 256k; Muon optimizer</small></div></div>
+  </div>
+
+  <p>In one sentence: HySparse2 = a <b>YOCO-style self-decoder / cross-decoder backbone</b> + <b>two-level KV sharing</b>. At the outer level, <b>KV Bridging</b> lets each cross-decoder full-attention layer project its own K/V from the <b>input hidden states</b> of a self-decoder full-attention layer. At the inner level, <b>KV Reuse</b> lets the sparse layers of a block reuse the full-attention layer's KV cache and selection indices. Together they mean <b>every KV cache in the cross-decoder can be built from self-decoder hidden states</b>, so once prefill has built those caches it can exit — never running the cross-decoder's 24 layers.</p>
+
+  <p>The paper's four figures split into two threads, quality and cost. Here is the overall picture:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: HySparse2 compared on long-context quality, prefill compute, and KV-cache storage">
+    <figcaption>
+      <b>Figure 1:</b> HySparse2 delivers better long-context performance at lower prefill cost and smaller KV-cache storage.
+      <span class="ex">Four panels: quality on the left, cost on the right. <b>Top-left, RULER-v2</b>: HySparse2 eases from ~71 at 16k down to ~59 at 256k, while both baselines fall below 55 after 32k and keep sliding — the gap widens with length. <b>Bottom-left, AgentPPL</b>: all three rise with length (more distractors in longer multi-turn trajectories), but HySparse2 hugs the lowest line across 64k–256k. <b>Top-right, prefill</b>: out to 1M, Hybrid SWA is steepest (~200 GFLOPs/token), HySparse in the middle (~115), and HySparse2 nearly flat at ~40. <b>Bottom-right, KV cache</b>: same ordering, roughly 12 GB / 6.7 GB / 2.7 GB at 1M. <i>Panel values are read off the plot and are approximate; the paper gives exact values only for the headline points.</i></span>
+          <span class="pgref">Report p.1</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image for the full-resolution original (300 DPI); click again or press Esc to close.</p>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page follows the paper; anything this page derives, aggregates, or converts is flagged <b>[organized]</b> or <b>[estimated]</b> so it can be told apart from the paper's own figures. Notation follows the paper: $L$ is the total layer count, $H_i^{\text{self}}$ the input hidden states of self-decoder layer $i$, $H_j^{\text{cross}}$ the input hidden states of cross-decoder layer $j$, and $k$ the top-$k$ budget. Inline citations for upstream methods use the paper's own attributions; I have not re-checked each reference entry.</div>
+
+  <div class="takeaway"><b>The one thing to remember:</b> the contribution is not "we saved more FLOPs". It is that <b>locality was rewritten from a branch that needs its own hidden states into "the recent window is always a member of the sparse selection set"</b>. That rewrite removes the cross-decoder's dependence on its own layer-by-layer hidden suffix, and that is what makes "prefill runs half the model" a structural property rather than an optimization.</div>
+</section>
+
+<!-- ============ s2 ============ -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Motivation</div>
+  <h2 class="sec">Background: three demands</h2>
+
+  <p>Section 2 of the paper lays out three threads of motivation, and every later design decision maps back onto one of them.</p>
+
+  <h3>2.1 Efficient prefill: cheaper attention is not enough</h3>
+  <p>Multi-turn agentic inference makes <abbr title="Inference: the model's forward computation, split into a prefill stage and a decode stage">inference</abbr> increasingly input-dominated — a single tool return can be orders of magnitude longer than the action that triggered it. The paper stresses one point: <b>reducing attention cost alone does not remove the cost of propagating those tokens through the whole backbone</b>. Even with a cheaper attention operator per layer, every layer's feed-forward still has to be computed.</p>
+  <p>Existing cross-layer KV sharing targets exactly this. <abbr title="You Only Cache Once: a decoder-decoder architecture where a self-decoder builds the global KV cache shared by the cross-decoder layers">YOCO</abbr> (Sun et al., 2024) uses a self-decoder to build one global KV cache that the cross-decoder reuses, so <b>prefill cache construction can exit after the self-decoder</b>. Gemma 3n (Sanseviero and Ballantyne, 2025) adopts related cross-layer KV sharing to improve prefill efficiency. HySparse (Gao et al., 2026) does cross-layer sharing <b>inside</b> each hybrid sparse block: every full-attention layer hands its global KV cache and top-$k$ block indices to the sparse layers after it — but, as the paper points out, <b>prefill still executes every layer</b>.</p>
+
+  <h3>2.2 The four axes of KV-cache compression</h3>
+  <p>The paper sorts KV-cache compression into four axes. The taxonomy is worth keeping, because it fixes which cell this work occupies:</p>
+  <ul class="tight">
+    <li><b>Head</b>: GQA/MQA let several query heads share KV heads (Ainslie et al., 2023; Shazeer, 2019), or MLA compresses KV into latent states (Liu et al., 2024a);</li>
+    <li><b>Sequence</b>: compress several tokens into fewer cache entries (DeepSeek-AI et al., 2026);</li>
+    <li><b>Layer</b>: share KV caches across layers (Brandon et al., 2024; Sun et al., 2024);</li>
+    <li><b>Precision</b>: lower the numerical precision of cached keys and values (Hooper et al., 2024; Liu et al., 2024b).</li>
+  </ul>
+  <p>The paper's read is that prior work concentrates on <b>intra-layer</b> compression along the head, sequence, and precision axes, while HySparse2 pushes the <b>layer</b> axis — and not just at one level, but at two simultaneously: KV Bridging outside and KV Reuse inside.</p>
+
+  <h3>2.3 Selection granularity: an inherent accuracy/efficiency trade-off</h3>
+  <p>Sparse attention restricts each query to a subset of KV entries (Child et al., 2019), and the <b>granularity of selection</b> sets the accuracy/efficiency balance. HySparse originally chose <abbr title="Block-level sparsity: the minimum selectable unit is a contiguous block (size 64 here) of tokens">block-level</abbr> selection as a pragmatic compromise: evaluations showed no substantial accuracy disadvantage, and the regular block structure is friendly to efficient kernels.</p>
+  <p>But the paper argues that modern agentic workloads are <b>long-horizon multi-turn trajectories</b> that need <b>precise</b> retrieval from a long history. Under those patterns block-level selection shows a pronounced accuracy disadvantage, while <abbr title="Token-level sparsity: the minimum selectable unit is an individual token">token-level</abbr> selection recovers relevant evidence more faithfully. At the same time, recent sparse-kernel progress (Wang et al., 2025) makes a token-level implementation practical. Together, those two facts justify the move from blocks to tokens.</p>
+
+  <div class="note"><b>Notice the shape of the argument:</b> the paper never claims block-level is worse on pretraining. It claims it is worse <b>under the agentic task shape</b>. The ablation in §4.3 exists to turn that claim into something measurable — and the paper adds its own qualifier: the gains are already visible <b>within the 32k training context</b>.</div>
+</section>
+
+<!-- ============ s3 ============ -->
+<section id="s3">
+  <div class="sec-no">03 · Design Rationale</div>
+  <h2 class="sec">Design rationale: three trade-offs</h2>
+
+  <p>Section 3 reads as three trade-offs. Understanding them matters more than memorizing the architecture diagram, because the second one is the <b>least replaceable</b> step in the whole paper.</p>
+
+  <h3>Trade-off 1: outer-level sharing happens only between full-attention layers</h3>
+  <p>KV Bridging draws a hard boundary: it is established <b>only between full-attention layers of the self-decoder and the cross-decoder</b> — never touching SWA layers or sparse layers. The wording next to Eq. (1) reflects this, with $(i, j)$ being a full-attention-to-full-attention pair. The immediate benefit: the two decoders can use <b>different hybrid ratios</b>, so one self-decoder full-attention layer can supply several cross-decoder full-attention layers (in Figure 2 below, one supplies four).</p>
+
+  <h3>Trade-off 2: remove the separate SWA branch and "force" the recent window into the selection</h3>
+  <p>This is the paper's central argument and deserves restating in full. HySparse's sparse layers carry a <b>separate gated SWA branch</b> for local modeling. The paper observes that if such a branch were kept in the cross-decoder, the cross-decoder would have to project <b>from its own hidden states</b> to build a window-sized suffix of its KV cache — and those hidden states in turn depend on the hidden states of earlier layers. The paper calls this the <b>cascading SWA dependency</b>: the required token suffix grows <b>linearly with depth</b>, far longer than the window itself.</p>
+  <p>That leaves two options: compute those states during prefill (which means the cross-decoder <b>cannot be skipped at all</b>), or approximate them with something like bounded replay (DeepSeek-AI, 2026). HySparse2 takes a third route and <b>removes the dependency by construction</b> — the most recent 128 tokens are forced into the sparse selection set, so locality is served by reusing the same full-attention KV cache and needs no hidden states of its own. The paper notes this also removes the parameter cost of the separate projections in the gated baseline.</p>
+
+  <div class="takeaway"><b>Why this step is irreplaceable:</b> it turns local modeling from a <b>branch that needs new hidden states</b> into a <b>fixed selection over an existing cache</b>. The former is depth-dependent and cannot be truncated at the half-model point; the latter depends only on what the full-attention layer already produced. That is exactly why prefill can exit early — not an engineering trick, a structural property.</div>
+
+  <h3>Trade-off 3: keep a few full-attention layers, and let them double as the indexer</h3>
+  <p>Both HySparse2 and HySparse keep a small number of full-attention layers, for two reasons. First, <b>full attention still matters for model quality</b>. Second, those layers serve as the <abbr title="Indexer: a module that predicts which tokens/KV entries are worth selecting">indexer</abbr>, using <b>exact attention scores</b> to provide oracle token selection for the following sparse layers. That buys a clean training property: <b>native end-to-end training with no separate indexer module and no auxiliary distillation objective to train one</b> — in contrast to the routes that distil an indexer (Gao et al., 2024; DeepSeek-AI et al., 2025).</p>
+  <p>Full attention is expensive though, so its share is kept low. The paper offers two future directions: approximate the retained full-attention layers in post-training with a lightweight indexer plus sparse attention; or shift the compute allocation further toward sparsity — for instance <b>reducing query heads in full-attention layers while increasing them in sparse-attention layers</b>. The paper also states a deployment fact: in HySparse2, <b>prefill KV-cache construction needs only one full-attention layer</b>.</p>
+
+  <div class="note"><b>[organized]</b> The three trade-offs interlock. Trade-off 2 is what makes the cross-decoder skippable; trade-off 1 is what lets one full-attention layer supply several; trade-off 3 uses very few full-attention layers to protect both quality and the selection signal. Each alone would be a local tweak — together they yield "prefill runs half the layers".</div>
+</section><!-- ============ s4 ============ -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">Method: what two-level KV sharing actually shares</h2>
+
+  <p>HySparse2 keeps YOCO's backbone: the model is split into a <b>self-decoder</b> and a <b>cross-decoder</b>, and both use hybrid attention. What differs is the recipe — the self-decoder mixes <b>full attention with sliding-window attention</b> for local modeling, the cross-decoder mixes <b>full attention with sparse attention</b> for global retrieval. Sharing happens on two levels: <b>KV Bridging</b> across the two decoders outside, and <b>KV Reuse</b> inside each hybrid block. The figure below draws both at once:</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: HySparse2's two-level KV sharing — overall architecture on the left, token-level sparse attention dataflow inside one block on the right">
+    <figcaption>
+      <b>Figure 2:</b> Two-level KV sharing in HySparse2. FA, SWA, and SA denote full attention, sliding-window attention, and sparse attention, respectively. Left: the overall architecture with KV Bridging between the self-decoder and cross-decoder. Prefill cache construction can exit after the self-decoder. Right: a HySparse2 block with token-level sparse attention and a forced local window. Through KV Reuse, SA layers reuse the block's FA KV cache and selection indices.
+      <span class="ex"><b>Left panel</b>, read bottom-up: Embedding → SWA×12 → FA → SWA×12 forms the self-decoder; the blue arrows (KV Bridging) fan out from the <b>input hidden states</b> of that single self-decoder FA layer to the cross-decoder's four FA layers; the red dashed line marks the <b>Prefill Exit</b>, drawn exactly where the self-decoder ends — the layers above it need not run during prefill. <b>Right panel</b> zooms into one hybrid block: the lower half is the FA layer, which first projects its own KV, then computes Full Attention to get token scores, passes them to Token Top-k to produce indices, and Token KV Selection uses those to pick KV entries, handing "KV + token indices" up to the sparse layer; the sparse layer reads queries through its own Q projection and runs Token Sparse Attention. The two strips of coloured cells visualize the selection: <b>green</b> cells are global tokens chosen by top-k, <b>amber</b> cells are the forced local window (anchored at the right end of the sequence), and <b>hollow</b> cells are unselected positions — the sparse layer and the full-attention layer read the same KV cache, they just see different subsets of it. <i>Colour semantics are this page's reading of the figure plus the prose.</i></span>
+          <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.1 Outer level: KV Bridging</h3>
+  <p>Take a pair of full-attention layers $(i, j)$, with $i$ in the self-decoder and $j$ in the cross-decoder. The paper defines the cross-decoder layer's K, V, and Q as:</p>
+
+  <div class="math">$$K_j^{\text{cross}} = \operatorname{Proj}_j^{K}\!\left(H_i^{\text{self}}\right),\qquad V_j^{\text{cross}} = \operatorname{Proj}_j^{V}\!\left(H_i^{\text{self}}\right),\qquad Q_j^{\text{cross}} = \operatorname{Proj}_j^{Q}\!\left(H_j^{\text{cross}}\right) \tag{1}$$</div>
+
+  <p>Three things matter in that equation. First, <b>the bridging source is $H_i^{\text{self}}$, the input hidden states of the self-decoder full-attention layer</b>, not its output — the annotation in Figure 2 reads "FA input hidden" for exactly this reason. Second, <b>K and V come from someone else's hidden states, but the projections are the layer's own</b>: layer $j$ owns $\operatorname{Proj}_j^{K}$ and $\operatorname{Proj}_j^{V}$, so even when several layers share one hidden-state source, each still constructs a distinct KV cache. Third, <b>Q still comes from the layer's own current hidden states</b>, $\operatorname{Proj}_j^{Q}(H_j^{\text{cross}})$ — the attention still relates this layer's tokens to the shared history.</p>
+
+  <p>Together these three points make "one self-decoder full-attention layer supplies several cross-decoder full-attention layers" unambiguous: what is supplied is the <b>source hidden states</b>, not already-projected K/V, so each layer can still keep its own KV representation.</p>
+
+  <h3>4.2 Inner level: two changes to KV Reuse</h3>
+  <p>HySparse2 makes two modifications to HySparse's KV Reuse, both described in §3.3.</p>
+
+  <h4>Change one: selection granularity moves from blocks to tokens</h4>
+  <p>The mechanism is direct: apply top-$k$ selection to <b>individual tokens</b> in the full-attention layers, and let the following sparse layers reuse the KV entries of those selected tokens. The motivation comes from §2.3 — long-horizon multi-turn agentic tasks need more precise retrieval. The ablation in §4.3 tests this explicitly.</p>
+
+  <h4>Change two: drop the separate SWA branch, force a local window instead</h4>
+  <p>Inside a block, the selection set is assembled from two parts: a <b>local window of the most recent tokens (always included)</b>, followed by the <b>highest-scoring tokens outside that window</b>. Both sets are read from the full-attention layer's KV cache and reused by the following sparse layers. The paper's configuration is <b>128 forced local tokens plus 1,024 global tokens</b> (that is, $k_{\text{local}} = 128$ and $k_{\text{global}} = 1024$).</p>
+  <p>It is worth lining up how the three models handle locality: Hybrid SWA uses a 128-token sliding window; HySparse selects 1,024 global tokens in 64-token blocks <b>plus</b> a separate 128-token SWA branch merged by gated fusion; HySparse2 simply places 128 tokens into the selection set.</p>
+
+  <h3>4.3 Mapping the configuration onto layer numbers [organized]</h3>
+  <p>The paper never prints a layer table, but matching Figure 2's boxes against the stated 49 layers gives a reading that explains a lot:</p>
+  <ul class="tight">
+    <li><b>self-decoder = 25 layers</b>: SWA×12 → FA → SWA×12, containing just <b>one full-attention layer</b>;</li>
+    <li><b>cross-decoder = 24 layers</b>: (FA + SA×5) repeated 4 times, i.e. <b>4 full-attention layers + 20 sparse layers</b>;</li>
+    <li>Total $25 + 24 = 49$ layers — 24 SWA, 20 SA, 5 FA — and the <b>FA total of 5 matches Table 1's "#Full = 5"</b>.</li>
+  </ul>
+  <p>Read together: the model has only 5 full-attention layers, and the single one in the self-decoder has to supply all four in the cross-decoder — that is what "different hybrid ratios, one-to-many bridging" looks like in the diagram; and of the 25 layers prefill must run, only one does full attention.</p>
+
+  <div class="note"><b>Section summary:</b> the two levels are not symmetric. <b>KV Bridging decides whether half the model can be skipped</b> (it moves the cross-decoder's KV source into the self-decoder); <b>KV Reuse decides whether sparse layers maintain a cache of their own</b> (they do not — they borrow the block's full-attention one). Token-level selection and the forced window decide <b>what the sparse layers can see</b>.</div>
+</section>
+
+<!-- ============ s5 ============ -->
+<section id="s5">
+  <div class="sec-no">05 · Inference System</div>
+  <h2 class="sec">Inference system: disaggregation and speculative decoding</h2>
+
+  <p>Section 3.5 translates the architectural property into a deployment plan. It is short but dense, and it decides what the design is actually worth in production.</p>
+
+  <h3>5.1 Prefill–decode disaggregation: the prefill node hosts half a model</h3>
+  <p>Under <abbr title="Prefill–Decode Disaggregation: serving prefill and token-by-token decode on separate nodes, each optimized for its own resource profile">prefill–decode disaggregation</abbr>, HySparse2's prefill node only has to host the <b>self-decoder plus the KV Bridging projections</b>. For the 49-layer model in Figure 2 that means <b>deploying only the first 25 layers and cutting the prefill node's memory requirement by nearly half</b>. And because the self-decoder's SWA-to-full-attention ratio is high, only 1 of those 25 layers does full attention.</p>
+  <p>One easily missed detail: the paper chooses to <b>compute the cross-decoder's full-attention KV caches on the prefill node</b> and transfer them to the decode nodes — because <b>the projected KV caches are smaller than the source hidden states</b>, so shipping KV beats shipping hidden states. That is a compute-for-bandwidth trade, and it also explains why KV Bridging uses per-layer projections rather than simply passing hidden states around.</p>
+
+  <h3>5.2 Speculative decoding: an MTP layer now, a larger drafter later</h3>
+  <p>During pretraining HySparse2 uses a <b>single <abbr title="Multi-Token Prediction: an extra head/layer that predicts several future tokens at once">MTP</abbr> layer</b> conditioned on the <b>hidden states at the self-decoder / cross-decoder boundary</b>, to aid convergence. In post-training that layer could be replaced by a larger <b>DFlash-style drafter</b> (Chen et al., 2026) conditioned on the same boundary hidden states. The paper notes these hidden states become <b>available early</b>, which could support asynchronous drafting and verification (Zhang et al., 2025).</p>
+  <p>The paper is careful to hedge, though: training the larger drafter and coordinating asynchronous execution with verification feedback <b>both remain future work</b>. In other words §5.2 is a design-possibility argument, not a demonstrated result.</p>
+
+  <div class="takeaway"><b>Calibrate this section carefully:</b> every cost number the paper reports is <b>a static account</b> — FLOPs and KV-cache bytes. The memory saved by disaggregated deployment and the availability of boundary hidden states to a drafter are <b>conditions for that account to be realized</b>, but the paper reports no end-to-end measured throughput or latency.</div>
+</section>
+
+<!-- ============ s6 ============ -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">Experiments: setup, pretraining, post-training, cost</h2>
+
+  <p>Evaluation has three parts — the overall comparison (model quality plus prefill FLOPs plus KV-cache size) and three ablations (sparse granularity, forced local window, KV Bridging). The organizing logic is clear: <b>token-level selection buys long-context accuracy, the forced window and KV Bridging buy prefill cost, and quality is required not to move</b>.</p>
+
+  <h3>6.1 Setup: three models differing only in attention design</h3>
+  <p>Unless stated otherwise the experiments use 80B-A3B MoE models: 49 Transformer layers, hidden size 2,048, and a simplified <abbr title="Manifold-constrained Hyper-Connections: a residual-connection variant; here the residual mixing matrix is fixed to the identity">mHC</abbr> variant (Xie et al., 2026; Zhu et al., 2025). <b>The only difference between the three models is the attention design:</b></p>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: configurations of the three attention designs — Hybrid SWA, HySparse, HySparse2">
+    <figcaption>
+      <b>Table 1:</b> Configurations of the three attention designs.
+      <span class="ex">Three rows and three columns carry the whole comparison's premises. <b>#Full</b>: Hybrid SWA keeps 9 full-attention layers; HySparse and HySparse2 keep only 5. The paper explains where 9 and 5 come from — full attention in every layer is the strongest reference, and a hybrid model's full-attention count is chosen to avoid a substantial accuracy gap from it; Hybrid SWA needs 9, because using fewer significantly degrades accuracy, whereas the HySparse family stays comparable with 5. <b>Heads (Q/KV)</b> is the easiest variable to overlook: both baselines use GQA at 64/4 while HySparse2 uses MQA at 64/1, and head dim (QK/V) goes from 192/128 to 256/256. The paper's stated reason for MQA is "a smaller KV cache and better token sparse attention kernel efficiency". <i>Keep this in mind when comparing KV-cache sizes — the accounting walkthrough in §6.4 uses it.</i></span>
+          <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>A few more configuration details are worth recording. Within HySparse2's self-decoder, the SWA layers use <b>partial <abbr title="Rotary Position Embedding">RoPE</abbr></b> (64 rotary dimensions, base 10,000) while the full and sparse attention layers use <b><abbr title="No Positional Embedding: no explicit positional encoding">NoPE</abbr></b> — which is why the paper stresses that HySparse2 <b>needs no RoPE adjustment for long-context extension</b>. Across all three configurations, every sparse and SWA layer uses <b>sigmoid output gates</b> (Qiu et al., 2025) and <b>learnable per-head sink biases</b> (Agarwal et al., 2025).</p>
+  <p>On training: pretraining runs about <b>500B tokens at a 32k context</b>; a light post-training stage adds roughly <b>100B tokens</b>, introduces agentic data into the mixture, and extends the context to <b>256k</b>. Within each stage all three models share the same data mixture and schedule. The <abbr title="Muon: an optimizer that applies orthogonalized updates to matrix parameters">Muon</abbr> optimizer (Jordan et al., 2024) with a WSD schedule, peak learning rates $10^{-3}$ for pretraining and $5\times10^{-5}$ for post-training. <b>The overall comparison reports both pretraining and post-training results; ablations report pretraining only.</b></p>
+
+  <p>Evaluation spans four families: knowledge (MMLU, MMLU-Redux, C-Eval, CMMLU, TriviaQA), reasoning (BBH, MATH, DROP, GSM8K, ARC-C, HellaSwag, WinoGrande), code (HumanEval+, MBPP+, Repo Code PPL) and long context (RULER, NoLiMa). <b>Repo Code PPL is an internal benchmark</b> reporting byte perplexity over long code repositories with cross-file dependencies, so it also probes long-context modeling. The post-training stage focuses on two groups: <b>multi-turn retrieval</b> (MRCR-v2, RULER-v2, GraphWalks) and <b>long-context likelihood</b> (AgentPPL, LongPPL). AgentPPL is an internal benchmark built from multi-turn agent trajectories, reporting byte perplexity on the reasoning, tool-call, and response segments of 1,000 trajectories; LongPPL (Fang et al., 2024) computes perplexity only on selected tokens that depend on long-range context, over 349 examples; MRCR-v2 (Vodrahalli et al., 2024) is multi-round retrieval with 2/4/8 needles; RULER-v2 (Hsieh et al., 2025) covers 12 retrieval and QA subtasks; GraphWalks (OpenAI, 2025) tests multi-hop graph traversal. Retrieval averages weight the reported context lengths <b>equally</b>.</p>
+
+  <h3>6.2 Pretraining: strongest on long context, a mixed account elsewhere</h3>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: pretraining performance of the three 80B-A3B models across knowledge, reasoning, code, and long context">
+    <figcaption>
+      <b>Table 2:</b> Pretraining performance of the 80B-A3B models. HySparse2 improves long-context performance while remaining broadly comparable to both baselines on general capabilities.
+      <span class="ex">Reading it as the paper summarizes: <b>it is best on the two long-context entries</b> — RULER 90.77 (5.88 above HySparse and the highest of the three), NoLiMa 49.76 (9.49 above HySparse, where Hybrid SWA manages only 30.13) — and its Repo Code PPL of 1.1570 is the lowest. <b>General capabilities are a mixed result</b>: HySparse2 is stronger on BBH (64.29) and MMLU-Pro (37.56), while HySparse holds an edge on DROP. <i>A caution from this page: the table also contains a batch of gaps the prose never itemizes. Against HySparse, DROP 58.99 vs 63.78 (−4.79), GSM8K 61.94 vs 64.14 (−2.20), MATH 34.32 vs 36.14 (−1.82), WinoGrande 71.82 vs 74.19 (−2.37), MMLU 63.92 vs 64.48. Against Hybrid SWA it is +2.44 on MMLU but lower on DROP (−1.91), GSM8K (−2.50), MATH (−1.86) and MBPP+ (−2.91).</i> "Broadly comparable" does hold, but the price is paid mostly on reasoning and code tasks — a reasonable expectation to carry into the rest of the paper.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>6.3 Post-training: ahead on four metrics at every length</h3>
+  <p>After the same light post-training stage of about 100B tokens, the picture gets much cleaner:</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: long-context performance after post-training — MRCR-v2, RULER-v2, AgentPPL and LongPPL">
+    <figcaption>
+      <b>Figure 3:</b> Long-context performance after a light post-training stage. HySparse2 achieves higher retrieval scores and lower perplexity than both baselines across all evaluated context lengths.
+      <span class="ex"><b>(a) MRCR-v2</b>: HySparse2 eases from about 39 at 8k to about 22 at 256k, staying above both baselines throughout; Hybrid SWA has a visible rebound at 64k (about 29) but apart from 32k stays below HySparse2. <b>(b) RULER-v2</b> is where the gap is widest: HySparse2 runs from about 72 at 16k to about 58 at 256k, while both baselines slide steadily after 16k and end near 35 and 33 — the paper's exact values at 256k are <b>58.45 vs 32.61 (HySparse) vs 35.74 (Hybrid SWA)</b>. <b>(c) AgentPPL</b>: all three rise with length, HySparse2 lowest. <b>(d) LongPPL</b>: all three <b>fall</b> with length, HySparse2 again lowest. Note that (c) and (d) move in opposite directions — the paper explains this as two opposing effects of longer context: a longer context exposes more relevant information for LongPPL's key tokens, but also introduces more intervening turns and tool outputs, making the evidence harder to retrieve in multi-turn trajectories. That is how "AgentPPL up, LongPPL down" can both be true. <i>Panel values are read off the plots.</i></span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+
+  <p>The paper's headline averages: relative to HySparse, mean <b>MRCR-v2 +11.30</b> and <b>RULER-v2 +19.81</b> points; relative to Hybrid SWA, <b>+6.44</b> and <b>+18.65</b>. HySparse2 also achieves lower AgentPPL and LongPPL across the whole evaluated range, so the retrieval gains come <b>together with</b> better likelihood on long agent trajectories and on context-dependent tokens.</p>
+
+  <h3>6.4 Cost: prefill FLOPs and KV cache</h3>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: prefill compute and KV-cache size for the 80B-A3B models, from 1k to 1M tokens">
+    <figcaption>
+      <b>Figure 4:</b> Prefill computation and KV-cache storage for the 80B-A3B models. HySparse2 reduces both costs relative to HySparse and Hybrid SWA.
+      <span class="ex">Both panels run from 1k to 1M tokens with an FP8 KV cache. <b>Left, prefill FLOPs.</b> HySparse2 grows the slowest and flattens at roughly 40 GFLOPs/token by 1M, against about 115 for HySparse and about 200 for Hybrid SWA — consistent with the paper's stated ratios of 2.92× (vs HySparse) and 5.02× (vs Hybrid SWA). <b>Right, KV-cache size.</b> At 1M, HySparse2 is <b>2.69 GB</b>, HySparse <b>6.72 GB</b>, Hybrid SWA <b>12.09 GB</b>. Both curves are essentially linear at 1M — resident cache grows linearly with sequence length, while window-shaped caches are a constant term. <i>Left-panel values are read off the plot; the three right-panel values come from the paper's prose.</i></span>
+          <span class="pgref">Report p.9</span>
+    </figcaption>
+  </figure>
+
+  <h4>The KV-cache account, item by item [estimated]</h4>
+  <p>The paper gives three totals and no breakdown. But Table 1's KV-head configuration is enough to re-derive them, and the result happens to confirm an important design claim:</p>
+  <ul class="tight">
+    <li><b>KV bytes per token per layer</b> = KV heads × (head dim K + head dim V) × 1 byte (FP8);</li>
+    <li>HySparse2 (MQA 64/1, head dim 256/256): $1 \times (256+256) = 512$ bytes per layer per token; with 5 FA layers → <b>2,560 bytes/token</b>;</li>
+    <li>HySparse (GQA 64/4, head dim 192/128): $4 \times (192+128) = 1{,}280$ bytes per layer per token; 5 FA layers → <b>6,400 bytes/token</b>;</li>
+    <li>Hybrid SWA (same GQA configuration): 1,280 bytes per layer per token; 9 FA layers → <b>11,520 bytes/token</b>.</li>
+  </ul>
+  <p>Multiplying by 1M tokens gives <b>2.56 / 6.40 / 11.52 GB</b> against the paper's <b>2.69 / 6.72 / 12.09 GB</b>.</p>
+  <p>None of the three matches exactly, but all three are off by <b>the same factor (about 1.05×)</b> — which points to a uniform unit or bookkeeping convention rather than a structural difference. What actually carries information is the <b>pairwise ratios</b>: the derived $6{,}400/2{,}560 = 2.50$ and $11{,}520/2{,}560 = 4.50$ line up almost exactly with $6.72/2.69 = 2.50$ and $12.09/2.69 = 4.49$ computed from the paper's numbers.</p>
+  <p>That confirms two things. First, the three models' cache sizes are <b>essentially determined by "FA-layer count × KV-head configuration"</b>. Second, the sparse layers carry <b>no resident KV cache at all</b> — they really do read the block's full-attention cache, which is exactly the accounting effect KV Reuse is supposed to produce. It also makes clear that part of HySparse2's 2.50× advantage over HySparse comes from <b>the MQA change rather than from cross-layer sharing alone</b>: if KV heads were held at GQA 64/4, the FA-layer count difference on its own would explain only $9/5 = 1.8\times$.</p>
+
+  <div class="note"><b>[organized] Keep the three sources of savings apart.</b> ① The large <b>prefill-FLOPs</b> drop comes mostly from "skipping 24 cross-decoder layers" (KV Bridging). ② The multiple-<b>KV-cache</b> reduction comes from "sparse layers hold no cache" (KV Reuse) plus MQA plus fewer FA layers. ③ The <b>long-context accuracy</b> gain comes from token-level selection and the forced window. The mechanisms differ, the ablations test them separately, and none substitutes for another.</div>
+</section>
+
+<!-- ============ s7 ============ -->
+<section id="s7">
+  <div class="sec-no">07 · Ablations</div>
+  <h2 class="sec">Ablations: three questions, three controls</h2>
+
+  <p>The three ablations correspond to three design decisions, and all report <b>pretraining results only</b> (within the 32k training context). That matters for interpretation — especially for the first one, whose motivation is a 256k agentic scenario.</p>
+
+  <h3>7.1 Granularity: token-level vs block-level, same budget</h3>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: token-level versus block-level sparse selection after pretraining">
+    <figcaption>
+      <b>Table 3:</b> Token-level versus block-level sparse selection after pretraining. Token-level selection improves long-context retrieval and graph reasoning under the same attention budget.
+      <span class="ex">The control is tight: both variants use <b>the same backbone layout, the same 1,024 global-token budget, and the same 128-token local window</b>; the only variable is the selection unit (block size 64). <b>Token-level wins on retrieval and graph reasoning</b>: RULER-v2 49.56 → 56.13 (+6.57), 2-needle MRCR-v2 12.94 → 21.08 (+8.14), GraphWalks 29.38 → 34.92 (+5.55), and MMLU-Pro also improves from 35.74 to 36.97. <b>But block-level is better on two entries</b>: BBH 61.93 vs 60.70 and NoLiMa 40.27 vs 38.43. <i>The prose highlights the token-level gains and does not discuss these two reversals — worth entering into the account yourself.</i></span>
+          <span class="pgref">Report p.9</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>The paper's explanation of the gain deserves quoting in its own right: agent trajectories repeatedly interleave reasoning, tool calls, and returned observations, and the information needed for an answer may be spread across several turns together with <b>role delimiters and other special tokens</b> (those are what mark the relevant boundaries). Under a fixed budget, <b>selecting a whole block in order to keep one such token also spends capacity on its neighbours</b>; token-level selection can allocate that budget to individual positions across the context. The retrieval and graph-reasoning gains are consistent with that account.</p>
+
+  <h3>7.2 Local window: forced membership vs a separate branch</h3>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: three ways of handling local context inside sparse layers">
+    <figcaption>
+      <b>Table 4:</b> Local-attention ablation in sparse layers. Forced SWA remains competitive with Gated SWA.
+      <span class="ex">The three columns are: a separate gated 128-token SWA branch (<b>Gated SWA</b>), removing the local branch entirely (<b>No SWA</b>), and forcing the most recent 128 tokens into the sparse selection (<b>Forced SWA</b>). All three share the same backbone, KV Bridging, and hybrid SWA self-decoder — <b>they differ only in how the cross-decoder's sparse attention handles locality</b>. How to read it: <b>No SWA degrades broadly</b>, showing local information is necessary inside sparse attention; <b>Forced SWA takes the best RULER (89.84), RULER-v2 (55.98) and GraphWalks (37.13)</b>, and even edges Gated SWA on BBH with 62.25 against 62.23 (No SWA manages only 60.11), so it is competitive on several tasks. <b>But the cost is explicit</b>: GSM8K is 5.08 points lower (64.52 → 59.44), MRCR-v2 is 4.99 points lower (27.66 → 22.67), and LongPPL is 1.50% worse (6.8807 → 6.9838). The paper judges the trade acceptable because Forced SWA needs no extra projection parameters and no local KV cache, <b>which is what makes early-exit prefill feasible</b>. <i>Note that MRCR-v2 is one of the two retrieval metrics this paper leans on to prove its retrieval is stronger, and Forced SWA is clearly below Gated SWA there — a real opening in the "structure bought with accuracy" bargain.</i></span>
+          <span class="pgref">Report p.10</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>7.3 KV Bridging: is the prefill gain free?</h3>
+  <p>The key question is whether KV Bridging — designed mainly to accelerate prefill — costs quality. The paper tests it in two directions.</p>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: KV Bridging with and without, at 290B-A8B scale">
+    <figcaption>
+      <b>Table 5:</b> KV Bridging ablation at the 290B-A8B scale. Models with and without KV Bridging achieve broadly comparable quality.
+      <span class="ex">What makes this control valuable is its <b>scale</b>: not 80B but <b>290B-A8B, about 1.8T tokens, 32k context</b>, with and without KV Bridging trained separately. Result: MMLU 72.68 → 72.80 and TriviaQA 73.32 → 74.10 improve slightly; RULER moves by only 0.31 (96.32 → 96.01); Repo Code PPL is nearly unchanged (1.1351 → 1.1353); and <b>LongPPL actually improves</b> (3.6053 → 3.4202). On the cost side: BBH and GSM8K each drop about a point (70.65 → 69.57 and 77.63 → 76.65), and <b>DROP falls from 71.37 to 68.17 (−3.20)</b>, the largest single concession.</span>
+          <span class="pgref">Report p.11</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>The second direction is the connection scheme itself. The paper compares KV Bridging against <b>KV Mirror</b> (Liu et al., 2026) on the same hybrid backbone and pretraining recipe:</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: RULER score of KV Bridging versus KV Mirror during pretraining">
+    <figcaption>
+      <b>Figure 5:</b> KV Bridging versus KV Mirror during pretraining. KV Bridging achieves higher RULER scores.
+      <span class="ex">The x-axis is training tokens (0–500B) and the y-axis is RULER score. The two schemes differ in <b>pairing</b>: KV Mirror uses U-shaped connections pairing early and late layers in reverse order ($1 \rightarrow n$, $2 \rightarrow n-1$, …), whereas KV Bridging connects only the <b>full-attention layers</b> of the self-decoder and cross-decoder. Both form the target KV representations by re-projecting source hidden states. The curves show KV Bridging stronger for most of training, finishing at <b>87.65 vs 81.28</b>. The paper's stated hypothesis: <b>full-attention-layer states are better sources</b> because full attention backpropagates through the attention scores across the entire visible context, while SWA restricts those direct connections to a local window; that denser supervision produces representations retaining more global information for projection. <i>This is a mechanistic hypothesis; the paper offers no further experiment to verify it.</i></span>
+          <span class="pgref">Report p.11</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>What the three ablations jointly say:</b> token-level selection converts <b>the same budget</b> into better retrieval (7.1); the forced window trades about 5 points of GSM8K and MRCR-v2 for a structurally skippable decoder (7.2); KV Bridging itself costs almost nothing and still holds at 290B scale (7.3). In other words, the biggest prize — "prefill runs half the model" — <b>is not bought with quality</b>. The step that actually pays in accuracy is 7.2.</div>
+</section>
+
+<!-- ============ s8 ============ -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary: strengths, limits, and the accounts to watch</h2>
+
+  <h3>Strengths</h3>
+  <ul class="tight">
+    <li><b>The argument is closed, not a pile of tricks.</b> The paper does not stop at "we saved FLOPs"; it completes the causal chain: separate SWA branch → depends on cross-decoder's own hidden states → cascading dependency makes the token suffix grow with depth → the cross-decoder cannot be skipped → therefore locality must be rewritten as fixed membership in the selection set. That ordering makes "prefill runs half the model" a derivable conclusion rather than an assertion.</li>
+    <li><b>The ablation controls are clean.</b> §7.1 holds backbone, 1,024-token global budget, and 128-token local window fixed and moves only the selection unit; §7.2 shares backbone, KV Bridging and self-decoder and moves only how the cross-decoder handles locality. One-variable-at-a-time controls like these are not that common.</li>
+    <li><b>The key mechanism is re-verified at larger scale.</b> The KV Bridging ablation is run at 290B-A8B / ~1.8T tokens rather than only at 80B — a step architecture papers often skip.</li>
+    <li><b>Honest about its reference baselines.</b> The paper states plainly that full attention in every layer is the strongest reference, that Hybrid SWA needs 9 full-attention layers because fewer significantly degrades accuracy, and that HySparse2 trails HySparse on DROP. Reversals are not hidden.</li>
+    <li><b>Architectural constraints are expressed in deployment terms.</b> The prefill node hosts 25 layers; KV rather than hidden states is transferred because it is smaller — design decisions map directly onto deployment decisions, so a reader can price them.</li>
+    <li><b>It leaves a testable next step.</b> Reduce query heads in <abbr title="Full Attention">FA</abbr> layers and increase them in <abbr title="Sparse Attention">SA</abbr> layers to push compute further toward sparsity — a concrete, falsifiable direction.</li>
+  </ul>
+
+  <h3>Limits and accounts to watch</h3>
+  <ul class="tight">
+    <li><b>What "broadly comparable" actually contains.</b> In Table 2 HySparse2 is 4.79 points below HySparse on DROP, 2.20 on GSM8K, 1.82 on MATH and 2.37 on WinoGrande; against Hybrid SWA it is 2.91 below on MBPP+ and 1.91 on DROP. The general-capability cost lands mainly on reasoning and code tasks and is summarized in one sentence as "a mixed picture".</li>
+    <li><b>The accuracy cost concentrates in the metrics it champions.</b> §7.2 shows Forced SWA 4.99 points below Gated SWA on MRCR-v2, 5.08 below on GSM8K, and 1.50% worse on LongPPL. MRCR-v2 is one of the two retrieval metrics used to argue retrieval is stronger, and GSM8K is a reasoning task. The paper calls the trade acceptable on the grounds that it swaps parameters and a local KV cache for early-exit capability — but the reader should judge the bargain.</li>
+    <li><b>Reversals in the granularity ablation go unmentioned.</b> In Table 3, NoLiMa (40.27 vs 38.43) and BBH (61.93 vs 60.70) both favour block-level. The prose does not raise either.</li>
+    <li><b>The KV-cache advantage is partly the head configuration's doing.</b> HySparse2 uses MQA 64/1 while both baselines use GQA 64/4 (Table 1), so the size advantage in §6.4 is not purely cross-layer sharing. The paper provides no MQA-vs-MQA or GQA-vs-GQA control to separate the two. By this page's estimate, ignoring the head difference, "5 FA layers against 9" would explain only $9/5 = 1.8\times$ rather than the observed 4.49×.</li>
+    <li><b>Ablation context length does not match the motivation.</b> §7.1 is motivated by long-horizon multi-turn agentic retrieval, yet the ablation runs inside the 32k training context — the paper itself notes "These gains are present within the 32k training context". The same control at 256k remains to be run.</li>
+    <li><b>All costs are book figures.</b> Every cost conclusion rests on FLOPs and KV-cache bytes with <b>no end-to-end throughput or latency measurement</b>; the claimed token-level kernel efficiency advantage is likewise unmeasured. §5.2's speculative-decoding part is a possibility argument the paper itself flags as future work.</li>
+    <li><b>Some metrics are not comparable across papers.</b> AgentPPL and Repo Code PPL are internal benchmarks; LongPPL's selection over 349 examples and MRCR-v2's needle combinations are described only coarsely. These numbers are valid within this paper's internal comparisons but should not be lined up against other papers' nominally similar metrics.</li>
+  </ul>
+
+  <h3>Lineage at a glance</h3>
+  <p class="muted">This page reorganizes the technical sources cited in the paper by component, to make clear what is new here and what is inherited and modified.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Components and their upstream sources (organized from the paper's inline citations; not a table from the paper)</caption>
+    <thead><tr><th>Component / decision</th><th>Upstream as cited by the paper</th><th>What this generation changed</th></tr></thead>
+    <tbody>
+      <tr><td>Two-decoder backbone + early-exit prefill</td><td>YOCO (Sun et al., 2024); related cross-layer sharing in Gemma 3n (Sanseviero and Ballantyne, 2025)</td><td>KV Bridging connects <b>only full-attention layers</b>, allowing different hybrid ratios in the two decoders — one self-decoder FA layer supplies four cross-decoder FA layers</td></tr>
+      <tr><td>Cross-layer KV / index sharing inside a hybrid block</td><td>HySparse (Gao et al., 2026)</td><td>Kept as the inner-level KV Reuse; the selection unit moves from 64-token blocks to <b>individual tokens</b></td></tr>
+      <tr><td>Oracle selection with no separate indexer</td><td>HySparse (Gao et al., 2026); contrasting routes: SeerAttention (Gao et al., 2024), DeepSeek-AI et al. (2025)</td><td>Top-$k$ over single tokens; <b>no distilled auxiliary indexer needed</b>, native end-to-end training</td></tr>
+      <tr><td>Handling locality</td><td>HySparse's separate gated SWA branch (Gao et al., 2026)</td><td><b>Branch deleted</b>; the most recent 128 tokens are forced into the sparse selection, and locality comes from the shared KV cache</td></tr>
+      <tr><td>Rejected alternative</td><td>bounded replay (DeepSeek-AI, 2026)</td><td>Rather than approximating, the dependency on cross-decoder hidden states is <b>removed by construction</b></td></tr>
+      <tr><td>Feasibility of token-level sparse kernels</td><td>TileLang (Wang et al., 2025)</td><td>Used to argue token-level selection is now practical to implement</td></tr>
+      <tr><td>KV head configuration</td><td>MQA (Shazeer, 2019); GQA (Ainslie et al., 2023)</td><td>Switched to <b>MQA 64/1</b> (baselines use GQA 64/4) for a smaller KV cache and better token-sparse kernel efficiency</td></tr>
+      <tr><td>Positional encoding</td><td>RoFormer / partial RoPE (Su et al., 2024); NoPE</td><td>SWA layers use 64-dim partial RoPE (base 10,000); full and sparse layers use <b>NoPE</b> — no RoPE adjustment needed for long-context extension</td></tr>
+      <tr><td>Attention post-processing</td><td>Sigmoid output gates (Qiu et al., 2025); per-head sink bias (Agarwal et al., 2025)</td><td>Applied uniformly to all sparse and SWA layers</td></tr>
+      <tr><td>Backbone and residuals</td><td>mHC (Xie et al., 2026; Zhu et al., 2025)</td><td>Simplified variant with the residual mixing matrix <b>fixed to the identity</b></td></tr>
+      <tr><td>Optimizer and schedule</td><td>Muon (Jordan et al., 2024)</td><td>WSD schedule; peak LR $10^{-3}$ (pretraining) / $5\times10^{-5}$ (post-training)</td></tr>
+      <tr><td>Connection-scheme control</td><td>KV Mirror's U-shaped pairing (Liu et al., 2026)</td><td>Changed to <b>full-attention layers only</b>; reported final RULER 87.65 vs 81.28</td></tr>
+      <tr><td>Speculative decoding / MTP</td><td>DFlash (Chen et al., 2026); asynchronous drafting and verification (Zhang et al., 2025)</td><td>MTP layer conditioned on the <b>self/cross boundary hidden states</b>; a larger drafter is future work</td></tr>
+      <tr><td>Long-context likelihood metric</td><td>LongPPL (Fang et al., 2024)</td><td>Adopted as-is; AgentPPL is this paper's internal benchmark</td></tr>
+      <tr><td>Evaluation suites</td><td>MRCR (Vodrahalli et al., 2024); RULER-v2 (Hsieh et al., 2025); GraphWalks (OpenAI, 2025); NoLiMa (Modarressi et al., 2025)</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Citations follow the paper's own inline attributions; this page has not re-checked each reference entry.</p>
+
+  <h3>Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><b>The token-score algorithm.</b> The paper says full-attention layers use "exact attention scores" to give the following sparse layers oracle selection, and Figure 2 only labels "token scores" and "Token Top-k". But <b>how scores are aggregated across query positions and across query heads into one score per KV token</b> (which statistic, whether only particular queries count, whether any extra normalization is applied) is not disclosed — and this determines the indexer's cost and is the first obstacle to reproduction.</li>
+    <li><b>End-to-end throughput and latency.</b> The paper reports only FLOPs and KV-cache bytes (a full-text search turns up no mention of throughput, latency, or TTFT). A measurement of real-kernel prefill latency and decode throughput is worth adding, especially at 1M context under the disaggregated deployment where the prefill node hosts 25 layers.</li>
+    <li><b>Prefill → decode KV transfer cost.</b> The paper computes the cross-decoder FA KV on the prefill node and ships it to decode nodes because "the projected KV caches are smaller than the source hidden states". The transfer volume, the benefit under a bandwidth constraint, and the <b>combined</b> benefit with "the prefill node hosts 25 layers" are not quantified.</li>
+    <li><b>Sensitivity of the forced window.</b> The window is fixed at 128 and the global budget at 1,024, with no sensitivity sweep. Given that Forced SWA is 4.99 points below Gated SWA on MRCR-v2, it is worth trying a longer window, or a gated variant inside the window, to see whether that gap can be recovered.</li>
+    <li><b>Granularity ablation at 256k.</b> The token-vs-block control was run within the 32k training context while its motivation is 256k multi-turn agentic retrieval. Repeating it at long context — and reproducing the Table 3 reversals on NoLiMa and BBH — is the key step in judging whether token-level is generally better.</li>
+    <li><b>Separating head configuration from cross-layer sharing.</b> A control with both models on MQA (or both on GQA) would split the KV-cache and kernel-efficiency gains into "cross-layer sharing" and "number of KV heads".</li>
+  </ul>
+
+  <div class="note"><b>One-line verdict:</b> read only the abstract and this looks like a paper that is faster, cheaper, <i>and</i> more accurate; read the tables all the way through and it reads more like a <b>system paper that keeps a meticulous cost account but under-reports its accuracy cost</b>. Its core contribution — eliminating the separate SWA branch via a forced local window so that prefill can genuinely exit — is a solid, reusable structural insight; the "general capabilities roughly comparable" claim leaves an observable gap on reasoning and code tasks.</div>
+</section>
+
+<!-- ============ s9 ============ -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Come back here whenever an abbreviation appears; underlined abbreviations in the prose also carry hover definitions.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Terms used on this page, grouped by theme (definitions are this page's summaries of the source)</caption>
+    <thead><tr><th>Abbrev. / term</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>FA</td><td>Full Attention</td><td>Every query sees the entire history; most accurate, most expensive — only 5 layers here</td></tr>
+      <tr><td>SWA</td><td>Sliding-Window Attention</td><td>Attends only to a recent fixed window; handles local modeling — 24 layers in the self-decoder</td></tr>
+      <tr><td>SA</td><td>Sparse Attention</td><td>Each query attends only to a selected subset of KV entries — 20 layers in the cross-decoder</td></tr>
+      <tr><td>KV Bridging</td><td>—</td><td>This paper's outer-level sharing: a cross-decoder FA layer projects its own K/V from the input hidden states of a self-decoder FA layer</td></tr>
+      <tr><td>KV Reuse</td><td>—</td><td>This paper's inner-level sharing: within a hybrid block, SA layers reuse the FA layer's KV cache and selection indices</td></tr>
+      <tr><td>KV Mirror</td><td>—</td><td>The comparison connection scheme: reverse U-shaped pairing of early and late layers ($1 \rightarrow n$, $2 \rightarrow n-1$); its RULER trails KV Bridging in Figure 5</td></tr>
+      <tr><td>hybrid block</td><td>—</td><td>Here, a group like "FA + SA×5"; the cross-decoder is made of four such groups</td></tr>
+      <tr><td>cascading SWA dependency</td><td>—</td><td>A separate SWA branch needs its own hidden-state suffix, which itself depends on earlier layers, so the required length grows linearly with depth — the root reason the cross-decoder cannot be skipped</td></tr>
+      <tr><td>block-level / token-level</td><td>—</td><td>Sparse selection granularity: 64-token blocks versus single tokens. This paper moves from the former to the latter</td></tr>
+      <tr><td>forced local window</td><td>—</td><td>The most recent 128 tokens are always included in the sparse selection set, replacing the separate SWA branch</td></tr>
+      <tr><td>indexer</td><td>—</td><td>A module predicting which KV entries are worth selecting. Here the FA layers serve as the indexer, so none is trained separately</td></tr>
+      <tr><td>oracle token selection</td><td>—</td><td>Selection signal derived from exact attention scores rather than an approximation module</td></tr>
+      <tr><td>gated fusion</td><td>—</td><td>How HySparse merges sparse attention with a separate SWA branch under a gate; HySparse2 removes this structure</td></tr>
+      <tr><td>sink bias</td><td>—</td><td>A learnable per-head bias that mitigates the attention-sink phenomenon</td></tr>
+      <tr><td>YOCO</td><td>You Only Cache Once</td><td>An architecture where a self-decoder builds one global KV cache reused by the cross-decoder, letting prefill exit after the self-decoder</td></tr>
+      <tr><td>MQA / GQA / MLA</td><td>Multi-Query / Grouped-Query / Multi-head Latent Attention</td><td>Three head-axis KV compression schemes: one shared KV set for all query heads / grouped sharing / compressed into latent states. HySparse2 uses MQA 64/1</td></tr>
+      <tr><td>RoPE / NoPE</td><td>Rotary / No Positional Embedding</td><td>Rotary position encoding / no explicit positional encoding. Here only SWA uses 64-dim partial RoPE</td></tr>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>80B-A3B means 80B total parameters with roughly 3B activated per token</td></tr>
+      <tr><td>mHC</td><td>Manifold-constrained Hyper-Connections</td><td>A residual-connection variant; the simplified form here fixes the residual mixing matrix to the identity</td></tr>
+      <tr><td>MTP</td><td>Multi-Token Prediction</td><td>An extra prediction layer usable as a speculative drafter; conditioned on the self/cross boundary hidden states here</td></tr>
+      <tr><td>Prefill / Decode</td><td>—</td><td>The two inference stages: one forward pass over the input to build the KV cache / autoregressive generation token by token</td></tr>
+      <tr><td>Prefill–Decode Disaggregation</td><td>—</td><td>Serving the two stages on separate nodes, each tuned to its own profile; the prefill node here hosts only 25 layers</td></tr>
+      <tr><td>FP8</td><td>8-bit Floating Point</td><td>The precision basis for this paper's KV-cache figures (1 byte per element)</td></tr>
+      <tr><td>GFLOPs / token</td><td>—</td><td>Billions of floating-point operations per token, the measure of prefill compute</td></tr>
+      <tr><td>PPL</td><td>Perplexity</td><td>Lower is better; AgentPPL / LongPPL / Repo Code PPL are three different variants</td></tr>
+      <tr><td>AgentPPL</td><td>—</td><td>This paper's internal benchmark: byte perplexity on the reasoning, tool-call and response segments of 1,000 multi-turn agent trajectories</td></tr>
+      <tr><td>LongPPL</td><td>—</td><td>Perplexity computed only on selected tokens that depend on long-range context (Fang et al., 2024); 349 examples here</td></tr>
+      <tr><td>needle</td><td>—</td><td>A fact planted inside a long document in retrieval evaluation; MRCR-v2 uses multi-round 2/4/8-needle settings</td></tr>
+      <tr><td>RULER / RULER-v2</td><td>—</td><td>Long-context benchmarks; v2 covers 12 retrieval and QA subtasks</td></tr>
+      <tr><td>MRCR-v2</td><td>—</td><td>Multi-round retrieval benchmark (following the MRCR line of Vodrahalli et al., 2024)</td></tr>
+      <tr><td>GraphWalks</td><td>—</td><td>Multi-hop graph traversal evaluation (OpenAI, 2025), probing reasoning-style retrieval across passages</td></tr>
+      <tr><td>bounded replay</td><td>—</td><td>A method that approximates required hidden states by replaying a bounded length; this paper avoids needing it by construction</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    An illustrated English reading of <i>HySparse2: Hybrid Sparse Attention with Two-Level KV Sharing</i> (LLM-Core, Xiaomi), arXiv:2609.26368v1.<br>
+    All 5 figures and 5 tables are extracted from the original at 300 DPI and shown in full (uncropped); commentary and any <b>[organized] / [estimated]</b> labels are the editor's, and the paper remains the authority.<br>
+    Paper: <a href="https://arxiv.org/abs/2609.26368">arXiv:2609.26368</a> · 中文版:<a href="index.html">中文精读</a><br>
+    <span style="opacity:.75">Dark mode · click any image for the original · print-friendly</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>
