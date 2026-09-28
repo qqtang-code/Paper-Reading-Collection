@@ -20,8 +20,9 @@
 | 6 | **DeepSeek-V4.1-Flash** — 552B 多模态 MoE 高效推理技术报告 | [高效推理](efficient-inference/) | KV Cache 压缩 · MoE · 多模态 · 长上下文 · FP4 | [中](efficient-inference/deepseek-v41-flash/) · [EN 完整版](efficient-inference/deepseek-v41-flash/en.html) | 2026-09 | 12 图 5 表 | [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page) |
 | 7 | **Elastic Attention** — Test-time Adaptive Sparsity Ratios for Efficient Transformers | [注意力与 KV Cache](attention-kv-cache/) | 混合注意力 · 测试时自适应 · Attention Router · 长上下文 | [中](attention-kv-cache/elastic-attention/) · [EN 速读](attention-kv-cache/elastic-attention/en.html) | 2026-09 | 17 图 14 表 | [OpenReview](https://openreview.net/forum?id=rLO2NTUHSW) · [代码](https://github.com/LCM-Lab/Elastic-Attention) |
 | 8 | **HySparse2** — Hybrid Sparse Attention with Two-Level KV Sharing | [注意力与 KV Cache](attention-kv-cache/) | 混合稀疏注意力 · 两级 KV 共享 · 长上下文 · Agentic · MoE | [中](attention-kv-cache/hysparse2/) · [EN 完整版](attention-kv-cache/hysparse2/en.html) | 2026-09 | 5 图 5 表 | [arXiv:2609.26368](https://arxiv.org/abs/2609.26368) |
+| 9 | **PISA** — Block Sparse Attention with Log-Linear Complexity | [注意力与 KV Cache](attention-kv-cache/) | 块稀疏注意力 · 金字塔 Top-K · LogSumExp · 长上下文 · O(N log N) | [中](attention-kv-cache/pisa/) · [EN 速读](attention-kv-cache/pisa/en.html) | 2026-09 | 3 图 7 表 | [arXiv:2609.31093](https://arxiv.org/abs/2609.31093) |
 
-点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑦ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑧ HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[⑧ EN](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/en.html)**
+点击论文名直达精读页:**[① Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[② FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[③ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[④ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑤ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑥ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑦ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑧ HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[⑨ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)**
 
 ## 目录结构
 
@@ -33,7 +34,8 @@ Paper-Reading-Collection/
 │   ├── declarative-attention/   ← arXiv:2609.02737(10 图 10 表)
 │   ├── random-attention/        ← arXiv:2609.03430(5 图 11 表)
 │   ├── elastic-attention/       ← OpenReview rLO2NTUHSW(17 图 14 表)
-│   └── hysparse2/               ← arXiv:2609.26368(5 图 5 表)
+│   ├── hysparse2/               ← arXiv:2609.26368(5 图 5 表)
+│   └── pisa/                    ← arXiv:2609.31093(3 图 7 表 + 1 算法框图)
 ├── efficient-inference/         ← 分类二:高效推理与部署
 │   ├── freetoken/               ← arXiv:2608.16157(5 图 1 表)
 │   ├── reset/                   ← arXiv:2606.13233(8 图 16 表)
@@ -65,6 +67,9 @@ KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱�
 
 **⑧ HySparse2(2026-09 · Xiaomi LLM-Core)**
 长程多轮的 agentic 推理让上下文被输入主导:模型产出的 action 很短,工具返回的观测却很长。HySparse2 把跨层 KV 共享做成**两级**——外层 KV Bridging 让 cross-decoder 的全注意力层用 self-decoder 全注意力层的**输入隐状态**经各自投影构造 K/V,内层 KV Reuse 让稀疏层复用同 block 全注意力层的 KV cache 与选择索引;再把选择粒度从 64-token 块换成单 token、**删掉稀疏层里独立的 SWA 分支**(改为强制最近 128 token 入选)。由于 cross-decoder 不再依赖自身逐层隐状态,**prefill 建完 cache 即可退出,只跑 49 层里的前 25 层**(其中仅 1 层做全注意力)。1M 上下文 prefill FLOPs 降 **2.92×/5.02×**、KV cache **2.69 GB**(对 6.72/12.09 GB),后训练 MRCR-v2 **+11.30**、RULER-v2 **+19.81** 个百分点。→ [精读页](attention-kv-cache/hysparse2/) · [原文](https://arxiv.org/abs/2609.26368)
+
+**⑨ PISA(2026-09 · 上海交通大学 × 上海创智学院 × ByteDance Seed)**
+块稀疏注意力把注意力计算降到线性,却没动"挑哪些块"这一步:为每个 query 扫全部 $N/C$ 个键块摘要,选择阶段仍是 $O(N^2/C)$,长序列上直接成为新瓶颈。PISA 把键逐级均值池化成一个 $O(\log N)$ 层的金字塔($C$ 个一组、之后每 2 个一组),选择时**反过来从最粗层往下逐层 Top-K**:每层只给上一层幸存块的孩子打分,保留 Top-$K$ 再展开——每层候选被 $gK$ 卡住,每个 query 的选路开销降到 $O(\log N)$、整段序列 $O(N\log N)$、解码 $O(\log N)$。块分数从"子块均值的平均"换成**子块摘要上的 LogSumExp**,并用 Jensen 不等式给出"均值平均 ≤ 摘要 LSE ≤ 父块真实 LSE"的夹逼论证。配置代进去看:4K/$K{=}8$ 时塔高 7 层,**最上面 4 层因候选数不超过 $K$ 而完全免费**,真正打分的只有 2 个中间层加叶层 1024 个原始键。256K 选块延迟比 BSA 快 **9.95×**(64K 2.86×、128K 5.31×),选择质量 Recall@8 **90.95%** 对 BSA 的 85.91%,RULER 平均 **62.80** 对 BSA 的 54.99。**注意 16K 以内 BSA 更快**(交叉点在 16K–32K 之间),且 9.95× 是选块阶段口径,不含被选中块上的注意力计算。→ [精读页](attention-kv-cache/pisa/) · [原文](https://arxiv.org/abs/2609.31093)
 
 ### ⚡ efficient-inference/ · 高效推理与部署
 

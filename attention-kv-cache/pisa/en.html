@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PISA deep-read: pyramid Top-K block selection, LogSumExp block scoring and Triton kernels, cutting block-sparse attention selection from O(N^2/C) to O(N log N). Every figure and table embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, PISA, block sparse attention, sparse attention, long context, LogSumExp, Top-K selection, Triton, O(N log N)">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · Block Sparse Attention with Log-Linear Complexity (PISA)">
+<meta property="og:description" content="Cutting the Top-K block-selection stage of block-sparse attention from O(N^2/C) to O(N log N): a key pyramid, coarse-to-fine selection and LogSumExp scoring. Every exhibit at 300 DPI.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · Block Sparse Attention with Log-Linear Complexity (PISA)</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head><body>
+
+<!-- topbar -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">PISA<span> · notes</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Method</a>
+      <a class="jump" href="#s4">Scoring</a>
+      <a class="jump" href="#s5">Systems</a>
+      <a class="jump" href="#s6">Experiments</a>
+      <a class="jump" href="#s7">Long context</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文精读版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark/light" title="Toggle dark/light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.31093</div>
+    <h1>Block Sparse Attention with Log-Linear Complexity</h1>
+    <div class="subtitle">PISA (Pyramid Sparse Attention) pools keys into a $C\to2\to2\to\cdots$ pyramid and selects coarse-to-fine, cutting the <b>block-selection</b> stage of block-sparse attention from $O(N^2/C)$ to $O(N\log N)$.</div>
+    <div class="meta">
+      <span>Authors: Bohao Tang, Zhen Qin, Yuqi Pan, Zheng Li, Pengfei Liu</span>
+      <span>Affiliations: Shanghai Jiao Tong University · Shanghai Innovation Institute · ByteDance Seed</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2609.31093">arXiv:2609.31093v1 [cs.LG]</a></span>
+      <span>Date: 2026-09-25</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Block-sparse attention</span><span class="pill">Long context</span><span class="pill">Top-K block selection</span>
+      <span class="pill">LogSumExp scoring</span><span class="pill">Triton kernels</span><span class="pill">O(N log N)</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents (every exhibit is embedded in the section that discusses it)</h2>
+  <ol>
+    <li><a href="#s1">Overview: the claim and the key numbers</a></li>
+    <li><a href="#s2">Background: two stages, and the bottleneck in the first</a></li>
+    <li><a href="#s3">Method: a pyramid of keys, selected coarse-to-fine</a></li>
+    <li><a href="#s4">Scoring: LogSumExp, and why not the mean</a></li>
+    <li><a href="#s5">Systems: Triton kernels and the IO ledger</a></li>
+    <li><a href="#s6">Experiments: language modelling and downstream</a></li>
+    <li><a href="#s7">Long context, selection quality, selection efficiency</a></li>
+    <li><a href="#s8">Commentary: lineage, limits, and what is not disclosed</a></li>
+    <li><a href="#s9">Glossary</a></li>
+  </ol>
+</nav>
+
+<!-- ===================== s1 ===================== -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: the claim and the key numbers</h2>
+
+  <p class="lead">The paper attacks a narrow, load-bearing problem: <b>block-sparse attention saves the attention computation but not the cost of deciding which blocks to keep.</b> The conventional recipe scores every query against all $N/C$ key blocks, so the selection stage costs $O(N^2/C)$ in total — attention itself has become linear while block selection stays quadratic, and at long sequence lengths selection becomes the new bottleneck. PISA replaces the full scan with a pyramid: keys are mean-pooled into $O(\log N)$ levels, and selection walks from the coarsest level down, expanding only the survivors. Routing drops to $O(\log N)$ per query and $O(N\log N)$ over the sequence.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">Mechanism</div><div class="v">Pyramid Top-K<small>mean pooling builds $O(\log N)$ key levels; each level scores at most $gK$ candidates and expands the survivors downward</small></div></div>
+    <div class="item"><div class="k">Block score</div><div class="v">LogSumExp over child summaries<small>not the average of child means; the paper gives a Jensen sandwich argument for why it is closer to the true block LSE</small></div></div>
+    <div class="item"><div class="k">Complexity</div><div class="v">O(N log N) prefill / O(log N) decode<small>against $O(N^2)$ and $O(N)$ for BSA / NSA / MoBA / HiLS</small></div></div>
+    <div class="item"><div class="k">Selection latency</div><div class="v">9.95× faster than BSA<small>at 256K prefill; 5.31× at 128K and 2.86× at 64K</small></div></div>
+    <div class="item"><div class="k">Selection quality</div><div class="v">Recall@8 90.95%<small>versus BSA 85.91% on identical queries and keys (paper's Table 7)</small></div></div>
+    <div class="item"><div class="k">Long context</div><div class="v">RULER average 62.80<small>2.67B at 16K, versus BSA 54.99 (paper's Table 3)</small></div></div>
+  </div>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page follows the paper. Anything this page derived, reorganised or converted from the paper's configuration is tagged <b>[organized]</b> or <b>[estimated]</b> so it can be told apart from the paper's own figures. Notation follows the paper: $N$ sequence length, $C$ block size, $K$ the block budget, $g$ the branching factor ($g=2$), $\ell$ the level index ($\ell=0$ raw keys, $\ell=1$ leaf blocks), $d$ head dimension. The paper does not link a code release.</div>
+
+  <h3>The argument in three steps</h3>
+  <p><b>Problem.</b> Block-sparse attention runs in two stages: pick $K$ key blocks per query, then attend only inside them. Stage two is linear, but stage one must score all $N/C$ block summaries per query, so it stays $O(N^2/C)$ overall. The longer the sequence, the more block selection looks like full attention again.</p>
+  <p><b>Method.</b> Pool keys into a fine-to-coarse pyramid ($C$ per group, then 2 per group), then select in the opposite direction: at each level score only the children of blocks kept at the previous level, keep the top $K$, and expand. Candidates per level are bounded by $gK$ and there are $O(\log N)$ levels, giving $O(\log N)$ routing per query. The block score is a LogSumExp over child summaries rather than an average of child means; Appendix A sandwiches it between the mean score and the parent's true raw-key LSE.</p>
+  <p><b>Evidence.</b> At 418M / 1.47B / 2.67B, pretrained on 100B tokens at 4K and continued-pretrained on 10B tokens at 16K, language-modelling loss and commonsense reasoning are comparable to BSA, NSA and HiLS; the six-task containment average is the best among sparse methods at all three scales; the RULER average is clearly above BSA. Selection latency overtakes BSA after 32K and is 9.95× faster at 256K.</p>
+
+  <div class="takeaway"><b>The other side of the coin:</b> PISA replaces "scan every key block" with "score a fixed ~$gK$ leaf blocks plus a few intermediate candidates". The first grows with $N$, the second is constant — so on short sequences PISA is actually <b>slower</b>. The paper's own numbers show BSA winning from 4K to 16K, with the crossover between 16K and 32K. This is a mechanism built for long context, not a general speedup.</div>
+</section>
+
+<!-- ===================== s2 ===================== -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">Background: two stages, and the bottleneck in the first</h2>
+
+  <p>Self-attention grows quadratically with sequence length, which is the hard wall in long-context modelling. Sparse attention lets each query see only part of the keys; the <b>block-sparse</b> variant groups keys and values into contiguous blocks of $C$ tokens, which keeps the sparse computation inside regular tiled kernels instead of turning it into scattered gathers.</p>
+
+  <p>The paper formalises block-sparse attention as two stages. Stage one gives each key block a summary vector $\bar{k}_i=f(K_i)$ — mean pooling or a learned projection — and scores it against the query:</p>
+
+  <div class="math">$$s_{t,i}=\frac{q_t^{\top}\bar{k}_i}{\sqrt{d}},\qquad i=1,\dots,M,\quad M=\lceil N/C\rceil \tag{1}$$</div>
+
+  <p>Stage two attends over the <b>original</b> keys and values inside the selected blocks:</p>
+
+  <div class="math">$$o_t=\frac{\sum_{j\in T_t}\exp\!\left(q_t^{\top}k_j/\sqrt{d}\right)v_j}{\sum_{j\in T_t}\exp\!\left(q_t^{\top}k_j/\sqrt{d}\right)},\qquad T_t=\bigcup_{i\in I_t}\{(i-1)C+1,\dots,\min(iC,N)\} \tag{2}$$</div>
+
+  <p>Each query reads at most $KC$ keys, so stage two is $O(N)$. Stage one, however, scores $M=N/C$ blocks per query, accumulating $O(N^2/C)$: the attention cost was cut, the selection cost was not.</p>
+
+  <h3>Where this sits relative to prior work</h3>
+  <p>The paper positions the literature on two axes — trainable or not, and prefill/decode complexity. The table is worth reading line by line, because it names both PISA's niche and its competitors:</p>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: training settings and computational complexity of sparse attention methods">
+    <figcaption>
+      <b>Table 1:</b> Training settings and computational complexity of selected sparse attention methods. N denotes the sequence length. Complexities include selection and attention computation. ✓ denotes trainable, and × denotes a training-free method. For LLSA [42], which is designed for diffusion models, the listed cost is per attention pass rather than autoregressive prefill.
+      <span class="ex">Line by line: <b>HiP</b> (Lee et al., ICLR 2025) is a training-free hierarchical-pruning serving framework and already reaches $O(N\log N)$ / $O(\log N)$ — note the "training-free" column, meaning weights are not updated. <b>HISA</b> (Xu et al., 2026) is training-free and still $O(N^2)$ at prefill. <b>MoBA</b> (Lu et al., NeurIPS 2025), <b>NSA</b> (Yuan et al., ACL 2025) and <b>HiLS</b> (Hu et al., 2026) are trainable but remain $O(N^2)$ at prefill — the selection stage is exactly why. <b>LLSA</b> (Zhou et al., CVPR 2026) already achieves $O(N\log N)$, but it targets diffusion transformers and shows "—" for decode. <b><abbr title="Block Sparse Attention">BSA</abbr></b> here means the single-level mean-pooled baseline that PISA is compared against.</span>
+      <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+
+  <p>Read down the columns and the claim is sharp: <b>the only row that is simultaneously trainable, $O(N\log N)$ at prefill and $O(\log N)$ at decode is PISA.</b> Log-linear complexity itself is not new — HiP and LLSA both have it — the contribution is making it an end-to-end trainable language-model attention layer with a decode path that keeps the $\log N$ guarantee.</p>
+
+  <div class="note"><b>A convention worth noticing:</b> the BSA baseline is the authors' own re-composition of NSA's selected-attention branch with mean-pooled key summaries, not a verbatim reproduction of a published system. NSA keeps its learned-compression and selected-attention branches; HiLS keeps its learnable landmark routing. All methods share the same data, backbone and attention projections (paper §4.1 and §C.1).</div>
+</section>
+
+<!-- ===================== s3 ===================== -->
+<section id="s3">
+  <div class="sec-no">03 · Method</div>
+  <h2 class="sec">Method: a pyramid of keys, selected coarse-to-fine</h2>
+
+  <h3>3.1 Fine to coarse: building the pyramid</h3>
+  <p>Level 0 is the raw keys ($M_0=N$, one token per block); level 1 is the leaf blocks ($M_1=\lceil N/C\rceil$); above that every $g=2$ adjacent blocks merge:</p>
+
+  <div class="math">$$M_{\ell+1}=\left\lceil\frac{M_\ell}{g_\ell}\right\rceil,\qquad g_0=C,\qquad g_\ell=g=2\;(\ell\ge 1) \tag{3}$$</div>
+
+  <p>Summaries are mean-pooled from their children, starting from $\bar{k}_i^{(0)}=k_i$:</p>
+
+  <div class="math">$$\bar{k}_i^{(\ell+1)}=\frac{1}{|\mathrm{Ch}_\ell(i)|}\sum_{r\in\mathrm{Ch}_\ell(i)}\bar{k}_r^{(\ell)},\qquad \ell\ge 0 \tag{4}$$</div>
+
+  <p>Because the merge groups are equally sized at every step, the recursion yields the mean of all original keys in the block. Queries stay token-level throughout; they are never pooled.</p>
+
+  <h3>3.2 Coarse to fine: narrowing the Top-K</h3>
+  <p>Selection runs in the opposite direction. The coarsest level has a single candidate, and each level only processes the children of the previous level's survivors:</p>
+
+  <div class="math">$$A_t^{(L)}=\{1\};\qquad s_t^{(\ell)}=\left[s_{t,i}^{(\ell)}\right]_{i\in A_t^{(\ell)}},\quad I_t^{(\ell)}=\mathrm{SelectK}\!\left(A_t^{(\ell)},s_t^{(\ell)}\right),\quad A_t^{(\ell-1)}=\bigcup_{i\in I_t^{(\ell)}}\mathrm{Ch}_{\ell-1}(i) \tag{5}$$</div>
+
+  <div class="math">$$\left|I_t^{(\ell)}\right|\le K,\qquad \left|A_t^{(\ell-1)}\right|\le g\left|I_t^{(\ell)}\right|\le gK \tag{6}$$</div>
+
+  <p>After the walk, $I_t^{(1)}$ is the set of original key/value blocks used for attention. The pyramid is $L=O(\log N)$ levels tall and each level is capped at $gK$ candidates, so routing costs $O(\log N)$ per query and $O(N\log N)$ over the sequence — the "log-linear" in the title.</p>
+
+  <p>One detail carries a lot of weight: if a level has at most $K$ candidates, they are <b>all retained without scoring</b>. The top levels of the pyramid are therefore nearly free, which is what makes the mechanism cheap in practice and not just asymptotically.</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: BSA versus PISA block selection">
+    <figcaption>
+      <b>Figure 1:</b> Comparison of two different Top-K selection methods for sparse attention. Top: BSA computes a score for each key block before performing Top-K selection. Bottom: PISA constructs a fine-to-coarse hierarchy of key blocks through mean pooling and expands only the selected candidates from coarse to fine during selection. Intermediate blocks are scored using LSE over their child summaries, while leaf blocks are scored using exact LSE over their original keys.
+      <span class="ex">Read the two panels against each other. <b>Top (BSA):</b> the entire $\ell=1$ key strip is hatched as "scored candidate" and the annotation reads "Mean scores computed for <i>all</i> blocks" — cost proportional to block count. <b>Bottom (PISA):</b> in the same $\ell=1$ strip only two blocks are hatched, ringed in orange; the rest are white "skipped computation". Selection starts from the single wide block at the top of the pyramid and narrows downward. The two right-hand brackets name the two scoring modes: <b>LSE over child-block</b> at intermediate levels, <b>LSE over original keys</b> at the leaf level. In the legend, "Selected by Top-K" (orange dashed box) is a routing decision while "Selected KV" (orange filled cells) is what actually gets computed on.</span>
+      <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+
+  <p class="zoom-hint">💡 Click any image to open the original 300 DPI version; click again or press Esc to close.</p>
+</section>
+
+<!-- ===================== s4 ===================== -->
+<section id="s4">
+  <div class="sec-no">04 · Scoring</div>
+  <h2 class="sec">Scoring: LogSumExp, and why not the mean</h2>
+
+  <p>Intermediate blocks have no raw keys available, only child summaries. The paper scores them with a <abbr title="LogSumExp">LogSumExp</abbr> over those summaries:</p>
+
+  <div class="math">$$s_{t,i}^{(\ell)}=\log\sum_{r\in\mathrm{Ch}_{\ell-1}(i)}\exp\!\left(\frac{q_t^{\top}\bar{k}_r^{(\ell-1)}}{\sqrt{d}}\right),\qquad \ell\ge 1 \tag{7}$$</div>
+
+  <p>At the leaf level $\bar{k}_r^{(0)}=k_r$, so this degenerates into the exact LSE over original keys. Each candidate expands at most $g$ intermediate children or $C$ raw keys, so scoring stays bounded.</p>
+
+  <p>A Taylor expansion explains the choice. For logits $z_1,\dots,z_m$ with mean $\bar z$ and variance $\mathrm{Var}(z)$:</p>
+
+  <div class="math">$$s_{\mathrm{PISA}}=\log\sum_{j=1}^{m}e^{z_j}=\log m+\bar z+\tfrac{1}{2}\mathrm{Var}(z)+\text{higher-order terms} \tag{8}$$</div>
+  <p>Dropping $\log m$, truncating at first order gives "mean only" and at second order "mean plus half the variance" — exactly the two ablation variants:</p>
+  <div class="math">$$s_{\mathrm{PISA-1}}=\bar z,\qquad s_{\mathrm{PISA-2}}=\bar z+\tfrac{1}{2}\mathrm{Var}(z) \tag{9}$$</div>
+
+  <p>Appendix A then gives a Jensen sandwich. Let block $B$ have $g$ equally sized children $C_1,\dots,C_g$, let $m_j$ be the dot product of the query with child $j$'s summary, and let $F_q(B)$ be the parent's normalised raw-key LSE:</p>
+
+  <div class="math">$$\frac{1}{g}\sum_{j=1}^{g}m_j\;\le\;\hat F(B):=\log\!\left(\frac{1}{g}\sum_{j=1}^{g}e^{m_j}\right)\;\le\;F_q(B) \tag{10}$$</div>
+
+  <p>The left term is the mean-of-means used by PISA-1, the middle term is PISA's score minus $\log g$, and the right term is the parent's true LSE. In words: <b>taking a LogSumExp over child means sits closer to the true block score than averaging the child means does</b>, because it preserves and amplifies differences between children. It cannot recover variation inside a child; when all logits within a child are equal the bounds meet.</p>
+
+  <div class="note"><b>The caveat the paper attaches itself:</b> the comparison is about the <i>numerical error of a block score</i> and, in the paper's words, "does not guarantee more accurate block rankings or recovery of the globally highest-mass leaf blocks" (Appendix A.1). So this is an argument that the score is closer to the truth, not a theorem that selection is better. Selection quality is settled empirically, by the Table 7 diagnostic later on.</div>
+
+  <h3>4.1 An inconsistency the paper discloses</h3>
+  <p>Following NSA, query heads inside one <abbr title="Grouped-Query Attention — query heads sharing a KV head">GQA</abbr> group share the selected blocks. PISA sums their LSE scores into a single block score:</p>
+
+  <div class="math">$$u_{h,t,i}^{(\ell)}=\sum_{h'\in H(h)}s_{h',t,i}^{(\ell)} \tag{11}$$</div>
+
+  <p>Appendix A.3 points out that the full-attention reference in the diagnostic instead <b>averages</b> block masses across those heads. Even with exact LSE scores, summing and averaging can rank blocks differently. The paper flags this itself; it is a convention mismatch to keep in mind when reading Table 7, not an error.</p>
+</section>
+
+<!-- ===================== s5 ===================== -->
+<section id="s5">
+  <div class="sec-no">05 · Systems</div>
+  <h2 class="sec">Systems: Triton kernels and the IO ledger</h2>
+
+  <p>Naively, the level-by-level loop would write and re-read intermediate candidates and give back in memory bandwidth what it saved in FLOPs. The paper's answer is to fuse the intermediate levels into a single kernel, keep candidate indices local to the program, and never materialise a dense query–key score matrix.</p>
+
+  <figure class="fig">
+    <img src="figs/algo1.png" alt="Algorithm 1: two-stage block selection for PISA">
+    <figcaption>
+      <b>Algorithm 1:</b> Two-stage block selection for PISA.
+      <span class="ex">Walk through it: <b>Stage 1 (lines 1–12)</b> parallelises over (query position, KV head), loads the query vectors once, and walks levels from $\ell=L$ down to $\ell=2$; line 5 computes the LSE score per candidate, line 6 sums scores over the query heads sharing the KV head (Eq. 11), line 8 applies SelectK, line 9 expands the survivors into candidates for the next level. <b>Stage 2 (lines 13–18)</b> switches the parallel axis: it clusters the queries that need a given leaf block's score, splits each cluster into groups of at most $Q_{\text{tile}}$ queries, and in line 15 loads the key block $K_{i,h}^{(1)}$ <b>once</b> to score a whole group — this is the key-block reuse. Finally (lines 19–22) a light kernel applies SelectK per query and KV head. Note the two different loop axes on lines 4 and 14: that split is precisely the division of labour between the two stages.</span>
+      <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure>
+
+  <h3>5.1 Why training uses two stages and decoding one</h3>
+  <p>Rather than asserting that the kernels are fast, the paper puts the two designs' IO costs side by side. Per <abbr title="Key-Value">KV</abbr> head, let $G_Q$ query heads share it, $C$ be the block size and $Q_{\text{tile}}$ the query tile.</p>
+
+  <p><b>Two-stage (training/prefill).</b> Each query is tied to at most $gK$ candidate key blocks, so loading its queries costs $O(NgKG_Qd)$; because query tiles run in parallel, each key block is loaded on average $O(CgK/Q_{\text{tile}})$ times, giving a total key IO of $O(NCgKd/Q_{\text{tile}})$. The two-stage leaf-level Q/K IO is therefore</p>
+  <div class="math">$$O\!\left(NgKd\left(G_Q+\frac{C}{Q_{\text{tile}}}\right)\right) \tag{12}$$</div>
+  <p><b>Single-stage</b> walks straight to the leaf level, loading up to $gK$ original key blocks per query, for an extra $O(NgKCd)$ (Eq. 13). The two-stage design wins whenever</p>
+  <div class="math">$$G_Q+\frac{C}{Q_{\text{tile}}}<C \tag{14}$$</div>
+  <p>With the implementation's $G_Q=16$, $Q_{\text{tile}}=4$ and $C=64$, this is $16+64/4=32<64$ — the condition holds, so training and prefill use the two-stage kernel.</p>
+
+  <p><b>Decoding flips the conclusion.</b> A decoding cluster contains a single query, so there is no cross-query reuse: the two-stage kernel would load $gKC$ keys and reload the query vectors $gK$ times, costing $O(gK(C+G_Q)d)$, while a single-stage kernel reuses the queries already loaded during intermediate selection and needs only $O(gKCd)$. Hence the fused single-stage selector for decoding, which also avoids separate grouping and final-selection launches.</p>
+
+  <div class="takeaway"><b>Why this ledger matters:</b> it explains a design choice that is easy to dismiss as an implementation detail — the same algorithm runs on two different kernel structures for training and decoding, for a reason that is quantifiable rather than intuitive. The decision reduces to one inequality (Eq. 14) that can be re-evaluated when $G_Q$, $Q_{\text{tile}}$ or $C$ change.</div>
+
+  <h3>5.2 Following the configuration down to actual levels</h3>
+  <p>"$O(\log N)$ levels, at most $gK$ candidates each" is easy to skim past. Substituting the paper's own two training configurations (pretraining at 4K with $C=64$, $K=8$; continued pretraining at 16K with $C=64$, $K=32$) shows what the pyramid actually looks like at realistic lengths:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>How the pyramid unfolds under the paper's 4K configuration ($N=4096$, $C=64$, $K=8$, $g=2$) — <b>[estimated]</b> from §3.2, §4.1, §C.1 and Table 5, not a table from the paper</caption>
+    <thead><tr><th>Level $\ell$</th><th>Tokens per block</th><th>Candidates $|A^{(\ell)}|$</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>$\ell=7$ (coarsest)</td><td>4096</td><td>1</td><td>at most $K$, retained without scoring</td></tr>
+      <tr><td>$\ell=6$</td><td>2048</td><td>2</td><td>no scoring</td></tr>
+      <tr><td>$\ell=5$</td><td>1024</td><td>4</td><td>no scoring</td></tr>
+      <tr><td>$\ell=4$</td><td>512</td><td>8</td><td>exactly $K$ — still no scoring</td></tr>
+      <tr><td>$\ell=3$</td><td>256</td><td>16</td><td>16 LSE scores, keep 8</td></tr>
+      <tr><td>$\ell=2$</td><td>128</td><td>16</td><td>16 LSE scores, keep 8</td></tr>
+      <tr class="hl"><td>$\ell=1$ (leaf)</td><td>64</td><td>16</td><td>$16\times64$ = <b>1024 raw keys</b> scored, keep 8 blocks</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">The pyramid is $L=\log_2(4096/64)+1=7$ levels tall. Only two intermediate levels require scoring (16 candidates each), and the leaf level scores 1024 raw keys to pick 8 blocks — <b>512 keys</b> attended.</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>The same pyramid under the 16K continued-pretraining configuration ($N=16384$, $C=64$, $K=32$, $g=2$) — <b>[estimated]</b></caption>
+    <thead><tr><th>Level $\ell$</th><th>Tokens per block</th><th>Candidates $|A^{(\ell)}|$</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>$\ell=9$ (coarsest)</td><td>16384</td><td>1</td><td>no scoring</td></tr>
+      <tr><td>$\ell=8$</td><td>8192</td><td>2</td><td>no scoring</td></tr>
+      <tr><td>$\ell=7$</td><td>4096</td><td>4</td><td>no scoring</td></tr>
+      <tr><td>$\ell=6$</td><td>2048</td><td>8</td><td>no scoring</td></tr>
+      <tr><td>$\ell=5$</td><td>1024</td><td>16</td><td>no scoring</td></tr>
+      <tr><td>$\ell=4$</td><td>512</td><td>32</td><td>exactly $K$ — still no scoring</td></tr>
+      <tr><td>$\ell=3$</td><td>256</td><td>64</td><td>64 candidates scored, keep 32</td></tr>
+      <tr><td>$\ell=2$</td><td>128</td><td>64</td><td>64 candidates scored, keep 32</td></tr>
+      <tr class="hl"><td>$\ell=1$ (leaf)</td><td>64</td><td>64</td><td>$64\times64$ = <b>4096 raw keys</b> scored, keep 32 blocks</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Here $L=9$. The top six levels are entirely free because candidates never exceed $K=32$; two intermediate levels score 64 candidates each; the leaf level scores 4096 raw keys and keeps 32 blocks — <b>2048 keys</b> attended.</p>
+
+  <p>These two tables also explain why BSA wins at short lengths: at 4K the leaf level still scores a fixed $gK\cdot C$ raw keys, while BSA only has to scan $M=N/C$ block summaries. While $N/C<gKC$, BSA's arithmetic is cheaper — the mechanism behind "BSA is faster from 4K to 16K" in Figure 3.</p>
+
+  <div class="note"><b>The crossover, [estimated]:</b> setting BSA's $N/C$ block-summary scores equal to PISA's $gKC$ raw-key scores gives $N=gKC^2$. With $g=2$, $K=8$, $C=64$ that is $N\approx 65\text{K}$, so the crossover should be in the 64K region on this arithmetic; the paper measures it between 16K and 32K (Table 4). Same order of magnitude but not equal, because the comparison counts dot products only and ignores BSA's lower kernel constant and PISA's extra intermediate-level and fusion overhead. This is a back-of-envelope estimate by this page, not a paper result.</div>
+
+  <h3>5.3 Remaining conventions</h3>
+  <ul class="tight">
+    <li><b>Forced blocks and causal masking:</b> following NSA's default in Flash Linear Attention (Yang &amp; Zhang, 2024), the first, previous and current leaf blocks and their ancestor paths are always retained. During prefill, summaries on the current block's path can contain future keys; those nodes are retained but <b>their scores are not used for ranking</b>, and the attention kernel masks future tokens inside selected blocks separately.</li>
+    <li><b>Backpropagation:</b> the selected block indices are held <b>fixed</b> in the backward pass — gradients flow through the attention over the selected entries, not through the discrete selection decision.</li>
+    <li><b>Decode cache:</b> the pyramid stores $O((N/C)d)$ elements per KV head and each level grows by a fixed fraction. Even if every expansion copies the whole buffer, total copying to length $N$ is $O((N/C)d\log N)$, keeping the average decode cost at $O(\log N)$ per generated token.</li>
+  </ul>
+</section>
+
+<!-- ===================== s6 ===================== -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">Experiments: language modelling and downstream</h2>
+
+  <p>Three scales — 418M / 1.47B / 2.67B — share one decoder-only backbone per scale and matched training settings: 100B tokens at sequence length 4096 from scratch, then 10B tokens of 16K continued pretraining. Sparse methods use $C=64$ throughout, with $K=8$ for pretraining and $K=32$ for continued pretraining (<abbr title="Continued Pre-Training">CPT</abbr>). The configuration first:</p>
+
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: from-scratch training configuration">
+    <figcaption>
+      <b>Table 5:</b> From-scratch training configuration.
+      <span class="ex">The essentials: 418M is 24 layers / $d=1024$ / head dim 64; 1.47B is 24 layers / $d=2048$ / head dim 128; 2.67B is 32 layers / $d=2560$ / head dim 128. All three use <b>32 query heads against 2 KV heads</b>, i.e. a GQA group size of $G_Q=16$ — the number that decides whether the IO inequality of §5.1, $G_Q+C/Q_{\text{tile}}=32$, holds. Pretraining runs 100K steps at sequence length 4096 with peak LR $3\times10^{-4}$, AdamW ($\beta=(0.9,0.95)$, $\epsilon=10^{-8}$, weight decay 0.1), global gradient clipping at 1.0, <abbr title="Fully Sharded Data Parallel">FSDP</abbr> with bfloat16 parameters and FP32 reductions, seed 42. The schedule is 1K linear warm-up, a 90K plateau and a 9K square-root decay to 0.1× peak.</span>
+      <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+
+  <p>Settings not in that table: GPT-2 BPE tokenizer (vocabulary 50,257 padded to 50,432), pre-RMSNorm, SiLU-gated feed-forward, no dropout; <abbr title="Rotary Position Embedding">RoPE</abbr> applied only to the <b>high-frequency half</b> of each attention head with base 10,000 (raised to 80,000 for continued pretraining); the 10B-token continued-pretraining run warms up to $3\times10^{-5}$ over the first 10% of steps and cosine-decays to $3\times10^{-6}$, restoring model parameters and Adam state, with packed inputs preserving document boundaries and no cross-document attention.</p>
+
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: language modelling and downstream evaluation">
+    <figcaption>
+      <b>Table 2:</b> Language modeling and downstream evaluation after 100B tokens of pretraining at 4K. Baselines include NSA [36] and HiLS [14]. Loss is the final training loss, and accuracies are reported as percentages. Gray columns show group averages; boldface marks the best sparse loss and group averages at each scale.
+      <span class="ex">The table has three blocks: perplexity (WikiText, LAMBADA and their average, lower is better), eight multiple-choice tasks with an Acc-8 average, and six containment tasks (SWDE, SQuAD, FDA, TQA, NQ, DROP) with their average. Containment counts a prediction as correct if it contains any gold answer as a case-insensitive literal substring. Per scale: PISA's loss is below BSA, PISA-1 and PISA-2 in all three rows, and its containment average — 41.77 / 49.83 / 52.14 — is <b>the highest among sparse methods at every scale</b> (bold), while still below Full Attention's 45.15 / 52.13 / 53.01.</span>
+      <span class="pgref">Report p.9</span>
+    </figcaption>
+  </figure>
+
+  <p>One point has to be stated according to where the paper's own boldface actually sits, or the table is easy to misread: <b>the bold "best sparse loss" is not in the PISA row — it is in the HiLS row</b> (2.5596 / 2.3084 / 2.2047 at the three scales). The paper's prose is careful to match: it claims PISA has lower loss than PISA-1, PISA-2 and BSA, not lower than every sparse baseline. [organized] from Table 2:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Loss column of the paper's Table 2, scale by scale (values from that table; <b>[organized]</b>)</caption>
+    <thead><tr><th>Scale</th><th>PISA</th><th>BSA</th><th>PISA-1</th><th>PISA-2</th><th>HiLS</th><th>NSA</th><th>Bold in the paper</th></tr></thead>
+    <tbody>
+      <tr><td>418M</td><td>2.5630</td><td>2.5684</td><td>2.5683</td><td>2.5663</td><td><b>2.5596</b></td><td>2.5727</td><td>HiLS</td></tr>
+      <tr><td>1.47B</td><td>2.3162</td><td>2.3179</td><td>2.3215</td><td>2.3168</td><td><b>2.3084</b></td><td>2.3142</td><td>HiLS</td></tr>
+      <tr><td>2.67B</td><td>2.2151</td><td>2.2184</td><td>2.2179</td><td>2.2152</td><td><b>2.2047</b></td><td>2.2098</td><td>HiLS</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">PISA's loss advantage over BSA is 0.0054 / 0.0017 / 0.0033 across the three scales (subtracted on this page, <b>[estimated]</b>); it is also consistently below PISA-1 and PISA-2, but every gap is in the third decimal. What PISA does take in bold on this table is the containment average at all three scales, plus the perplexity average (23.04, tied with PISA-2) and the Acc-8 average (50.52) at 418M.</p>
+
+  <p>The change of convention after continued pretraining deserves its own warning, because it is an easy trap:</p>
+
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: downstream results after 16K continued pretraining">
+    <figcaption>
+      <b>Table 6:</b> Training loss and downstream performance for the 1.47B and 2.67B models after 10B tokens of continued pretraining at 16K. Sparse methods, including NSA [36], use C = 64 and K = 32. Loss is the final training loss. Gray columns show group averages; the containment average covers SWDE, SQuAD Completion, and FDA. The block budget does not apply to Full Attention.
+      <span class="ex"><b>Two convention gaps to note.</b> ① This table's containment average covers only <b>three</b> tasks (SWDE, SQuAD, FDA), whereas Table 2 covers six (adding TQA, NQ, DROP) — so "52.14" from Table 2 and "66.40" from Table 6 <b>are not the same metric and cannot be compared directly</b>. ② After continued pretraining PISA's containment average (65.33 at 1.47B, 66.40 at 2.67B) is <b>below BSA</b> (66.55 / 68.15), which the paper states plainly. Meanwhile PISA's loss is below BSA (1.7039 / 1.6324) and PISA-1 (1.7042 / 1.6331) at both scales — which is exactly the scope of the paper's sentence.</span>
+      <span class="pgref">Report p.20</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Modelling takeaway:</b> PISA is reliably ahead on the retrieval-style containment tasks during pretraining, and roughly level on loss and perplexity; after continued pretraining BSA overtakes it on containment. The abstract's claim of "better results on retrieval tasks" rests mainly on the RULER results in the next section, not on Table 6.</div>
+</section>
+
+<!-- ===================== s7 ===================== -->
+<section id="s7">
+  <div class="sec-no">07 · Long context &amp; efficiency</div>
+  <h2 class="sec">Long context, selection quality, selection efficiency</h2>
+
+  <h3>7.1 RULER needle-in-a-haystack</h3>
+  <p>Long-context retrieval uses four <abbr title="Long-context evaluation suite">RULER</abbr> needle-in-a-haystack families (Hsieh et al., 2024) — single-key, multi-key, multi-query and multi-value — greedily decoded at five lengths from 1K to 16K, on the 2.67B models after 16K continued pretraining.</p>
+
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: RULER needle-in-a-haystack results">
+    <figcaption>
+      <b>Table 3:</b> RULER needle-in-a-haystack results after 10B tokens of continued pretraining at 16K for the 2.67B models. Sparse methods use C = 64 and K = 32. Scores are accuracies in percent. The gray Avg column averages scores over the four task families at 1K, 2K, 4K, 8K, and 16K, before rounding. Boldface marks the best sparse result in each column.
+      <span class="ex"><b>How to read it, and two surprises.</b> Each family has five length columns and the rightmost Avg spans all four families and five lengths. ① The bold entry in Avg is <b>PISA-2 at 62.92</b>, not the full PISA at 62.80 — on this metric the second-order truncation edges out the exact LSE. The difference is small but it does not fall on the side of the full method. ② In the single-key family the bold entries mostly go to <b>NSA</b> (91.67 at 16K against PISA's 71.27); PISA's family advantage is concentrated in multi-key, multi-query and multi-value. ③ All sparse methods degrade sharply at 16K on those three families — the best sparse scores there are only 15.20 (multi-key, NSA), 25.20 (multi-query, PISA-2) and 28.90 (multi-value, NSA), against Full Attention's 23.13 / 34.85 / 57.20.</span>
+      <span class="pgref">Report p.10</span>
+    </figcaption>
+  </figure>
+
+  <p>Flattening the 16K column of Table 3 makes the picture clearer (arithmetic mean over the four families, values from that table, <b>[estimated]</b>): PISA 30.86, PISA-2 32.56 and PISA-1 28.09 all beat BSA's 25.90, but all sit below NSA's 39.99 and Full Attention's 53.50. PISA's retrieval edge over BSA holds at 16K; it is not the strongest method in that column.</p>
+
+  <h3>7.2 Block-selection diagnostic</h3>
+  <p>This section answers whether the pyramid plus LSE actually selects the right blocks. The design is clean: take a 418M full-attention model (100B tokens pretrained), feed every selector <b>the same</b> query and key tensors, let each pick $K=8$ blocks, and compare against a reference set derived from the full-attention weights. All 24 layers, $C=64$, 100 FDA prompts, query positions $\ge512$ only (where more than eight blocks are eligible). The two metrics are the overlap Recall@K and the retained attention mass ratio.</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: selection quality by query position">
+    <figcaption>
+      <b>Figure 2:</b> Block-selection quality on 100 FDA prompts using identical Full-Attention queries and keys. Curves show mean Recall@8 and attention mass ratio by query position. All selectors and the reference share K = 8 and the forced-block policy; Recall@8 includes forced blocks.
+      <span class="ex">Left is Recall@8, right is the attention mass ratio, and the x-axis is query position over 500–2000 tokens. The solid orange line (full PISA) sits <b>on top throughout both panels</b>; blue dash-dot is PISA-2, grey dotted is PISA-1 and yellow dashed is BSA. The ordering of the three LSE/mean curves is the same in both panels: PISA &gt; PISA-2 &gt; PISA-1 ≈ BSA (in the right panel PISA-1 and BSA effectively coincide, with BSA marginally higher). Both curves fall <b>monotonically</b> with query position: the longer the prefix and the more blocks eligible, the harder it is for any selector to hit the blocks full attention cares about. Recall@8 includes the three forced blocks, which is why the curves start near 95%; only the declining part reflects selection ability.</span>
+      <span class="pgref">Report p.10</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: aggregated selection quality">
+    <figcaption>
+      <b>Table 7:</b> Block-selection quality on 100 FDA prompts using shared Full-Attention queries and keys, with C = 64 and K = 8. Scores are percentages, averaged over query rows with more than eight eligible blocks. Recall@8 includes the three forced blocks. Boldface marks the best result in each column.
+      <span class="ex">PISA takes all three bold entries: Recall@8 90.95% (against BSA 85.91%, PISA-1 84.75%, PISA-2 88.24%), captured attention mass 86.47% (BSA 85.67%) and attention mass ratio 99.46% (BSA 98.42%). Two readings: the full LSE clearly beats the first-order PISA-1 (90.95 vs 84.75), so the second-order information — differences between children — is where most of the selection quality comes from; and the mass-ratio column exceeds 98% for every selector, meaning the chosen blocks cover nearly all the mass the reference set covers, which compresses the differences between selectors on that metric.</span>
+      <span class="pgref">Report p.21</span>
+    </figcaption>
+  </figure>
+
+  <h3>7.3 Selection latency</h3>
+  <p>Finally, efficiency. What is measured is the latency of <b>the selection stage alone</b>: random BF16 queries and keys, batch 1, 32 query heads, 2 KV heads, $d=64$, $C=64$, $K=8$, $g=2$, dot products accumulated in FP32. Timings include mean-summary construction and all selection stages and <b>exclude</b> attention over the selected blocks.</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: prefill block-selection latency">
+    <figcaption>
+      <b>Figure 3:</b> Prefill block-selection latency from 4K to 256K with C = 64 and K = 8. Timings include mean-summary construction and all selection stages, but exclude attention over the selected blocks. The key-block reuse implementation of PISA uses Q_tile = 4; annotations show speedups over BSA. Complete settings are provided in Appendix B.
+      <span class="ex"><b>The crossover is the headline.</b> Yellow dashed is BSA, grey dotted is PISA's per-query fused kernel, solid orange is the key-block reuse implementation ($Q_{\text{tile}}=4$, the paper's Q4). From 4K to 16K BSA is faster (at 16K, 1.461 ms against Q4's 1.581 ms); from 32K Q4 takes over and pulls away, reaching 2.86× / 5.31× / 9.95× at 64K / 128K / 256K. BSA's curve visibly steepens at long lengths (312.96 ms at 256K) — the $O(N^2/C)$ term at work. Key-block reuse gains a steady 1.30×–1.35× over the per-query implementation from 64K to 256K, modest but consistent: that is the payoff from the $G_Q+C/Q_{\text{tile}}=32<64$ inequality of §5.1.</span>
+      <span class="pgref">Report p.11</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: fixed-length block-selection latency">
+    <figcaption>
+      <b>Table 4:</b> Fixed-length block-selection latency from 4K to 256K. Q1, Q2, and Q4 reuse one leaf-key tile across up to one, two, and four query references, respectively. Boldface marks the lowest latency at each sequence length.
+      <span class="ex">Q1/Q2/Q4 differ in how many queries each leaf key tile serves. Bold marks the row winner: 4K, 8K and 16K go to <b>BSA</b> (0.167007 / 0.462596 / 1.461185 ms); 32K through 256K go to <b>Q4</b> (3.184846 / 6.704480 / 14.452411 / 31.440747 ms). Note also that at 4K, Q4 (0.701181 ms) is slower than per-query (0.573228 ms); the paper explains this directly — at short lengths there are few candidate blocks, so the overhead of organising queries into groups exceeds the reuse benefit, and the trade turns positive from 8K onward.</span>
+      <span class="pgref">Report p.18</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Efficiency takeaway:</b> this is a win-at-length scorecard. Once selection complexity goes from $O(N^2/C)$ to $O(N\log N)$, the benefit only outweighs PISA's fixed extra work when $N$ is large enough; the measured crossover is between 16K and 32K, and at 256K the gap is nearly 10×. Both questions a reader is likely to ask — "is it faster than BSA?" (much faster at long lengths, slower at short ones) and "by how much?" (9.95× on the selection stage; the end-to-end multiple is not measured, see §8.2) — are answered in this section.</div>
+</section>
+
+<!-- ===================== s8 ===================== -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary: lineage, limits, and what is not disclosed</h2>
+
+  <h3>8.1 Limitations (the paper's own)</h3>
+  <p>The Limitations section is one short paragraph: computational constraints limited the model sizes and pretraining budgets explored, and both factors can substantially affect performance and the relative gains over baselines; within the settings evaluated, the central finding — pyramid block selection reduces selection complexity while keeping performance competitive — holds. No other limitation is self-reported.</p>
+
+  <h3>8.2 Where the components come from</h3>
+  <p>Separating each component's upstream attribution makes it clear what is inherited and what is this paper's own change:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Component lineage (organised from the paper's inline citations; not a table from the paper; citations follow the paper's own attribution and this page has not re-checked each reference entry)</caption>
+    <thead><tr><th>Component</th><th>Upstream as attributed by the paper</th><th>Change / integration in this work</th></tr></thead>
+    <tbody>
+      <tr><td>Two-stage block-sparse framework (select, then attend inside)</td><td>General BSA paradigm, attributed to MoBA (Lu et al., 2025) and NSA (Yuan et al., 2025)</td><td>Keeps the two stages; stage one changes from a flat scan over all blocks to a level-by-level narrowing</td></tr>
+      <tr><td>Pooled block summaries for selection</td><td>Query-dependent summaries in MoBA (Lu et al., 2025) and InfLLM-V2 (Zhao et al., 2025)</td><td>Extends a single leaf-level summary into a pyramid of $O(\log N)$ summary levels</td></tr>
+      <tr><td>Multi-level / coarse-to-fine selection</td><td>HiP (Lee et al., ICLR 2025, training-free) repeats selection across levels; LLSA (Zhou et al., CVPR 2026) does hierarchical Top-K for diffusion transformers</td><td>First to make it a <b>trainable</b> language-model attention layer, with an $O(\log N)$ argument for the decode path</td></tr>
+      <tr><td>Block scoring function</td><td>No direct upstream (BSA/NSA-family methods use summary dot products or means)</td><td>LogSumExp over child summaries; Appendix A proves the sandwich "mean of means ≤ summary LSE ≤ parent raw-key LSE" and derives the PISA-1 / PISA-2 Taylor variants from it</td></tr>
+      <tr><td>Shared selection within a GQA group</td><td>NSA (Yuan et al., 2025)</td><td>Kept; the per-head LSE scores are <b>summed</b> (Appendix A.3 notes the diagnostic reference instead averages, so the two can rank blocks differently)</td></tr>
+      <tr><td>Forced-block policy (first / previous / current) and the decode-stage structure</td><td>NSA's default implementation in Flash Linear Attention (Yang &amp; Zhang, 2024)</td><td>Masking and forced-block semantics kept; decoding fuses intermediate and leaf levels into one kernel</td></tr>
+      <tr><td>Two-stage Triton kernels and key-block reuse for training/prefill</td><td>This work</td><td>Stage 1 fuses all intermediate levels with candidate indices staying on-chip; Stage 2 clusters by (KV head, leaf block) and loads each key block once to serve up to 4 queries</td></tr>
+      <tr><td>Evaluation protocol</td><td>lm-evaluation-harness (Biderman et al., 2023), the BASED / JRT containment implementations (Arora et al., 2024), RULER (Hsieh et al., 2024)</td><td>Adopted as-is; containment uses three tasks or six depending on the table (see the Table 2 / Table 6 convention gap)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>8.3 Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><b>End-to-end speed and throughput.</b> Figure 3 and Table 4 measure the <b>selection stage</b> and explicitly exclude attention over the selected blocks; the paper reports no step time, tokens/s or end-to-end speedup, and no measured memory footprint. So "9.95× faster" is a selection-stage figure and should not be read as an end-to-end gain. The benchmark hardware is not named either.</li>
+    <li><b>Modelling quality beyond 64K.</b> 256K appears only in the selection-latency microbenchmark, on random queries and keys. No real model is evaluated at 64K–256K for perplexity or retrieval, yet that is exactly the range where PISA's complexity advantage matters. "Faster at long lengths" has direct evidence; "still good at long lengths" is supported only up to 16K.</li>
+    <li><b>Pyramid maintenance cost is never isolated.</b> The timings include summary construction, but apart from Figure 3 the paper reports neither the extra memory of the pyramid cache during training and decoding nor a memory comparison against BSA. The pyramid is $O((N/C)d)$ elements per KV head — modest, but unmeasured.</li>
+    <li><b>Single seed, no error bars.</b> All training and evaluation runs use seed 42. Differences in Tables 2/3/6 are often in the third decimal or a few points (for instance the RULER average: PISA 62.80 against PISA-2 62.92 and NSA 61.07). No repeats and no significance testing, so the stability of the small gaps is unknown.</li>
+    <li><b>Baseline coverage.</b> Trainable comparisons are BSA, NSA and HiLS only. MoBA (Lu et al., 2025), listed in Table 1, and the SeerAttention, IndexCache, LongCat and InfLLM-V2 references are not evaluated; nor are training-free methods compared for latency at the same lengths.</li>
+    <li><b>LSE versus its truncated approximations disagree across tables.</b> Full PISA wins the Table 7 diagnostic (90.95 vs PISA-2's 88.24) and the loss columns of Table 2, but on the RULER average PISA-2 (62.92) edges out PISA (62.80). The paper does not discuss this reversal; a claim that exact LSE is better would need RULER explained or repeated.</li>
+    <li><b>Contribution of the forced blocks to the diagnostic.</b> Recall@8 necessarily includes three forced blocks, which the paper states in the Figure 2 caption, but no net Recall excluding them is given, so a reader cannot tell how much of the "8 slots" is handed over for free.</li>
+  </ul>
+
+  <h3>8.4 Assessment</h3>
+  <p><b>What the contribution really is.</b> Quadratic block selection is a real engineering bottleneck in long-context systems, and the paper answers it with a structure that is both simple and analysable: build a pooling pyramid and replace "scan every block" with "narrow level by level". The $O(N\log N)$ complexity itself had already been reached by a training-free method (HiP) and by a diffusion-model method (LLSA), so the incremental contribution is threefold: putting hierarchical selection inside a <b>trainable</b> language-model attention layer, replacing the block score with an LSE backed by a sandwich argument, and working out the IO ledger for training/prefill versus decoding and turning it into two Triton kernels. That third point is the most solid — writing out "substitute $G_Q=16$, $Q_{\text{tile}}=4$, $C=64$ and check whether the inequality holds" is far more informative than the customary claim that a kernel is well optimised.</p>
+  <p><b>How strong the evidence is.</b> The division of labour is clear: modelling quality rests on three scales and 100B+10B tokens of training, selection quality on a controlled diagnostic over identical tensors, and selection efficiency on a 4K–256K microbenchmark. Each strand stands on its own, but <b>together they do not add up to "PISA is better across the board."</b> Loss is beaten by HiLS; single-key retrieval is beaten by NSA; the RULER average is beaten by PISA's own PISA-2 variant; containment after continued pretraining is beaten by BSA; selection latency below 16K is beaten by BSA. What holds in every experiment is narrower: the six-task containment average during pretraining (best at all three scales) and selection latency above 32K (2.86× from 64K, 9.95× at 256K). The abstract's phrasing — comparable commonsense reasoning, better retrieval — maps onto exactly those two, and does not overreach. That is an honest abstract.</p>
+  <p><b>Where it applies.</b> The value of the mechanism grows with sequence length; below 16K it is outright slower. Its target is long-context prefill and long-sequence decoding. A reader deploying at 4K–16K gets no reason to adopt it from this paper; at 64K and beyond, the fact that selection grows quadratically with length is genuinely removed, and the quality cost at 16K looks acceptable in these experiments.</p>
+  <p><b>What is still open.</b> The most important question is: if selection is 10× faster, how much faster is the end-to-end forward pass? That depends on the share of time taken by attention over the selected blocks, and the paper does not measure it, so how much of the benefit is realised remains open. Next is whether the pyramid's memory and copying overhead is really amortised as $O(\log N)$ inside a real training loop, and whether quality holds beyond 64K — both need measurements outside this paper's configuration.</p>
+</section>
+
+<!-- ===================== s9 ===================== -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Abbreviations are also hoverable in the prose via dotted underlines.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Reading glossary (hover the dotted abbreviations in the prose for the same definitions)</caption>
+    <thead><tr><th>Term</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>PISA</td><td>Pyramid Sparse Attention</td><td>This paper's method: a pyramid of key levels plus coarse-to-fine level-by-level Top-K selection.</td></tr>
+      <tr><td>BSA</td><td>Block Sparse Attention</td><td>The general family; on this page it means the paper's baseline — single-level Top-K over mean-pooled summaries.</td></tr>
+      <tr><td>Top-K selection</td><td>—</td><td>Keep the $K$ highest-scoring candidate blocks. $K$ is the block budget: 8 for pretraining, 32 for continued pretraining.</td></tr>
+      <tr><td>LSE</td><td>LogSumExp</td><td>$\log\sum_j e^{z_j}$ — the denominator of the softmax, and a continuous measure of how much a block matters to a query.</td></tr>
+      <tr><td>Leaf block</td><td>—</td><td>Level 1 of the pyramid: $C$ adjacent raw keys, the unit that actually takes part in attention.</td></tr>
+      <tr><td>Branching factor $g$</td><td>—</td><td>How many blocks of a level merge into one block of the next. Here $g_0=C$ and $g_\ell=2$ for $\ell\ge1$.</td></tr>
+      <tr><td>GQA</td><td>Grouped-Query Attention</td><td>Query heads share KV heads (Ainslie et al., 2023). Here, heads in a group share one selected block set.</td></tr>
+      <tr><td>$G_Q$</td><td>Query heads per KV head</td><td>32 query heads over 2 KV heads in this paper, so $G_Q=16$.</td></tr>
+      <tr><td>$Q_{\text{tile}}$</td><td>Query tile size</td><td>How many queries one loaded leaf key block serves in Stage 2; the implementation uses 4.</td></tr>
+      <tr><td>PISA-1 / PISA-2</td><td>First- / second-order variants</td><td>Taylor truncations of the LSE score: mean only, and mean plus half the variance.</td></tr>
+      <tr><td>CPT</td><td>Continued Pre-Training</td><td>After 4K pretraining, 10B more tokens extend the length to 16K and the budget to $K=32$.</td></tr>
+      <tr><td>RoPE</td><td>Rotary Position Embedding</td><td>Applied to the high-frequency half of each head only; base raised from 10,000 to 80,000 for continued pretraining.</td></tr>
+      <tr><td>FSDP</td><td>Fully Sharded Data Parallel</td><td>Used with bfloat16 parameters and FP32 reductions.</td></tr>
+      <tr><td>RULER</td><td>—</td><td>Long-context evaluation suite (Hsieh et al., 2024); four needle-in-a-haystack families at 1K–16K here.</td></tr>
+      <tr><td>Containment</td><td>Containment accuracy</td><td>Correct if the generation contains any gold answer as a case-insensitive literal substring; used for retrieval tasks.</td></tr>
+      <tr><td>Recall@K</td><td>—</td><td>Overlap between selected and full-attention reference blocks, forced blocks included. PISA scores 90.95%.</td></tr>
+      <tr><td>Attention mass ratio</td><td>—</td><td>Mass covered by the selected blocks divided by the reference set's mass. PISA scores 99.46%.</td></tr>
+      <tr><td>Triton</td><td>—</td><td>Python-like kernel language for GPUs; both the training/prefill and decoding kernels are written in it.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    An English quick-read of arXiv:2609.31093v1 "Block Sparse Attention with Log-Linear Complexity" (Shanghai Jiao Tong University · Shanghai Innovation Institute · ByteDance Seed).<br>
+    All 3 figures, 7 tables and the algorithm box are extracted from the paper at 300 DPI and shown scaled but uncropped; content tagged <b>[organized]</b> / <b>[estimated]</b>, and the commentary, are the editor's, not the paper's.<br>
+    Paper: <a href="https://arxiv.org/abs/2609.31093">arXiv:2609.31093</a> · 中文精读版: <a href="index.html">阅读中文版</a><br>
+    <span style="opacity:.75">Dark mode · click any image for the original · print-friendly</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

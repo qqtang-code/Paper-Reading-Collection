@@ -14,6 +14,8 @@ PAGES = [
     "/attention-kv-cache/elastic-attention/en.html",
     "/attention-kv-cache/hysparse2/",
     "/attention-kv-cache/hysparse2/en.html",
+    "/attention-kv-cache/pisa/",
+    "/attention-kv-cache/pisa/en.html",
     "/efficient-inference/freetoken/",
     "/efficient-inference/freetoken/en.html",
     "/efficient-inference/reset/",

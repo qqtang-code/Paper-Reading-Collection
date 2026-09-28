@@ -8,6 +8,7 @@
 | Random Attention(2026-09) | KV Cache 驱逐 · 推理模型 · 长思维链 · vLLM | [random-attention/](random-attention/) | [en.html(英文速读)](random-attention/en.html) |
 | Elastic Attention(2026-09) | 混合注意力 · 测试时自适应 · Attention Router · 长上下文 | [elastic-attention/](elastic-attention/) | [en.html(英文速读)](elastic-attention/en.html) |
 | HySparse2(2026-09) | 混合稀疏注意力 · 两级 KV 共享 · 长上下文 · Agentic | [hysparse2/](hysparse2/) | [en.html(完整英译)](hysparse2/en.html) |
+| PISA(2026-09) | 块稀疏注意力 · 金字塔 Top-K · LogSumExp · 长上下文 · O(N log N) | [pisa/](pisa/) | [en.html(英文速读)](pisa/en.html) |
 
 模型层的效率工作(量化、架构压缩、服务系统)见 [efficient-inference/](../efficient-inference/)。
 

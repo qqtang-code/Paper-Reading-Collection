@@ -137,8 +137,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(两篇旗舰论文为完整英译,其余为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete translations for the two flagship papers, quick-read editions for the rest).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(三篇旗舰论文为完整英译,其余为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete translations for the three flagship papers, quick-read editions for the rest).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -149,8 +149,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>8</b> 篇</span><span class="i18n-en"><b>8</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>68</b> 图 + <b>78</b> 表</span><span class="i18n-en"><b>68</b> figures + <b>78</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>9</b> 篇</span><span class="i18n-en"><b>9</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>71</b> 图 + <b>85</b> 表</span><span class="i18n-en"><b>71</b> figures + <b>85</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -244,6 +244,26 @@
       <div class="go">
         <a class="i18n-zh" href="attention-kv-cache/hysparse2/">开始阅读 →</a>
         <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">Read in English →</a>
+      </div>
+    </div>
+
+        <div class="pcard">
+      <span class="cat"><span class="i18n-zh">块稀疏注意力 · 金字塔 Top-K · 长上下文 · O(N log N)</span><span class="i18n-en">Block-Sparse Attention · Pyramid Top-K · Long Context · O(N log N)</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/pisa/">⑨ PISA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">对数线性的块稀疏注意力选择</span></a>
+        <a class="i18n-en" href="attention-kv-cache/pisa/en.html">⑨ PISA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Block Sparse Attention with Log-Linear Complexity</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">块稀疏注意力省下了注意力计算,却没省下"挑哪些块"——为每个 query 扫全部 N/C 个键块,选择阶段仍是 O(N²/C)。PISA 把键池化成 O(log N) 层金字塔,从最粗层逐层 Top-K 展开,块分数改用子块摘要上的 LogSumExp 并用 Jensen 不等式给出夹逼论证。256K 选块延迟比 BSA 快 <b>9.95×</b>,Recall@8 <b>90.95%</b> 对 BSA 的 85.91%;RULER 平均 <b>62.80</b> 对 BSA 的 54.99。16K 以内 BSA 更快,交叉点在 16K–32K 之间。</span>
+        <span class="i18n-en">Block-sparse attention saves the attention compute but not the cost of choosing blocks — scanning all N/C key blocks per query keeps selection at O(N²/C). PISA pools keys into an O(log N)-level pyramid, narrows Top-K level by level from the coarsest, and scores blocks with a LogSumExp over child summaries backed by a Jensen sandwich argument. Selection latency is <b>9.95×</b> faster than BSA at 256K, Recall@8 is <b>90.95%</b> against BSA's 85.91%, and the RULER average is <b>62.80</b> against 54.99. BSA is still faster below 16K; the crossover sits between 16K and 32K.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">3 图 7 表 + 1 算法框图</span><span class="i18n-en">3 figures · 7 tables · 1 algorithm</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.31093">2609.31093</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读版</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/pisa/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/pisa/en.html">Read in English →</a>
       </div>
     </div>
 
