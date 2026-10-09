@@ -14,8 +14,8 @@
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Illustrated paper-reading notes in Chinese and English: efficient inference and benchmarks, every figure/table embedded at 300 DPI. 论文中英文双语精读合集,图文配合,全部图表高清内嵌。">
-<meta name="keywords" content="paper reading, 论文精读, 论文解读, 高效推理, long context, quantization, multimodal embedding, benchmark">
+<meta name="description" content="Illustrated paper-reading notes in Chinese and English: how the visible key set is decided, where model and system efficiency comes from, and how to measure long context — every figure/table embedded at 300 DPI. 论文中英文双语精读合集,图文配合,全部图表高清内嵌。">
+<meta name="keywords" content="paper reading, 论文精读, 论文解读, sparse attention, KV cache, 高效推理, long context, quantization, multimodal embedding, benchmark">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Paper Reading Collection · 论文精读合集">
 <meta property="og:description" content="One illustrated reading page per paper — full Chinese deep-reads plus English editions, every figure at 300 DPI. 每篇论文一个图文配合的精读页,中英双语。">
@@ -74,9 +74,10 @@
             border-radius:10px; padding:8px 18px; font-size:13.5px}
   .stats b{font-size:17px}
 
-  section{margin:48px 0}
+  section{margin:48px 0; scroll-margin-top:60px}
   .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
-  h2.sec{font-size:24px; font-weight:800; margin:0 0 18px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  h2.sec{font-size:24px; font-weight:800; margin:0 0 10px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .axis{font-size:14px; color:var(--muted); margin:0 0 22px; max-width:900px}
 
   .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px}
   .pcard{background:var(--card); border:1px solid var(--border); border-radius:14px;
@@ -97,6 +98,17 @@
                border-radius:8px; padding:6px 18px; font-weight:700}
   .pcard .go a:hover{filter:brightness(1.1)}
 
+  /* mechanism matrix */
+  .matrix-wrap{overflow-x:auto; margin:0 0 8px}
+  table.matrix{border-collapse:collapse; width:100%; min-width:840px; font-size:13px; line-height:1.6; background:var(--card)}
+  table.matrix th{background:var(--th-bg); border:1px solid var(--border); padding:8px 11px; font-weight:700; text-align:left; white-space:nowrap}
+  table.matrix td{border:1px solid var(--border); padding:8px 11px; vertical-align:top}
+  table.matrix td.num{text-align:center; font-weight:700; color:var(--accent); white-space:nowrap}
+  table.matrix td.pap{font-weight:700; min-width:136px}
+  table.matrix td.pap a{color:var(--accent); text-decoration:none}
+  table.matrix tbody tr:nth-child(even) td{background:#fafbfd}
+  html[data-theme="dark"] table.matrix tbody tr:nth-child(even) td{background:#141b29}
+
   footer{margin-top:70px; padding:30px 0 46px; border-top:1px solid var(--border);
          color:var(--muted); font-size:13.5px; text-align:center}
   footer a{color:var(--accent); text-decoration:none}
@@ -106,7 +118,8 @@
             box-shadow:var(--shadow); display:none}
   .back-top.show{display:block}
 
-  @media print{.topbar,.back-top,.theme-toggle,.lang-toggle{display:none!important}}
+  @media print{.topbar,.back-top,.theme-toggle,.lang-toggle{display:none!important}
+               .pcard{break-inside:avoid} table.matrix{min-width:0; font-size:11px}}
   @media (max-width:760px){header.hero h1{font-size:25px}}
 </style>
 </head>
@@ -119,6 +132,7 @@
       <span class="i18n-en">Paper Reading<span> Collection</span></span>
     </a>
     <div class="links">
+      <a href="#matrix"><span class="i18n-zh">机制对照</span><span class="i18n-en">Matrix</span></a>
       <a href="#attention"><span class="i18n-zh">注意力与 KV Cache</span><span class="i18n-en">Attention &amp; KV Cache</span></a>
       <a href="#inference"><span class="i18n-zh">高效推理</span><span class="i18n-en">Efficient Inference</span></a>
       <a href="#benchmark"><span class="i18n-zh">评测基准</span><span class="i18n-en">Benchmarks</span></a>
@@ -137,8 +151,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(三篇旗舰论文为完整英译,其余为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete translations for the three flagship papers, quick-read editions for the rest).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(四篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the four flagship papers, quick-read editions for the other six).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -149,8 +163,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>9</b> 篇</span><span class="i18n-en"><b>9</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>71</b> 图 + <b>85</b> 表</span><span class="i18n-en"><b>71</b> figures + <b>85</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>10</b> 篇</span><span class="i18n-en"><b>10</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>75</b> 图 + <b>95</b> 表</span><span class="i18n-en"><b>75</b> figures + <b>95</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -159,59 +173,191 @@
 
 <div class="wrap">
 
+<section id="matrix">
+  <div class="sec-no">How to read the collection</div>
+  <h2 class="sec">
+    <span class="i18n-zh">机制对照:10 篇论文的分工图</span>
+    <span class="i18n-en">Mechanism matrix: how the ten papers divide the work</span>
+  </h2>
+  <p class="axis">
+    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑥)、模型权重与系统栈(⑦–⑨)、度量而非优化(⑩)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
+    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑥), the model weights and the system stack (⑦–⑨), or measurement rather than optimization (⑩). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
+  </p>
+  <div class="matrix-wrap">
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th><span class="i18n-zh">论文</span><span class="i18n-en">Paper</span></th>
+        <th><span class="i18n-zh">省的是什么</span><span class="i18n-en">What is saved</span></th>
+        <th><span class="i18n-zh">机制 / 决策者</span><span class="i18n-en">Mechanism / decision maker</span></th>
+        <th><span class="i18n-zh">需要训练吗</span><span class="i18n-en">Training?</span></th>
+        <th><span class="i18n-zh">代表数字</span><span class="i18n-en">Headline numbers</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">1</td>
+        <td class="pap"><a href="attention-kv-cache/cowindow-attention/">CoWindow Attention</a></td>
+        <td><span class="i18n-zh">跨 head 重复的长程 query-key 连接</span><span class="i18n-en">Long-range query-key connections duplicated across heads</span></td>
+        <td><span class="i18n-zh">位置与全局 KV-head 索引(零学习、零额外开销)</span><span class="i18n-en">Position and global KV-head index (no learning, no extra overhead)</span></td>
+        <td><span class="i18n-zh">从头训练(0.6B→14B scaling law)</span><span class="i18n-en">From scratch (0.6B→14B scaling law)</span></td>
+        <td><span class="i18n-zh">8K 覆盖消融 21.32 → 89.73;128K 前向 7.4× / 反向 8.6×;14B 训 32K 时 FLOPs −28.5%</span><span class="i18n-en">8K coverage ablation 21.32 → 89.73; 128K forward 7.4× / backward 8.6×; FLOPs −28.5% at 14B/32K</span></td>
+      </tr>
+      <tr>
+        <td class="num">2</td>
+        <td class="pap"><a href="attention-kv-cache/hysparse2/">HySparse2</a></td>
+        <td><span class="i18n-zh">长上下文 prefill 里重复的 KV 构建与跨层重复存储</span><span class="i18n-en">Duplicated KV construction and cross-layer storage in long-context prefill</span></td>
+        <td><span class="i18n-zh">复用同模型全注意力层已有的选择与隐状态(两级 KV 共享)</span><span class="i18n-en">Reuses the model's own full-attention layers' choices and hidden states (two-level KV sharing)</span></td>
+        <td><span class="i18n-zh">从头预训练 + 后训练(80B-A3B,1M 上下文)</span><span class="i18n-en">Pre-training + post-training (80B-A3B, 1M context)</span></td>
+        <td><span class="i18n-zh">1M 上下文 prefill FLOPs 降 2.92× / 5.02×;KV cache 2.69 GB;MRCR-v2 +11.30、RULER-v2 +19.81</span><span class="i18n-en">1M-context prefill FLOPs −2.92× / −5.02×; KV cache 2.69 GB; MRCR-v2 +11.30, RULER-v2 +19.81</span></td>
+      </tr>
+      <tr>
+        <td class="num">3</td>
+        <td class="pap"><a href="attention-kv-cache/pisa/">PISA</a></td>
+        <td><span class="i18n-zh">「挑哪些块」本身的开销(块稀疏的选择仍是 O(N²/C))</span><span class="i18n-en">The cost of choosing blocks itself (block-sparse selection is still O(N²/C))</span></td>
+        <td><span class="i18n-zh">键金字塔上的 LogSumExp 打分 + 逐层 Top-K(每 query O(log N))</span><span class="i18n-en">LogSumExp scoring over a key pyramid + level-wise Top-K (O(log N) per query)</span></td>
+        <td><span class="i18n-zh">从头训练(4K 预训练 + 16K 继续预训练)</span><span class="i18n-en">From scratch (4K pre-training + 16K continued)</span></td>
+        <td><span class="i18n-zh">256K 选块延迟比 BSA 快 9.95×;Recall@8 90.95% 对 85.91%;RULER 平均 62.80 对 54.99</span><span class="i18n-en">9.95× faster block selection than BSA at 256K; Recall@8 90.95% vs 85.91%; RULER avg 62.80 vs 54.99</span></td>
+      </tr>
+      <tr>
+        <td class="num">4</td>
+        <td class="pap"><a href="attention-kv-cache/elastic-attention/">Elastic Attention</a></td>
+        <td><span class="i18n-zh">混合注意力里被写死的 FA/SA 稀疏比</span><span class="i18n-en">The hard-coded FA/SA sparsity ratio of hybrid attention</span></td>
+        <td><span class="i18n-zh">学习到的轻量路由器(0.27M 参数)</span><span class="i18n-en">A learned lightweight router (0.27M parameters)</span></td>
+        <td><span class="i18n-zh">只训路由器,骨干冻结(8×A800,12 小时)</span><span class="i18n-en">Router only, backbone frozen (8×A800, 12 h)</span></td>
+        <td><span class="i18n-zh">LongBench-E 平均分全部第一;加速 1.51×–3.28×;路由延迟 0.196 ms</span><span class="i18n-en">Tops LongBench-E on all backbones; 1.51×–3.28× speedup; 0.196 ms router latency</span></td>
+      </tr>
+      <tr>
+        <td class="num">5</td>
+        <td class="pap"><a href="attention-kv-cache/declarative-attention/">Declarative Attention</a></td>
+        <td><span class="i18n-zh">解码时实际读取的 KV cache 量</span><span class="i18n-en">KV-cache reads actually issued during decoding</span></td>
+        <td><span class="i18n-zh">模型自己在思维链里声明</span><span class="i18n-en">The model declares it in its chain-of-thought</span></td>
+        <td><span class="i18n-zh">零训练、零样本</span><span class="i18n-en">Zero training, zero-shot</span></td>
+        <td><span class="i18n-zh">注意力读取 −52.0% / −31.1%;精度 −1.27pp / −2.75pp;墙钟 0.71× / 0.77×</span><span class="i18n-en">Attention reads −52.0% / −31.1%; accuracy −1.27pp / −2.75pp; wall-time 0.71× / 0.77×</span></td>
+      </tr>
+      <tr>
+        <td class="num">6</td>
+        <td class="pap"><a href="attention-kv-cache/random-attention/">Random Attention</a></td>
+        <td><span class="i18n-zh">被驱逐的那部分 KV 条目本身</span><span class="i18n-en">The KV entries that get evicted</span></td>
+        <td><span class="i18n-zh">不由任何信号决定:prompt 锚定 + 头内均匀随机</span><span class="i18n-en">No signal at all: prompt pinning + uniform random eviction per head</span></td>
+        <td><span class="i18n-zh">零训练(免调参)</span><span class="i18n-en">Zero training (no tuning)</span></td>
+        <td><span class="i18n-zh">60 格中 31 格显著领先;vLLM 吞吐 +32–43%</span><span class="i18n-en">Significantly ahead in 31 of 60 cells; +32–43% vLLM throughput</span></td>
+      </tr>
+      <tr>
+        <td class="num">7</td>
+        <td class="pap"><a href="efficient-inference/deepseek-v41-flash/">DeepSeek-V4.1-Flash</a></td>
+        <td><span class="i18n-zh">全栈:激活参数、KV cache 体积、量化位宽</span><span class="i18n-en">The whole stack: active parameters, KV-cache size, precision</span></td>
+        <td><span class="i18n-zh">架构 + 缓存 + 精度协同(Causal Encoder-Decoder / CSA2 / FP4)</span><span class="i18n-en">Architecture + cache + precision together (Causal Encoder-Decoder / CSA2 / FP4)</span></td>
+        <td><span class="i18n-zh">预训练技术报告(45T 多模态 token)</span><span class="i18n-en">Pre-training report (45T multimodal tokens)</span></td>
+        <td><span class="i18n-zh">全局 KV cache 每 token 890 字节;DeepSWE v1.1 74.2;Codeforces 3471</span><span class="i18n-en">890 bytes/token global KV cache; DeepSWE v1.1 74.2; Codeforces 3471</span></td>
+      </tr>
+      <tr>
+        <td class="num">8</td>
+        <td class="pap"><a href="efficient-inference/reset/">ReSET</a></td>
+        <td><span class="i18n-zh">NVFP4 量化带来的精度损失</span><span class="i18n-en">The accuracy lost to NVFP4 quantization</span></td>
+        <td><span class="i18n-zh">按解码步骤调整 softmax 温度 + 小 M 解码内核</span><span class="i18n-en">Per-step softmax temperature + a small-M decode kernel</span></td>
+        <td><span class="i18n-zh">零权重改动(免训练)</span><span class="i18n-en">No weight changes (training-free)</span></td>
+        <td><span class="i18n-zh">AIME-120 +2.6(Qwen3-32B 77.5,超 BF16 的 75.8);内核 1.57–2.49×</span><span class="i18n-en">AIME-120 +2.6 (Qwen3-32B 77.5, above BF16's 75.8); kernels 1.57–2.49×</span></td>
+      </tr>
+      <tr>
+        <td class="num">9</td>
+        <td class="pap"><a href="efficient-inference/freetoken/">FreeToken</a></td>
+        <td><span class="i18n-zh">单机显存与内存带宽瓶颈</span><span class="i18n-en">Single-machine memory and bandwidth limits</span></td>
+        <td><span class="i18n-zh">带宽自适应执行</span><span class="i18n-en">Bandwidth-adaptive execution</span></td>
+        <td><span class="i18n-zh">系统实现,非训练方法</span><span class="i18n-en">A systems contribution, not a training method</span></td>
+        <td><span class="i18n-zh">8GB 笔记本跑 35B;台式机跑 284B;单卡工作站跑 753B GLM-5.2</span><span class="i18n-en">35B on an 8GB laptop; 284B on a desktop; 753B GLM-5.2 on one workstation GPU</span></td>
+      </tr>
+      <tr>
+        <td class="num">10</td>
+        <td class="pap"><a href="benchmarks/mmlongembed/">MMLongEmbed</a></td>
+        <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
+        <td><span class="i18n-zh">基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型</span><span class="i18n-en">Benchmark construction: 4 tasks / 8 datasets / 8,460 queries / 11 models</span></td>
+        <td><span class="i18n-zh">需要(训练与评测协议)</span><span class="i18n-en">Yes (training and evaluation protocols)</span></td>
+        <td><span class="i18n-zh">现役模型靠表面特征匹配"作弊";细粒度保持随长度衰退</span><span class="i18n-en">Current models "cheat" via surface matching; fine-grained retention decays with length</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
 <section id="attention">
   <div class="sec-no">Category 01</div>
   <h2 class="sec">
     <span class="i18n-zh">🎯 注意力与 KV Cache</span>
     <span class="i18n-en">🎯 Attention &amp; KV Cache</span>
   </h2>
+  <p class="axis">
+    <span class="i18n-zh">一层里「哪些 key 被看到」由谁决定。六篇按决策权排列:<b>结构/位置 → 复用已有选择 → 层内内容打分 → 层内学习路由 → 模型自己声明 → 不需要信号</b>。</span>
+    <span class="i18n-en">Who decides which keys a layer sees. The six papers run from external structure to the model itself, and finally to a deliberate refusal to decide: <b>position/structure → reuse of an existing choice → in-layer content scoring → an in-layer learned router → the model's own declaration → no signal at all</b>.</span>
+  </p>
   <div class="cards">
 
-<div class="pcard">
-      <span class="cat"><span class="i18n-zh">稀疏注意力 · KV Cache · 长上下文</span><span class="i18n-en">Sparse Attention · KV Cache · Long Context</span></span>
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">稀疏注意力 · 结构化窗口 · GQA · 张量并行</span><span class="i18n-en">Sparse Attention · Structured Windows · GQA · Tensor Parallelism</span></span>
       <h3>
-        <a class="i18n-zh" href="attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html">① Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
-        <a class="i18n-en" href="attention-kv-cache/declarative-attention/en.html">① Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
+        <a class="i18n-zh" href="attention-kv-cache/cowindow-attention/">① CoWindow Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">完整因果覆盖是 head 集合的集体属性</span></a>
+        <a class="i18n-en" href="attention-kv-cache/cowindow-attention/en.html">① CoWindow Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Full Causal Coverage Is a Collective Property</span></a>
       </h3>
       <p class="one">
-        <span class="i18n-zh">让模型在思维链里用标签声明"自己要看哪里",引擎解析声明并跳过大部分 KV cache 读取。零训练零样本:注意力读取降 <b>52.0% / 31.1%</b>,精度仅降 1.27pp / 2.75pp,解码墙钟 <b>0.71× / 0.77×</b>。</span>
-        <span class="i18n-en">The model declares where to look with tags in its chain-of-thought; the engine parses the declarations and skips most KV-cache reads. Zero training, zero-shot: attention reads down <b>52.0% / 31.1%</b>, accuracy down only 1.27pp / 2.75pp, decode wall-time <b>0.71× / 0.77×</b>.</span>
+        <span class="i18n-zh">所有 KV head 共享近邻窗与前缀 sink 窗,剩余长程距离均分成互补区间、每 head 一段——单个 head 对远处稀疏,合起来对整条因果前缀稠密。<b>不带路由器也不带索引器</b>(选择开销 O(1)、辅助状态 O(H_k)),按全局 KV-head 编号对齐张量并行。8K 覆盖消融上 100% 覆盖拿到 <b>89.73%</b>(重复窗仅 21.32%),128K 算子级前向 <b>7.4×</b> / 反向 <b>8.6×</b>,14B 训 32K 时总训练 FLOPs 降 <b>28.5%</b>。</span>
+        <span class="i18n-en">All KV heads share a near window and a prefix-sink window while the remaining long-range distances are split into complementary intervals, one per head — individually sparse at distance, collectively dense over the causal prefix. <b>No router, no indexer</b> (selection cost O(1), auxiliary state O(H_k)), with windows assigned by global KV-head index to align with tensor parallelism. 100% coverage reaches <b>89.73%</b> on the 8K ablation (duplicated windows: 21.32%); at 128K the operator runs <b>7.4×</b> faster forward and <b>8.6×</b> backward, with <b>28.5%</b> fewer total training FLOPs at 14B/32K.</span>
       </p>
       <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">10 图 10 表</span><span class="i18n-en">10 figures · 10 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.02737">2609.02737</a></span>
-        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+        <span>2026-10</span><span><span class="i18n-zh">4 图 10 表 + 2 算法</span><span class="i18n-en">4 figures · 10 tables · 2 algorithms</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.32704">2609.32704</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html">开始阅读 →</a>
-        <a class="i18n-en" href="attention-kv-cache/declarative-attention/en.html">Read in English →</a>
+        <a class="i18n-zh" href="attention-kv-cache/cowindow-attention/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/cowindow-attention/en.html">Read in English →</a>
       </div>
     </div>
 
-<div class="pcard">
-      <span class="cat"><span class="i18n-zh">KV Cache 驱逐 · 推理模型 · 高效服务</span><span class="i18n-en">KV Cache Eviction · Reasoning Models · Efficient Serving</span></span>
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">混合稀疏注意力 · 两级 KV 共享 · Agentic · MoE</span><span class="i18n-en">Hybrid Sparse Attention · Two-Level KV Sharing · Agentic · MoE</span></span>
       <h3>
-        <a class="i18n-zh" href="attention-kv-cache/random-attention/">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">重新思考面向高效推理的 KV Cache 驱逐</span></a>
-        <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">④ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Rethinking KV Cache Eviction for Efficient Reasoning</span></a>
+        <a class="i18n-zh" href="attention-kv-cache/hysparse2/">② HySparse2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">两级 KV 共享的混合稀疏注意力</span></a>
+        <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">② HySparse2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Hybrid Sparse Attention with Two-Level KV Sharing</span></a>
       </h3>
       <p class="one">
-        <span class="i18n-zh">KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐,4 模型 × 6 任务追平最强基线、<b>60 格中 31 格显著领先</b>,vLLM 吞吐再快 <b>32–43%</b>——一篇把"选择信号几乎不贡献精度"钉死的机制论文。</span>
-        <span class="i18n-en">KV cache eviction needs no score: pin the prompt and evict uniformly at random within each head — matching the strongest evictor across 4 models × 6 reasoning tasks (<b>significantly ahead in 31 of 60 cells</b>) while serving <b>32–43% higher throughput</b> in vLLM, with a full mechanistic account of why the selection signal buys almost nothing.</span>
+        <span class="i18n-zh">把"局部性"从一条需要自身隐状态的独立 SWA 分支,改写成"最近窗口永远入选"的固定选择——cross-decoder 从此不再依赖自己的逐层隐状态,<b>prefill 只要跑完半个模型就能退出</b>。1M 上下文 prefill FLOPs 降 <b>2.92×/5.02×</b>、KV cache 压到 <b>2.69 GB</b>,后训练检索 MRCR-v2 <b>+11.30</b>、RULER-v2 <b>+19.81</b> 个百分点。</span>
+        <span class="i18n-en">Rewrites locality from a branch needing its own hidden states into "the recent window is always selected", so the cross-decoder no longer depends on its own hidden suffix — <b>prefill can exit after half the model</b>. At 1M context: prefill FLOPs down <b>2.92×/5.02×</b>, KV cache down to <b>2.69 GB</b>, post-training retrieval up <b>+11.30</b> MRCR-v2 and <b>+19.81</b> RULER-v2 points.</span>
       </p>
       <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">5 图 11 表</span><span class="i18n-en">5 figures · 11 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.03430">2609.03430</a></span>
-        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+        <span>2026-09</span><span><span class="i18n-zh">5 图 5 表</span><span class="i18n-en">5 figures · 5 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.26368">2609.26368</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="attention-kv-cache/random-attention/">开始阅读 →</a>
-        <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">Read in English →</a>
+        <a class="i18n-zh" href="attention-kv-cache/hysparse2/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">Read in English →</a>
       </div>
     </div>
 
-<div class="pcard">
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">块稀疏注意力 · 金字塔 Top-K · LogSumExp · O(N log N)</span><span class="i18n-en">Block Sparse · Pyramid Top-K · LogSumExp · O(N log N)</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/pisa/">③ PISA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">对数线性的块稀疏注意力选择</span></a>
+        <a class="i18n-en" href="attention-kv-cache/pisa/en.html">③ PISA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Block Sparse Attention with Log-Linear Complexity</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">块稀疏注意力省下了注意力计算,却没省下"挑哪些块"——为每个 query 扫全部 N/C 个键块,选择阶段仍是 O(N²/C)。PISA 把键池化成 O(log N) 层金字塔,从最粗层逐层 Top-K 展开,块分数改用子块摘要上的 LogSumExp 并用 Jensen 不等式给出夹逼论证。256K 选块延迟比 BSA 快 <b>9.95×</b>,Recall@8 <b>90.95%</b> 对 BSA 的 85.91%;RULER 平均 <b>62.80</b> 对 BSA 的 54.99。16K 以内 BSA 更快,交叉点在 16K–32K 之间。</span>
+        <span class="i18n-en">Block-sparse attention saves the attention compute but not the cost of choosing blocks — scanning all N/C key blocks per query keeps selection at O(N²/C). PISA pools keys into an O(log N)-level pyramid, narrows Top-K level by level from the coarsest, and scores blocks with a LogSumExp over child summaries backed by a Jensen sandwich argument. Selection latency is <b>9.95×</b> faster than BSA at 256K, Recall@8 is <b>90.95%</b> against BSA's 85.91%, and the RULER average is <b>62.80</b> against 54.99. BSA is still faster below 16K; the crossover sits between 16K and 32K.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">3 图 7 表 + 1 算法框图</span><span class="i18n-en">3 figures · 7 tables · 1 algorithm</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.31093">2609.31093</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读版</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/pisa/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/pisa/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
       <span class="cat"><span class="i18n-zh">混合注意力 · 测试时自适应 · 长上下文</span><span class="i18n-en">Hybrid Attention · Test-time Adaptation · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="attention-kv-cache/elastic-attention/">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">让模型的稀疏比随输入"伸缩"</span></a>
-        <a class="i18n-en" href="attention-kv-cache/elastic-attention/en.html">⑦ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Test-time Adaptive Sparsity Ratios for Efficient Transformers</span></a>
+        <a class="i18n-zh" href="attention-kv-cache/elastic-attention/">④ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">让模型的稀疏比随输入"伸缩"</span></a>
+        <a class="i18n-en" href="attention-kv-cache/elastic-attention/en.html">④ Elastic Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Test-time Adaptive Sparsity Ratios for Efficient Transformers</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">混合注意力的 FA/SA 比例从静态超参数变成<b>输入自适应</b>:每层一个 0.27M 参数的 Attention Router,推理时把每个 KV 头分到全注意力或稀疏注意力——摘要/代码任务稀疏到 ~0.82,问答任务守住 0.63–0.68。8×A800 训练 <b>12 小时</b>、骨干完全冻结,3 个骨干在 LongBench-E 平均分全部第一,RULER 256K 外推优势最大;路由器延迟 <b>0.196 ms</b> 且与序列长度无关。</span>
@@ -228,42 +374,42 @@
     </div>
 
     <div class="pcard">
-      <span class="cat"><span class="i18n-zh">混合稀疏注意力 · 两级 KV 共享 · 长上下文 · Agentic</span><span class="i18n-en">Hybrid Sparse Attention · Two-Level KV Sharing · Long Context · Agentic</span></span>
+      <span class="cat"><span class="i18n-zh">声明式稀疏注意力 · KV Cache · CoT</span><span class="i18n-en">Declarative Sparsity · KV Cache · CoT</span></span>
       <h3>
-        <a class="i18n-zh" href="attention-kv-cache/hysparse2/">⑧ HySparse2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">两级 KV 共享的混合稀疏注意力</span></a>
-        <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">⑧ HySparse2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Hybrid Sparse Attention with Two-Level KV Sharing</span></a>
+        <a class="i18n-zh" href="attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html">⑤ Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">模型可以在思维链里控制自己的注意力</span></a>
+        <a class="i18n-en" href="attention-kv-cache/declarative-attention/en.html">⑤ Declarative Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Language Models Can Control Their Own Attention</span></a>
       </h3>
       <p class="one">
-        <span class="i18n-zh">把"局部性"从一条需要自身隐状态的独立 SWA 分支,改写成"最近窗口永远入选"的固定选择——cross-decoder 从此不再依赖自己的逐层隐状态,<b>prefill 只要跑完半个模型就能退出</b>。1M 上下文 prefill FLOPs 降 <b>2.92×/5.02×</b>、KV cache 压到 <b>2.69 GB</b>,后训练检索 MRCR-v2 <b>+11.30</b>、RULER-v2 <b>+19.81</b> 个百分点。</span>
-        <span class="i18n-en">Rewrites locality from a branch needing its own hidden states into "the recent window is always selected", so the cross-decoder no longer depends on its own layer-by-layer hidden suffix — <b>prefill can exit after half the model</b>. At 1M context: prefill FLOPs down <b>2.92×/5.02×</b>, KV cache down to <b>2.69 GB</b>, post-training retrieval up <b>+11.30</b> MRCR-v2 and <b>+19.81</b> RULER-v2 points.</span>
+        <span class="i18n-zh">让模型在思维链里用标签声明"自己要看哪里",引擎解析声明并跳过大部分 KV cache 读取。零训练零样本:注意力读取降 <b>52.0% / 31.1%</b>,精度仅降 1.27pp / 2.75pp,解码墙钟 <b>0.71× / 0.77×</b>。</span>
+        <span class="i18n-en">The model declares where to look with tags in its chain-of-thought; the engine parses the declarations and skips most KV-cache reads. Zero training, zero-shot: attention reads down <b>52.0% / 31.1%</b>, accuracy down only 1.27pp / 2.75pp, decode wall-time <b>0.71× / 0.77×</b>.</span>
       </p>
       <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">5 图 5 表</span><span class="i18n-en">5 figures · 5 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.26368">2609.26368</a></span>
-        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+        <span>2026-09</span><span><span class="i18n-zh">10 图 10 表</span><span class="i18n-en">10 figures · 10 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.02737">2609.02737</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="attention-kv-cache/hysparse2/">开始阅读 →</a>
-        <a class="i18n-en" href="attention-kv-cache/hysparse2/en.html">Read in English →</a>
+        <a class="i18n-zh" href="attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/declarative-attention/en.html">Read in English →</a>
       </div>
     </div>
 
-        <div class="pcard">
-      <span class="cat"><span class="i18n-zh">块稀疏注意力 · 金字塔 Top-K · 长上下文 · O(N log N)</span><span class="i18n-en">Block-Sparse Attention · Pyramid Top-K · Long Context · O(N log N)</span></span>
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">KV Cache 驱逐 · 推理模型 · 高效服务</span><span class="i18n-en">KV Cache Eviction · Reasoning Models · Efficient Serving</span></span>
       <h3>
-        <a class="i18n-zh" href="attention-kv-cache/pisa/">⑨ PISA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">对数线性的块稀疏注意力选择</span></a>
-        <a class="i18n-en" href="attention-kv-cache/pisa/en.html">⑨ PISA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Block Sparse Attention with Log-Linear Complexity</span></a>
+        <a class="i18n-zh" href="attention-kv-cache/random-attention/">⑥ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">重新思考面向高效推理的 KV Cache 驱逐</span></a>
+        <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">⑥ Random Attention<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Rethinking KV Cache Eviction for Efficient Reasoning</span></a>
       </h3>
       <p class="one">
-        <span class="i18n-zh">块稀疏注意力省下了注意力计算,却没省下"挑哪些块"——为每个 query 扫全部 N/C 个键块,选择阶段仍是 O(N²/C)。PISA 把键池化成 O(log N) 层金字塔,从最粗层逐层 Top-K 展开,块分数改用子块摘要上的 LogSumExp 并用 Jensen 不等式给出夹逼论证。256K 选块延迟比 BSA 快 <b>9.95×</b>,Recall@8 <b>90.95%</b> 对 BSA 的 85.91%;RULER 平均 <b>62.80</b> 对 BSA 的 54.99。16K 以内 BSA 更快,交叉点在 16K–32K 之间。</span>
-        <span class="i18n-en">Block-sparse attention saves the attention compute but not the cost of choosing blocks — scanning all N/C key blocks per query keeps selection at O(N²/C). PISA pools keys into an O(log N)-level pyramid, narrows Top-K level by level from the coarsest, and scores blocks with a LogSumExp over child summaries backed by a Jensen sandwich argument. Selection latency is <b>9.95×</b> faster than BSA at 256K, Recall@8 is <b>90.95%</b> against BSA's 85.91%, and the RULER average is <b>62.80</b> against 54.99. BSA is still faster below 16K; the crossover sits between 16K and 32K.</span>
+        <span class="i18n-zh">KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐,4 模型 × 6 任务追平最强基线、<b>60 格中 31 格显著领先</b>,vLLM 吞吐再快 <b>32–43%</b>——一篇把"选择信号几乎不贡献精度"钉死的机制论文。</span>
+        <span class="i18n-en">KV cache eviction needs no score: pin the prompt and evict uniformly at random within each head — matching the strongest evictor across 4 models × 6 reasoning tasks (<b>significantly ahead in 31 of 60 cells</b>) while serving <b>32–43% higher throughput</b> in vLLM, with a full mechanistic account of why the selection signal buys almost nothing.</span>
       </p>
       <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">3 图 7 表 + 1 算法框图</span><span class="i18n-en">3 figures · 7 tables · 1 algorithm</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.31093">2609.31093</a></span>
-        <span class="i18n-zh">中文精读 + 英文速读版</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+        <span>2026-09</span><span><span class="i18n-zh">5 图 11 表</span><span class="i18n-en">5 figures · 11 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.03430">2609.03430</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="attention-kv-cache/pisa/">开始阅读 →</a>
-        <a class="i18n-en" href="attention-kv-cache/pisa/en.html">Read in English →</a>
+        <a class="i18n-zh" href="attention-kv-cache/random-attention/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">Read in English →</a>
       </div>
     </div>
 
@@ -276,33 +422,37 @@
     <span class="i18n-zh">⚡ 高效推理与部署</span>
     <span class="i18n-en">⚡ Efficient Inference &amp; Deployment</span>
   </h2>
+  <p class="axis">
+    <span class="i18n-zh">在模型权重与系统栈上省算力与显存,按「模型 → 权重 → 系统」排列:<b>整篇模型报告的架构与缓存压缩 → 量化精度与定制内核 → 服务系统与部署形态</b>。</span>
+    <span class="i18n-en">Saving compute and memory in the weights and the system stack, ordered "model → weights → system": <b>a full model report on architecture and cache compression → quantization accuracy and custom kernels → the serving system and deployment shape</b>.</span>
+  </p>
   <div class="cards">
 
-        <div class="pcard">
-      <span class="cat"><span class="i18n-zh">MoE · 边缘部署 · 带宽自适应</span><span class="i18n-en">MoE · Edge Deployment · Bandwidth-Adaptive</span></span>
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">KV Cache 压缩 · MoE · 多模态 · 长上下文</span><span class="i18n-en">KV Cache Compression · MoE · Multimodal · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/freetoken/">② FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">边缘原生的 MoE 服务系统</span></a>
-        <a class="i18n-en" href="efficient-inference/freetoken/en.html">② FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Edge-Native MoE Serving with Bandwidth-Adaptive Execution</span></a>
+        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">⑦ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">552B 多模态 MoE 高效推理技术报告</span></a>
+        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">⑦ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Technical Report · 552B Multimodal MoE</span></a>
       </h3>
       <p class="one">
-        <span class="i18n-zh">把个人电脑变成统一的弹性推理平台:带宽自适应执行让 <b>8GB 笔记本跑 35B</b>、台式机跑 284B、单张工作站 GPU 跑 <b>753B GLM-5.2</b>,快到能支撑真实 agent 负载。</span>
-        <span class="i18n-en">Turns the consumer PC into one elastic inference platform: bandwidth-adaptive execution puts a <b>35B model on an 8GB laptop</b>, 284B on a desktop, and <b>753B GLM-5.2 on a single workstation GPU</b> — fast enough for real agent workloads.</span>
+        <span class="i18n-zh">DeepSeek-V4.1-Flash 技术报告:552B 多模态 MoE 用 Causal Encoder-Decoder 让 prefill 只激活 8B;CSA2 跨层 KV 复用 + FP4 量化把全局 KV Cache 压到<b>每 token 890 字节</b>(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代 1/8——性能反超更大的 V4-Flash:DeepSWE v1.1 <b>74.2</b>、Codeforces <b>3471</b>。</span>
+        <span class="i18n-en">The DeepSeek-V4.1-Flash technical report: a 552B multimodal MoE whose Causal Encoder-Decoder activates just 8B in prefill; CSA2 cross-layer KV reuse + FP4 squeeze the global KV cache to <b>890 bytes/token</b> (1/4 of V4-Flash, 1/437 of V1) while SWA Bounded Replay shrinks the persistent cache to 1/8 of the last generation — outperforming the larger V4-Flash: DeepSWE v1.1 <b>74.2</b>, Codeforces <b>3471</b>.</span>
       </p>
       <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">5 图 1 表</span><span class="i18n-en">5 figures · 1 table</span></span><span>arXiv:<a href="https://arxiv.org/abs/2608.16157">2608.16157</a></span>
-        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
+        <span>2026-09</span><span><span class="i18n-zh">12 图 5 表</span><span class="i18n-en">12 figures · 5 tables</span></span><span><a href="https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page">GitHub</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="efficient-inference/freetoken/">开始阅读 →</a>
-        <a class="i18n-en" href="efficient-inference/freetoken/en.html">Read in English →</a>
+        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">Read in English →</a>
       </div>
     </div>
 
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">量化 · NVFP4 · 温度缩放</span><span class="i18n-en">Quantization · NVFP4 · Temperature Scaling</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/reset/">③ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Accurate Latency-Critical NVFP4 Reasoning</span></a>
-        <a class="i18n-en" href="efficient-inference/reset/en.html">③ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Step-Aware Temperature Scaling for NVFP4 Reasoning</span></a>
+        <a class="i18n-zh" href="efficient-inference/reset/">⑧ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Accurate Latency-Critical NVFP4 Reasoning</span></a>
+        <a class="i18n-en" href="efficient-inference/reset/en.html">⑧ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Step-Aware Temperature Scaling for NVFP4 Reasoning</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">NVFP4 低精度推理在延迟敏感场景的精度救星:<b>步骤感知温度缩放</b>按解码步骤动态调整 softmax 温度,不牺牲延迟地恢复量化精度。</span>
@@ -318,27 +468,27 @@
       </div>
     </div>
 
-        <div class="pcard">
-      <span class="cat"><span class="i18n-zh">KV Cache 压缩 · MoE · 多模态 · 长上下文</span><span class="i18n-en">KV Cache Compression · MoE · Multimodal · Long Context</span></span>
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">MoE · 边缘部署 · 带宽自适应</span><span class="i18n-en">MoE · Edge Deployment · Bandwidth-Adaptive</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">⑥ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">552B 多模态 MoE 高效推理技术报告</span></a>
-        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">⑥ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Technical Report · 552B Multimodal MoE</span></a>
+        <a class="i18n-zh" href="efficient-inference/freetoken/">⑨ FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">边缘原生的 MoE 服务系统</span></a>
+        <a class="i18n-en" href="efficient-inference/freetoken/en.html">⑨ FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Edge-Native MoE Serving with Bandwidth-Adaptive Execution</span></a>
       </h3>
       <p class="one">
-        <span class="i18n-zh">DeepSeek-V4.1-Flash 技术报告:552B 多模态 MoE 用 Causal Encoder-Decoder 让 prefill 只激活 8B;CSA2 跨层 KV 复用 + FP4 量化把全局 KV Cache 压到<b>每 token 890 字节</b>(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代 1/8——性能反超更大的 V4-Flash:DeepSWE v1.1 <b>74.2</b>、Codeforces <b>3471</b>。</span>
-        <span class="i18n-en">The DeepSeek-V4.1-Flash technical report: a 552B multimodal MoE whose Causal Encoder-Decoder activates just 8B in prefill; CSA2 cross-layer KV reuse + FP4 squeeze the global KV cache to <b>890 bytes/token</b> (1/4 of V4-Flash, 1/437 of V1) while SWA Bounded Replay shrinks the persistent cache to 1/8 of the last generation — outperforming the larger V4-Flash: DeepSWE v1.1 <b>74.2</b>, Codeforces <b>3471</b>.</span>
+        <span class="i18n-zh">把个人电脑变成统一的弹性推理平台:带宽自适应执行让 <b>8GB 笔记本跑 35B</b>、台式机跑 284B、单张工作站 GPU 跑 <b>753B GLM-5.2</b>,快到能支撑真实 agent 负载。</span>
+        <span class="i18n-en">Turns the consumer PC into one elastic inference platform: bandwidth-adaptive execution puts a <b>35B model on an 8GB laptop</b>, 284B on a desktop, and <b>753B GLM-5.2 on a single workstation GPU</b> — fast enough for real agent workloads.</span>
       </p>
       <div class="meta">
-        <span>2026-09</span><span><span class="i18n-zh">12 图 5 表</span><span class="i18n-en">12 figures · 5 tables</span></span><span><a href="https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page">GitHub</a></span>
-        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+        <span>2026-09</span><span><span class="i18n-zh">5 图 1 表</span><span class="i18n-en">5 figures · 1 table</span></span><span>arXiv:<a href="https://arxiv.org/abs/2608.16157">2608.16157</a></span>
+        <span class="i18n-zh">中文精读 + 英文速读</span><span class="i18n-en">ZH deep-read + EN quick-read</span>
       </div>
       <div class="go">
-        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">开始阅读 →</a>
-        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">Read in English →</a>
+        <a class="i18n-zh" href="efficient-inference/freetoken/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/freetoken/en.html">Read in English →</a>
       </div>
     </div>
 
-      </div>
+  </div>
 </section>
 
 <section id="benchmark">
@@ -347,13 +497,17 @@
     <span class="i18n-zh">📏 评测基准</span>
     <span class="i18n-en">📏 Benchmarks</span>
   </h2>
+  <p class="axis">
+    <span class="i18n-zh">度量模型真实能力的研究——不优化模型,而是回答「我们怎么知道它真的读懂了长上下文」。</span>
+    <span class="i18n-en">Work that measures rather than optimizes — not improving models, but answering "how do we know it really understood the long context?".</span>
+  </p>
   <div class="cards">
 
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">多模态 · 嵌入模型 · 长上下文</span><span class="i18n-en">Multimodal · Embeddings · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑤ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
-        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑤ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
+        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑩ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
+        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑩ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">首个专门评测多模态嵌入模型长上下文能力的基准:<b>4 个检索任务、8 个数据集、8,460 个查询、11 个模型</b>。核心发现:现役模型靠表面特征匹配"作弊",细粒度信息保持随长度衰退——"窗口大"≠"读得懂"。</span>
@@ -378,8 +532,8 @@
 
 <footer>
   <div class="wrap">
-    <span class="i18n-zh">本合集由 <a href="https://github.com/qqtang-code/paper-reading-html">paper-reading-html</a> 工作流制作,图片以 300 DPI 摘自各论文原文,解读为编者观点,版权归原作者所有。首次访问跟随浏览器语言,切换后偏好会被记住。</span>
-    <span class="i18n-en">Built with the <a href="https://github.com/qqtang-code/paper-reading-html">paper-reading-html</a> workflow. Images are extracted from the original papers at 300 DPI; commentary reflects the editor's views; all rights belong to the original authors. First visit follows your browser language; your switch is remembered.</span>
+    <span class="i18n-zh">本合集由 <a href="https://github.com/qqtang-code/paper-reading-html">paper-reading-html</a> 工作流制作,图片以 300 DPI 摘自各论文原文,解读为编者观点,版权归原作者所有。分类只用一个轴:省在哪一层。首次访问跟随浏览器语言,切换后偏好会被记住。</span>
+    <span class="i18n-en">Built with the <a href="https://github.com/qqtang-code/paper-reading-html">paper-reading-html</a> workflow. Images are extracted from the original papers at 300 DPI; commentary reflects the editor's views; all rights belong to the original authors. Categories follow one axis: which layer the saving happens in. First visit follows your browser language; your switch is remembered.</span>
     <br>
     <a href="https://github.com/qqtang-code/Paper-Reading-Collection">GitHub</a> · <span class="i18n-zh">支持深色模式 · 打印友好</span><span class="i18n-en">Dark mode supported · print-friendly</span>
   </div>

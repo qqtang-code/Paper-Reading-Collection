@@ -4,6 +4,7 @@
 
 - **中文精读**:[Elastic-Attention论文精读_HTML.html](Elastic-Attention论文精读_HTML.html) · [在线](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)
 - **English quick-read**:[en.html](en.html) · [online](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/en.html)
+- **分类**:注意力与 KV Cache · 决策者 = 学习的轻量路由(Attention Router)/ 混合注意力 / 长上下文
 - **图表**:`figs/` 共 32 张(17 Figure + 14 Table + Algorithm 1),300 DPI 从原文提取,中英页共用
 - **原文**:<https://openreview.net/forum?id=rLO2NTUHSW>(ICML 2026 投稿) · **代码**:<https://github.com/LCM-Lab/Elastic-Attention>
 

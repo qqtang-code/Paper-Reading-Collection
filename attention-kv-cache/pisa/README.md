@@ -9,7 +9,7 @@
 - 中文精读页:`index.html`
 - 英文速读版:[`en.html`](en.html) — 完整速览 + 全部 3 图 7 表 1 算法框图的原文图注与英文解读 + 点评
 - 图片:`figs/` — 3 图 + 7 表 + 1 算法框图,300 DPI 高清提取,中英文页共用
-- 分类:注意力与 KV Cache · 块稀疏注意力 / 金字塔 Top-K / LogSumExp 打分 / O(N log N)
+- 分类:注意力与 KV Cache · 决策者 = 层内内容打分(键金字塔 Top-K)/ LogSumExp / O(N log N)
 - [在线阅读(中文)](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/) · [Read in English](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/en.html) · [论文原文](https://arxiv.org/abs/2609.31093)
 
 ## 本页比论文多做的三处推算

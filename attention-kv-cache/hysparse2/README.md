@@ -9,7 +9,7 @@
 - 中文精读页:`index.html`
 - 英文完整版:[`en.html`](en.html) — 全 9 章 1:1 对应,全部 5 图 5 表原文图注与英文解读
 - 图片:`figs/` — 5 图 + 5 表,300 DPI 高清提取,中英文页共用
-- 分类:注意力与 KV Cache · 混合稀疏注意力 / 两级 KV 共享 / 长上下文
+- 分类:注意力与 KV Cache · 决策者 = 复用同模型全注意力层已有的选择(两级 KV 共享)/ Agentic / 长上下文
 - [在线阅读(中文)](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/) · [Read in English](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/en.html) · [论文原文](https://arxiv.org/abs/2609.26368)
 
 ## 本页比论文多做的两处推算

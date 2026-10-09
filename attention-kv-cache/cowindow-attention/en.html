@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="English reading notes: CoWindow Attention (CoWA) — full causal coverage as a collective property of the KV-head ensemble, with every figure and table embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, CoWindow Attention, CoWA, sparse attention, long context, GQA, tensor parallelism, arXiv 2609.32704">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · CoWindow Attention: Full Causal Coverage Is a Collective Property">
+<meta property="og:description" content="All KV heads share a near window and a prefix-sink window while complementary long-range windows cover the rest of the causal history — no router, no indexer, one position-defined rule for training and inference.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · CoWindow Attention: Full Causal Coverage Is a Collective Property (arXiv:2609.32704)</title>
+<style>
+  /* ===== illustrated paper-reading page (paper-reading-html skill v2, EN edition) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* sticky top navigation */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0; scroll-margin-top:64px}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+  footer a{color:var(--accent); text-decoration:none}
+
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox,.lang-toggle{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">CoWA<span> · reading notes</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Method</a>
+      <a class="jump" href="#s4">Execution</a>
+      <a class="jump" href="#s5">Retrieval</a>
+      <a class="jump" href="#s6">Efficiency</a>
+      <a class="jump" href="#s7">Scale</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="CoWindow-Attention论文精读_HTML.html" title="阅读中文版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark/light" title="Toggle dark/light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.32704v1 [cs.AI]</div>
+    <h1>CoWindow Attention: turning "full causal coverage" from a per-head duplicate into a collective property of the head ensemble</h1>
+    <div class="subtitle">Every KV head shares one near window and one prefix-sink window; the remaining long-range causal distances are cut into complementary intervals, one per KV head. Individually each head is sparse at distance; collectively they are dense over the whole causal prefix — with no learned router or indexer, one position-defined window rule shared by the training forward/backward passes, inference prefill and autoregressive decoding, and window assignment by <b>global</b> KV-head index so that it aligns with tensor-parallel KV-head sharding.</div>
+    <div class="meta">
+      <span>Authors: Jingze Shi<sup>1,2</sup>, Zhangyang Peng<sup>1</sup>, Xianduo Li<sup>2</sup>, Yanlin Qi<sup>2,3</sup>, Xiaotian Lin<sup>1</sup>, Haoxian Chen<sup>1,2</sup>, Liangdong Wang<sup>2</sup>, Guang Liu<sup>2</sup>, Yuyu Luo<sup>1</sup></span>
+      <span>Affiliations: <sup>1</sup>HKUST(GZ) · <sup>2</sup>Beijing Academy of Artificial Intelligence (BAAI) · <sup>3</sup>Université Paris Cité</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2609.32704">arXiv:2609.32704</a></span>
+      <span>Code: released as <code>flash-sparse-attention</code> (named in the paper; no URL given)</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Sparse attention</span><span class="pill">Long context</span><span class="pill">GQA</span>
+      <span class="pill">Tensor parallelism</span><span class="pill">Position-defined windows</span><span class="pill">Coverage ablation</span>
+      <span class="pill">0.6B → 14B scaling law</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents (exhibits are embedded where they are discussed)</h2>
+  <ol>
+    <li><a href="#s1">Overview: the claim, the numbers, the verdict</a></li>
+    <li><a href="#s2">Background: the duplicated cost of full attention, and three routes to sparsity</a></li>
+    <li><a href="#s3">Method: how the windows are cut, why coverage holds, what it costs</a></li>
+    <li><a href="#s4">Execution: forward, backward, decoding and tensor parallelism</a></li>
+    <li><a href="#s5">Experiment I: coverage ablation and associative recall</a></li>
+    <li><a href="#s6">Experiment II: operator latency and memory (selection overhead included)</a></li>
+    <li><a href="#s7">Experiment III: scaling laws and 14B/32B model evaluation</a></li>
+    <li><a href="#s8">Commentary: what is strong, where the boundaries are, what to test next</a></li>
+    <li><a href="#s9">Glossary (keep this handy while reading)</a></li>
+  </ol>
+</nav>
+
+<!-- ============ s1 ============ -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview</h2>
+
+  <p class="lead">This paper does exactly one thing: it replaces the implicit convention that <b>every attention head must repeatedly see the complete causal history</b> with the convention that <b>a group of KV heads collectively sees the complete causal history</b>. Each head becomes sparse at distance; the duplicated long-range query-key connections are removed. The authors' answer is that as long as this "collective coverage" is complete, retrieval and language-modeling quality barely move.</p>
+
+  <p>The construction is light. All KV heads share a <abbr title="near-diagonal window: the w_near keys closest to the current query">near window</abbr> and a <abbr title="prefix-sink window: the first w_sink keys of the sequence, i.e. the attention-sink positions">prefix-sink window</abbr>; the remaining long-range distances are split evenly into $H_k$ complementary intervals, one per KV head. Any key position is therefore always directly visible to <em>some</em> head in the layer, but never has to be visible to all of them. The paper calls this property <b>collective coverage</b>. The overview figure lays out both halves of the story at once:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1 CoWindow Attention overview: left, the visible-key pattern of three KV heads (shared near window plus one long-range band each); centre, the window partition over the causal triangle; right, latency/memory/RULER summaries">
+    <figcaption>
+      <b>Figure 1:</b> CoWindow Attention Overview. Left: All KV heads share the near window and receive complementary long-range windows whose union covers the full causal attention region, preserving direct access to every preceding key position without duplicating the full history in every head. The shared sink window is omitted for visual clarity. Right: As sequence length grows, CoWA reduces forward and backward latency during training and decoding latency during inference, while matching FullAttn's peak operator memory during training and reducing it during decoding. Separate model-level evaluations show comparable performance on the RULER benchmark.
+      <span class="ex">Left: the visible-key set of each KV head. The orange near-diagonal band is shared by every head; the green and blue long-range bands each belong to a single head, and together they tile the whole history. Centre: the causal triangle cut by <em>distance from the current query</em> — the small block at the top right is the shared near window (plus the omitted sink window), and the rest is divided by distance across eight KV heads, so each head is dense inside one diagonal band and empty everywhere else. Right: four summaries in order — forward latency+memory, backward latency+memory, decode latency+memory, and per-task RULER scores. Red (CoWA) pushes both latency and memory down at long lengths while tracking blue (FullAttn) on RULER.</span>
+          <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to open the full-resolution original; click again or press Esc to close.</p>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page is taken from the paper as written. Anything this page derived by organizing, generalizing or recomputing the paper's own configuration is explicitly marked <b>[organized]</b> or <b>[estimated]</b>, so it can be told apart from the paper's own figures. Notation follows the paper: $N_q, N_k$ are query/key sequence lengths, $H_q$ is the number of QO (query/output) heads, $H_k$ the number of KV heads, $H_q/H_k$ the size of a QO-head group, $d_{qk}, d_v$ the per-head dimensions, $w_{\text{sink}}$ and $w_{\text{near}}$ the shared sink and near window widths, and $TP$ the tensor-parallel degree. This page additionally writes $\bar{s}$ for the paper's "mean number of selected keys per query and per QO head".</div>
+
+  <div class="kv">
+    <div class="item"><div class="k">8K associative recall · 100% collective coverage vs full attention</div><div class="v">89.73% <small>FullAttn 89.97% — a 0.24 pp gap at matched per-head window widths (Table 1 / Figure 2)</small></div></div>
+    <div class="item"><div class="k">Same window widths, coverage the only variable (8K)</div><div class="v">21.32 → 89.73 <small>duplicated windows at 12.5% coverage → complementary windows at 100%</small></div></div>
+    <div class="item"><div class="k">128K operator latency (8×H100, TP=8)</div><div class="v">7.4× forward · 8.6× backward <small>versus FullAttn; decoding 3.0×</small></div></div>
+    <div class="item"><div class="k">Decoding-operator peak memory</div><div class="v">8.4 MiB (7.6× lower) <small>FullAttn 64.0 MiB; training forward/backward peaks are identical</small></div></div>
+    <div class="item"><div class="k">14B total training FLOPs reduction</div><div class="v">3.1% / 28.5% <small>4K pre-training / 32K long-context training, at matched perplexity</small></div></div>
+    <div class="item"><div class="k">14B / 32B model evaluation</div><div class="v">Comparable, not better <small>knowledge 72.70/76.07, reasoning 64.87/75.53, RULER within 0.3 points of FullAttn</small></div></div>
+  </div>
+
+  <div class="takeaway"><b>Three things to remember:</b><br>
+  ① <b>It does not remove the quadratic term.</b> For fixed $H_k$, full-sequence attention stays $O(N^2)$; what is saved is the <em>cross-head duplication</em> of long-range connections. That is exactly why the FLOPs reduction is only 3.1% in pre-training but 28.5% in the long-context stage: the longer the sequence, the smaller the shared window's share.<br>
+  ② <b>The selling point is the absence of selection cost.</b> Visible blocks are computed from position (and the global KV-head index) rather than retrieved: no block pooling or TopK as in MoBA, no lightning indexer as in DSA. The auxiliary state is $O(H_k)$, independent of sequence length. On long sequences this is what pulls ahead of the baselines.<br>
+  ③ <b>It has a hard prerequisite: $H_k$ must be reasonably large.</b> The number of complementary intervals <em>is</em> the number of KV heads, and the paper states that at $H_k=1$ full coverage degenerates to dense causal attention. That puts the design in tension with the MLA/MQA direction of trading KV heads for cache size.</div>
+</section>
+
+<!-- ============ s2 ============ -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">Background: what gets optimized, and what does not</h2>
+
+  <h3>2.1 FlashAttention optimizes IO, not duplication</h3>
+  <p>Long-context requirements — long-document understanding, multi-turn reasoning, repository-level code generation — push sequences from thousands to hundreds of thousands of tokens, and attention dominates the cost. Work such as <abbr title="FlashAttention: tiled, fused, IO-aware exact attention">FlashAttention</abbr> (Dao et al., 2022) improves IO efficiency through tiling, fusion and online softmax, but it <b>does not change the attention pattern</b>: every head still runs QK and PV over the entire causal prefix. The same distant key is therefore read and multiplied once per head — in the KV dimension $H_k$ times, and in the QO dimension up to $H_q$ times. That is pure structural redundancy, and no amount of kernel engineering removes it.</p>
+
+  <h3>2.2 Three existing routes to sparsity, and what each costs</h3>
+  <p>The paper groups prior work into three families and names the price of each; this sets up the operator benchmark later on:</p>
+  <ul class="tight">
+    <li><b>Fixed or local windows</b> (Longformer, Beltagy et al., 2020; SWA): regular and fast, but every head gets the same finite horizon and direct access to more distant tokens is simply lost;</li>
+    <li><b>Structured blocks and global tokens</b> (Child et al., 2019; Longformer): only predetermined long-range paths are kept;</li>
+    <li><b>Dynamic selection</b> (Seer, NSA, MoBA, DSA, InfLLMv2 and others): more flexible, but it <b>introduces a separate selection problem</b> and usually breaks the regular window structure that makes sparse attention cheap — so the router or indexer brings its own FLOPs and auxiliary state.</li>
+  </ul>
+  <p>The paper then makes a point that is easy to miss: two methods can be <b>given the same selected-token budget</b> and still differ substantially end to end, because the selection itself costs money. Table 3's asymptotic ledger and Figure 3's measured curves both cash this out.</p>
+
+  <h3>2.3 Why distributing across heads is plausible</h3>
+  <p>The starting observation is head heterogeneity: heads spontaneously develop distinct roles, with both local and long-range behaviours (Barbero et al., 2025, and the line of work cited there). If heads were never homogeneous to begin with, then "every head must attend to the entire history" is not self-evidently necessary — it suffices that <b>every historical position remains visible to at least one head</b> for each query.</p>
+  <p>The closest upstream work is SPAttention (ref. [66]), which distributes causal-distance regions across MHA heads while preserving aggregate causal connectivity. The paper's framing of the relationship is careful and worth quoting in substance: it generalizes this into a <b>design principle that can be evaluated systematically</b> — an attention layer keeps access to the full causal history collectively, without requiring every head to attend to every position — and instantiates it under GQA, where the complementary windows live on KV heads rather than on all heads. A footnote draws the boundary explicitly: SPAttention's published exclusive bands differ from its released shared-local implementation MEHC, which does not provide the long-context GQA, decoding, or tensor-parallel execution studied here.</p>
+  <p>Put together, the paper's question is: <b>can distributing access to the causal history across KV heads preserve model quality and long-range retrieval while actually reducing training and inference cost?</b> Note that "actually executable" is part of the question — which is why a good share of the paper is about tensor parallelism, block traversal and decoding rather than about the attention pattern alone.</p>
+</section>
+
+<!-- ============ s3 ============ -->
+<section id="s3">
+  <div class="sec-no">03 · Method</div>
+  <h2 class="sec">Method: how the windows are cut, why coverage holds, what it costs</h2>
+
+  <h3>3.1 One distance definition spanning training and inference</h3>
+  <p>First the engineering trap is closed. Training uses a full sequence with a causal mask; prefill may have $N_q \neq N_k$; decoding has $N_q = 1$ against a cache of length $N_k$. The paper defines a bottom-right-aligned causal distance that unifies all three:</p>
+  <div class="math">$$\delta(i_q, i_k) := i_q + (N_k - N_q) - i_k \tag{1}$$</div>
+  <p>When $N_q = N_k$ this reduces to the familiar $i_q - i_k$, and a key is causally available to a query exactly when $\delta(i_q, i_k) \ge 0$. Every window below (near, sink, long-range) is then expressed purely in terms of $\delta$, so training, prefill and decoding need no separate rules — a structural advantage over dynamic sparse methods, which typically need special handling at decode steps (a newly generated token is not yet in the index, and so on).</p>
+  <p>The second interface is <abbr title="Grouped-Query Attention: several QO heads share one set of KV heads">GQA</abbr> ($H_q$ an integer multiple of $H_k$): QO head $h$ uses the K/V tensors and window assignment of KV head $h_k = \lfloor h H_k / H_q \rfloor$. Those $H_q/H_k$ QO heads form a group that shares keys, values and the visible-key set while computing weights from distinct queries. The group concept recurs throughout, because a shared visible set means <b>how often a distant key is duplicated depends on the group size</b>, not on $H_q$.</p>
+
+  <h3>3.2 Three windows: shared sink, shared near, exclusive long-range</h3>
+  <p>First fix how much history remains outside the shared windows, and where the cut points go:</p>
+  <div class="math">$$L := \max(N_k - w_{\text{sink}} - w_{\text{near}},\, 0), \qquad b_{h_k} := \left\lfloor \frac{h_k\, L}{H_k} \right\rfloor, \quad h_k = 0,\dots,H_k \tag{2}$$</div>
+  <p>Writing $\delta = \delta(i_q,i_k)$, the three windows are:</p>
+  <div class="math">$$\begin{aligned}
+    W^{\text{near}}_{h_k}(i_q) &:= \{\, i_k : 0 \le \delta &lt; w_{\text{near}} \,\} &amp;&amp;\text{(near, shared by all heads)}\\
+    W^{\text{sink}}_{h_k}(i_q) &:= \{\, i_k : 0 \le i_k &lt; w_{\text{sink}},\ \delta \ge 0 \,\} &amp;&amp;\text{(prefix sink, shared by all heads)}\\
+    W^{\text{long}}_{h_k}(i_q) &:= \{\, i_k : w_{\text{near}} + b_{h_k} \le \delta &lt; w_{\text{near}} + b_{h_k+1} \,\} &amp;&amp;\text{(long-range, exclusive to one head)}
+    \end{aligned}$$</div>
+  <p>The visible-key set is their union:</p>
+  <div class="math">$$A_{h_k}(i_q) := W^{\text{near}}_{h_k}(i_q) \cup W^{\text{sink}}_{h_k}(i_q) \cup W^{\text{long}}_{h_k}(i_q) \tag{3}$$</div>
+  <p>So each head sees the shared recent context plus the shared start of the sequence plus one long-range interval of its own. The width of $W^{\text{long}}$ is $b_{h_k+1} - b_{h_k}$; equal widths (adjacent cut points $L/H_k$ apart) are the default, chosen for load balance during decoding. In the algorithm interface each head's windows collapse into a four-tuple $w_{h_k} = (w_{\text{sink}},\, w_{\text{near}},\, b_{h_k},\, b_{h_k+1}-b_{h_k})$ — sink width, near width, the gap after the near window, and the long-range width. The same interface admits head-specific widths and gaps, but this work only uses equal widths.</p>
+
+  <h3>3.3 Collective coverage: the union really does tile the causal prefix</h3>
+  <p>Taking the union over the $H_k$ heads:</p>
+  <div class="math">$$\bigcup_{h_k=0}^{H_k-1} A_{h_k}(i_q) \;=\; \{\, i_k \in \{0,\dots,N_k-1\} : \delta(i_q, i_k) \ge 0 \,\} \tag{4}$$</div>
+  <p>The right-hand side is the complete causal prefix — every key position lies inside at least one head's direct view. <b>But the paper immediately adds a caveat that deserves to be quoted verbatim in spirit:</b> full causal coverage guarantees direct access to token positions, but it <b>does not imply</b> the same head-specific interactions or outputs as FullAttn. The reason is that each QO head applies softmax over its own visible-key set — <b>the normalizer changes</b>. CoWA is therefore not an approximation-equivalent of FullAttn; it is a different attention distribution that happens to leave the "accessible information" dimension intact. The coverage ablation in §5 exists to quantify exactly this difference.</p>
+
+  <h3>3.4 The cost ledger: the near window is what gets duplicated</h3>
+  <p>Consider the final query position $i_q = N_q-1$ in the common regime $w_{\text{sink}}+w_{\text{near}} \le N_k$. Sink, near and long-range are disjoint there, so the total number of visible keys summed across KV heads is:</p>
+  <div class="math">$$\sum_{h_k=0}^{H_k-1} |A_{h_k}(N_q-1)| \;=\; H_k\,(w_{\text{sink}} + w_{\text{near}}) \;+\; L \tag{5}$$</div>
+  <p>The reading is direct: the shared windows are repeated by <b>every</b> KV head and contribute $H_k(w_{\text{sink}}+w_{\text{near}})$, whereas each long-range key belongs to <b>exactly one</b> KV-head support set and the whole long-range span contributes only $L$. Dense causal attention's counterpart is $H_k N_k$. Dividing by $H_k$ gives the average number of visible keys per KV head; with equal query groups, multiplying either summed count by $H_q/H_k$ converts it into actual QO-head query-key connections.</p>
+  <p>The paper also records several boundary cases, all worth keeping:</p>
+  <ul class="tight">
+    <li>the count above is for the <b>final query</b>; full-sequence training accumulates support sizes over all positions, and earlier queries are clipped by causality and may have overlapping windows, so the count drops — actual work can differ across heads even when widths are equal;</li>
+    <li>if $w_{\text{sink}}+w_{\text{near}} &gt; N_k$ the shared windows already cover the causal prefix, the per-head count is capped at $N_k$, and the long-range windows do nothing;</li>
+    <li>for fixed $H_k$, full-sequence attention <b>remains quadratic</b>; the saving comes from fewer duplicated query-key connections;</li>
+    <li>cross-head decomposition requires $H_k &gt; 1$; <b>at $H_k=1$ full coverage reduces to dense causal attention</b> — this is the design's hard boundary.</li>
+  </ul>
+
+  <h3>3.5 Walkthrough: putting the paper's configurations into concrete numbers <span class="muted">[estimated]</span></h3>
+  <p>The budget figures scattered through the main text and appendix are in fact tied together by a single rule. Substituting $H_k=8$ and a shared width $w_{\text{sink}}+w_{\text{near}} = 1024$, the per-QO-head budget needed for <em>full</em> coverage is $1024 + (N_k-1024)/8$. Checking every budget the paper discloses against that expression (the arithmetic below is this page's, the inputs are the paper's — see Table 1, Table 5, Table 7 and Appendices A.1/A.3):</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Per-QO-head budget versus the "full coverage" expression, for every configuration the paper discloses (this page's arithmetic on the paper's numbers)</caption>
+    <thead><tr><th>Configuration / source</th><th>Sequence length $N_k$</th><th>Budget in the paper</th><th>$1024 + (N_k-1024)/8$</th><th>Exact full coverage?</th></tr></thead>
+    <tbody>
+      <tr><td>Associative recall, 1K / 2K / 4K / 8K (A.1)</td><td>1,024 / 2,048 / 4,096 / 8,192</td><td>1,024 / 1,152 / 1,408 / 1,920</td><td>1,024 / 1,152 / 1,408 / 1,920</td><td>Yes — all four match digit for digit</td></tr>
+      <tr><td>Scaling-law pre-training (Table 7)</td><td>4,096</td><td>1,408</td><td>1,408</td><td>Yes</td></tr>
+      <tr><td>Scaling-law long-context (A.3/A.4)</td><td>32,768</td><td>4,992</td><td>4,992</td><td>Yes</td></tr>
+      <tr><td>Operator benchmark at 128K (Table 5)</td><td>131,072</td><td>17,280</td><td>17,280</td><td>Yes</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>In other words, every configuration the paper runs sits on the single point "shared window of 1024 + eight equal long-range bands = 100% collective coverage". Two consequences follow immediately: the long-range band width at the long-context stage is $(32768-1024)/8 = 3968$ keys, and in the 128K operator benchmark it is $(131072-1024)/8 = 16256$ keys.</p>
+  <p>Now the tensor-parallel side. By the global-indexing rule of Equation 6, when $H_k = TP = 8$ each rank holds exactly one KV head, and local head 0 on rank $r$ maps to global index $h_{\text{global}} = r$ — <b>the eight complementary long-range windows land one per rank</b> [estimated]. That alignment is not required, but it shows why global-index assignment is the necessary choice: assigning by local index would give every rank "long-range band 0", collapsing the complementarity between ranks and breaking the design under TP.</p>
+  <p>The last set of numbers is the per-layer group size ($H_q/H_k$), which determines how many QO heads directly see a given long-range key [organized from Table 7 and Appendix A.4]: 0.6B is 16/8 = 2; 1.7B is 2; 4B is 32/8 = 4; 8B is 4; 14B is 40/8 = 5; 32B is 64/8 = 8. The long-range redundancy equals that group size, whereas the near window's redundancy is $H_q$ — this is precisely where "fewer duplicates" is cashed in.</p>
+</section><!-- ============ s4 ============ -->
+<section id="s4">
+  <div class="sec-no">04 · Execution</div>
+  <h2 class="sec">Execution: one rule covering forward, backward, decoding and tensor parallelism</h2>
+
+  <p>The second half of the method section introduces almost no new concepts. It is there to show that <b>a single position-defined window rule can run every path of training and inference without special cases</b> — which is exactly where dynamic sparse methods are most expensive, since they typically need a separate approximation or index maintenance step for decoding, for the backward pass and for distribution.</p>
+
+  <h3>4.1 Forward: visit only the legal blocks</h3>
+  <p>The forward operator serves both the training forward pass and prefill. Q/O and K/V are stored head-major with shapes $Q,O \in \mathbb{R}^{H_q \times N_q \times d_h}$ and $K,V \in \mathbb{R}^{H_k \times N_k \times d_h}$ (for notational simplicity the paper assumes $Q$ is pre-scaled by $1/\sqrt{d_h}$). The token dimension is split into QO blocks $I_i$ and KV blocks $J_j$, and each QO block only touches the KV-block set $\mathcal{J}_{h_k}(i)$ that contains at least one legal pair under Equation 3:</p>
+  <figure class="fig">
+    <img src="figs/algo1.png" alt="Algorithm 1 CoWindow Attention Forward: block traversal, deriving KV blocks from the window, online-softmax recurrence, final normalization, storing O and the log-sum-exp state">
+    <figcaption>
+      <b>Algorithm 1:</b> CoWindow Attention Forward. Divide Q, O into QO blocks of size $B_q$ and K, V into KV blocks of size $B_k$; for each QO head compute $h_k$ under grouped-query attention, derive the KV-block set $\mathcal{J}_{h_k}(i)$ from $w_{h_k}$, then visit only those blocks while maintaining online-softmax states $m$, $\ell$ and $O$; finally normalize and store $O$ together with the log-sum-exp state $\ell$.
+      <span class="ex">Lines 7–9 are the crux: the visible block set is <b>computed from $w_{h_k}$</b>, not looked up in any index, and blocks outside the set are skipped before any QK is computed. Lines 10–15 are the standard online-softmax recurrence — block-row maxima first, then rescaling of $O$ and $\ell$ — so the full attention matrix is never materialized. Only blocks crossing a causal, window or sequence boundary need element-wise masking, which is the payoff of a regular window. Note that line 17 stores not probabilities but the log-sum-exp form $\ell_{hi} \leftarrow m_{hi} + \log(\ell_{hi})$, which the backward pass uses to reconstruct probabilities exactly.</span>
+          <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.2 Backward: traverse the inverse relation, exactly</h3>
+  <p>The backward operator flips the traversal: for each KV block $J_j$ it computes the set of QO blocks $\mathcal{I}_{h_k}(j)$ that have legal pairs with it — the inverse of the forward visibility relation. The visible-key set is <em>the same</em> as in the forward pass, so this is not an approximate gradient.</p>
+  <figure class="fig">
+    <img src="figs/algo2.png" alt="Algorithm 2 CoWindow Attention Backward: traversing QO blocks per KV block, reconstructing probabilities from the log-sum-exp state, accumulating dK/dV/dQ">
+    <figcaption>
+      <b>Algorithm 2:</b> CoWindow Attention Backward. For each KV block $J_j$, compute the QO-block set $\mathcal{I}_{h_k}(j)$ from $w_{h_k}$ and traverse this inverse relation with the same visible-key set as the forward pass; probabilities reconstructed from the saved logsumexp $\ell$ yield the exact gradient of the CoWA operator, and atomic additions combine contributions to $dQ$ from multiple KV blocks and to $dK,dV$ from QO heads in the same group.
+      <span class="ex">Lines 11–12 are what makes this implementation viable: probabilities are <b>reconstructed</b> from the stored $\ell$ ($P = \exp(S - \ell^\top)$), so no attention-probability matrix needs to be saved and the gradient is still exact. Lines 13–14 accumulate $dV$, $dK$ and $dQ$; within one KV-head group the contributions of several QO heads to $dK/dV$, and of several KV blocks to $dQ$, are merged with atomic adds. Because $dQ$ requires atomic accumulation across KV blocks, the "parallel over KV blocks" and "parallel over QO blocks" tilings have to be reconciled — this is where such sparse operators get harder to write than dense FlashAttention.</span>
+          <span class="pgref">Report p.5</span>
+    </figcaption>
+  </figure>
+
+  <h3>4.3 Decoding: the cut points slide every step</h3>
+  <p>Autoregressive decoding is the $N_q = 1$ case of the forward pass: $\delta(0, i_k) = N_k - 1 - i_k$, and $N_k$ equals the number of cached tokens plus one for the current token, so the near window naturally lands on the most recent KV-cache entries. The critical detail is that <b>the cut points are recomputed from the current key length at every step</b> — $b_{h_k}$ in Equation 2 depends on $N_k$, so equal-width long-range bands slide smoothly as the sequence grows rather than requiring re-indexing as fixed block partitions would. Visible KV blocks can be distributed across split-KV programs and merged through standard partial online-softmax states; how the splits are scheduled sets parallelism and load balance but does not change the window rule itself.</p>
+
+  <h3>4.4 Tensor parallelism: global indexing is a necessary design choice</h3>
+  <p>This subsection is the paper's clearest "it has to be done this way" argument. Let $TP$ be the tensor-parallel degree (with $TP \le H_k$, and the $H_k$ KV heads sharded evenly and contiguously). For local head $h_{\text{local}}$ on rank $r$:</p>
+  <div class="math">$$h_{\text{global}} = r\,H_k^{\text{local}} + h_{\text{local}}, \qquad H_k^{\text{local}} = H_k / TP \tag{6}$$</div>
+  <p><b>The breakpoints in Equation 2 are always evaluated with the global index $h_{\text{global}}$ and the global $H_k$</b>, in training and inference alike. Each rank therefore receives complementary long-range intervals rather than every rank starting from "band 0". The backward pass works the same way: each rank traverses the inverse relation for its local KV heads only, and the global indices keep the sparse pattern aligned across ranks.</p>
+  <p>Three boundaries are stated here, and they map directly onto the measurement conventions later:</p>
+  <ul class="tight">
+    <li><b>Persistent KV cache and operator peak memory are different things.</b> In the model-level evaluations each rank still keeps the full history of its local KV heads resident in <abbr title="High Bandwidth Memory: GPU device memory">HBM</abbr>; window-aware offloading and prefetching to reduce HBM-resident KV storage are explicitly future work. The peaks measured in §6 are along the operator path, not serving-time cache occupancy.</li>
+    <li><b>$TP &gt; H_k$ replicates logical KV heads</b>, in which case each rank stores <em>more</em> than $1/TP$ of the global KV cache.</li>
+    <li>KV-head sharding partitions the cache across ranks, whereas visiting only visible KV blocks reduces the decoding operator's working memory — the two should not be conflated.</li>
+  </ul>
+  <div class="takeaway"><b>The transferable lesson here is "fold the distributed constraint into the formula".</b> Defining breakpoints by global index looks like adding a subscript, but it is what makes complementarity an invariant across ranks; otherwise the same logical head would receive different windows under different TP configurations, and the attention pattern used in training would no longer match the one used in deployment. In dynamic sparse methods that mismatch typically shows up as "training runs, deployment loses points".</div>
+</section>
+
+<!-- ============ s5 ============ -->
+<section id="s5">
+  <div class="sec-no">05 · Experiments I</div>
+  <h2 class="sec">Experiment I: isolating coverage as a single variable</h2>
+
+  <h3>5.1 Ablation design: same window widths, different numbers of distinct long-range windows</h3>
+  <p>To show that CoWA's benefit comes from <b>complementary allocation</b> rather than from wider windows, the cleanest possible experiment <b>freezes the per-head window width</b> and varies only how many <em>distinct</em> long-range windows are spread across the eight KV heads:</p>
+  <ul class="tight">
+    <li>1 distinct window × 8 heads (duplicated) → 12.5% long-range coverage</li>
+    <li>2 windows × 4 heads → 25%</li>
+    <li>4 windows × 2 heads → 50%</li>
+    <li>8 windows × 1 head (CoWA) → 100%</li>
+  </ul>
+  <p>One implementation detail is easy to overlook but matters: the duplicated layouts repeat the windows <b>closest to the near window</b> ($W_1,\dots,W_m$). The control arms therefore receive the <em>most recent</em> long-range segments — the freshest information — while CoWA must also claim the most distant ones. <b>The bias runs against CoWA, and it still wins</b>, which makes the conclusion stronger and is worth mentioning whenever the table is cited.</p>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1 window-matched coverage ablation: FullAttn/SWA plus 1/2/4/8 distinct long-range windows, associative-recall accuracy at 1K-8K">
+    <figcaption>
+      <b>Table 1:</b> Collective Coverage with Matched Per-Head Window Widths. The 1-, 2-, 4-, and 8-window layouts use matched per-head window widths and vary the number of distinct long-range windows assigned across eight KV heads. FullAttn and SWA are dense and local references and are not part of this window-matched comparison. We report associative-recall accuracy (%) at $d_{model} = 512$.
+      <span class="ex">Read the rightmost column (8K) downwards: SWA, seeing only the near window, reaches 5.34%; a single duplicated window reaches 21.32%; 2 windows 32.92%; 4 windows 52.32%; 8 complementary windows 89.73%; FullAttn 89.97%. <b>Going from 12.5% to 100% coverage multiplies accuracy by more than four</b>, whereas every layout is at 100 on 1K (a 1024 budget already covers the whole sequence), the curves separate from 2K, and the gap is widest at 8K — so nearly all of the ablation's information lives in that last column. Note also that FullAttn itself only drops to 89.97 at 8K, i.e. the task becomes genuinely hard exactly there.</span>
+          <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure>
+  </div>
+  <p>The paper's conclusion is blunt: 8K recall rises <b>monotonically</b> as duplicated windows are replaced by complementary ones (21.32 → 32.92 → 52.32 → 89.73), full coverage nearly matches FullAttn (89.97), and the near-only SWA reference collapses to 5.34%. These numbers support the value of distributing complementary long-range access across KV heads.</p>
+
+  <h3>5.2 Controlled associative recall: stronger opponents</h3>
+  <p>The second experiment switches to the standard <abbr title="associative recall: given a set of key-value bindings, recover the value bound to a queried key at a later position">associative recall</abbr> task (the Zoology setup of Arora et al., 2024): 256 key-value pairs, randomized bindings with no semantic shortcut, 250K training and 1K test examples, 100 epochs, sequence lengths 1,024 → 8,192 and $d_{model}$ from 64 to 512. The opponents span dense, local, structured and dynamic sparsity: FullAttn, SWA, Seer, InfLLMv2, NSA, MoBA and DSA.</p>
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2 associative recall: accuracy of eight attention mechanisms across model dimensions 64-512 at four sequence lengths">
+    <figcaption>
+      <b>Figure 2:</b> Associative Recall. Accuracy with 256 key-value pairs across sequence lengths and model dimensions. At sequence lengths 1K, 2K, 4K, and 8K, all sparse methods use matched per-query token budgets of 1,024, 1,152, 1,408, and 1,920 tokens, respectively. We do not add random padding or additional noise tokens. CoWA closely tracks FullAttn as the context grows, whereas the other sparse patterns lose a substantial fraction of the associations.
+      <span class="ex">Four panels left to right are 1K/2K/4K/8K; within each, the x axis is model dimension 64→512 and the y axis is recall accuracy. Three layers of reading: <b>(1) on the 1K panel every method is near-perfect once $d_{model} \ge 128$</b>, because a 1,024 budget covers the entire sequence — the design's "budget equals coverage" logic made visible; <b>(2) separation starts at 2K and widens with length</b>: on 4K only FullAttn and CoWA still climb to 1.0 past $d_{model}=256$; <b>(3) on 8K the red CoWA curve sits essentially on the blue FullAttn curve, while DSA/MoBA stall near 0.5 and NSA and the rest sit around 0.1</b>. The paper notes a counter-intuitive detail: some baselines do improve with model dimension, but increasing dimension does not close the retrieval gap over the tested range — the deficit is structural, not a capacity problem.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+  <p>The budget-matching convention is worth stating explicitly: all four sequence lengths are run at per-query budgets of 1,024 / 1,152 / 1,408 / 1,920 [organized from Appendix A.1]. The check in §3.5 shows these are exactly $1024 + (N_k-1024)/8$ — <b>i.e. every opponent competes at the same budget CoWA needs for full coverage</b>, so CoWA does not win by spending more. CoWA itself uses $w_{\text{sink}}=1$ and $w_{\text{near}}=1023$, a shared width of 1,024 tokens.</p>
+  <p>One scope boundary must be stated as well: the paper explicitly does <b>not</b> insert random padding or additional noise tokens. The task is therefore retrieval <em>in the pure sense</em>, without the extra job of filtering distractors — a point the commentary returns to.</p>
+  <div class="takeaway"><b>How to read these two results:</b> Table 1 answers "how much is coverage worth?", Figure 2 answers "how does it compare with stronger opponents?". Table 1 is the more persuasive of the two because it reduces the variables to coverage alone. Figure 2 reports, at 8K and $d_{model}=512$, CoWA 89.73% against FullAttn 89.97%, with DSA, MoBA and NSA at 53.71%, 50.12% and 25.23% and the remainder near 10% [organized from the main text].</div>
+</section>
+
+<!-- ============ s6 ============ -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments II</div>
+  <h2 class="sec">Experiment II: operator latency and memory — putting selection overhead on the table</h2>
+
+  <h3>6.1 The asymptotic ledger: CoWA's auxiliary state does not grow with sequence length</h3>
+  <p>Before the measured curves, one table states the difference between the four mechanisms asymptotically ($n$ sequence length, $h$ QO heads, $w$ per-query budget, $B$ MoBA's block size, $h_I$ and $d_I$ the DSA indexer's head count and dimension):</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3 asymptotic cost comparison of attention variants: selected attention cost, selection overhead and auxiliary state">
+    <figcaption>
+      <b>Table 3:</b> Comparison of Different Attention Variants. The sequence-dependent attention and sparse-selection costs. The auxiliary state column describes routing or indexing state beyond the QKV tensors and attention outputs.
+      <span class="ex">All four mechanisms share the same shape for <em>selected</em> attention ($O(nwh(d_{qk}+d_v))$ for the sparse three, $O(n^2h(d_{qk}+d_v))$ for FullAttn); the differences live entirely in the <b>selection overhead</b> and <b>auxiliary state</b> columns. MoBA must mean-pool block keys and score every query against $n/B$ block representatives, so selection itself costs $O(n^2 h d_{qk}/B)$ with $O(n^2h/B)$ auxiliary state; DSA's lightning indexer scores all query-key pairs and produces TopK, costing $O(n^2h_Id_I)$ with $O(n^2h_I + nw)$ state; <b>CoWA's selection overhead is $O(1)$ per QO block with auxiliary state $O(H_k)$</b> — neither depends on $n$. That is what "position-defined" buys. The text below the table is equally candid: once routing and indexing are included, methods with the same budget can differ substantially end to end.</span>
+          <span class="pgref">Report p.16</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>6.2 Benchmark configuration and budgets: the head counts are not the same</h3>
+  <p>Measurements run on 8 <abbr title="NVIDIA H100 GPU (SM90)">H100</abbr> GPUs with $TP=8$, batch size one, latency averaged over 100 iterations after 25 warm-ups unless a configuration runs out of memory, and memory reported as the <b>maximum per-rank peak</b> across the eight ranks. The four operator shapes are [organized from Table 4]:</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4 latency and memory benchmark configurations: operator shapes, warm-ups/runs, selector and precision per method">
+    <figcaption>
+      <b>Table 4:</b> Latency and Memory Benchmark Configurations. The operator shapes and sparse-selection mechanisms used for the running-time curves. All measurements use tensor parallelism $TP = 8$ on 8 H100 GPUs.
+      <span class="ex">All four use $n_h=64$ and batch 1, but <abbr title="number of KV heads">$n_{hkv}$</abbr> differs completely: FullAttn and CoWA use 8 KV heads, <b>MoBA uses 64 (one KV head per QO head)</b>, and DSA uses a single latent head with $d_{qk}=576$, $d_v=512$. This directly affects comparability of the memory curves: much of MoBA's footprint comes from holding 64 KV heads rather than from its selection mechanism. The paper's handling of this is to <b>disclose it</b> — "retain each method's native head configuration" — rather than reshaping opponents into a favourable form. Note also that CoWA's selector column reads "fused window", MoBA's is block routing at $B=128$, and DSA's is an FP8 indexer.</span>
+          <span class="pgref">Report p.16</span>
+    </figcaption>
+  </figure>
+  </div>
+  <p>On budgets (Table 5, 128K column): FullAttn 131,072; MoBA 17,408 (aligned to 128-token blocks); DSA 4,320; CoWA 17,280. DSA's budget is roughly a quarter of CoWA's because its per-selected-token (PST) FLOPs are about four times larger — the paper aligns methods on approximate forward selected-attention FLOPs rather than on raw token counts.</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5 per-query token budgets at every benchmark sequence length for FullAttn, MoBA, DSA and CoWA">
+    <figcaption>
+      <b>Table 5:</b> Per-Query Token Budgets. The token budgets used at every benchmark sequence length.
+      <span class="ex">Rows are FullAttn (everything), MoBA, DSA, CoWA. The PST FLOPs column gives each method's per-token unit price: 32,768 for FullAttn/MoBA/CoWA and 139,264 for DSA (about 4×, hence its roughly quarter-sized budget). CoWA's budget sequence — 1,024 / 1,152 / 1,408 / 1,920 / 2,944 / 4,992 / 9,088 / 17,280 — matches $1024+(N_k-1024)/8$ at every length [estimated], i.e. the operator benchmark always runs CoWA at 100% collective coverage. MoBA's budgets are all multiples of 128 (its block size), and DSA's baseline differs, so comparing token counts directly would be wrong: the PST FLOPs column has to travel with them.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>6.3 The curves: at long lengths CoWA pulls ahead by not doing selection</h3>
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3 operator latency and memory: three panels for forward, backward and decoding, bars for latency and markers for memory">
+    <figcaption>
+      <b>Figure 3:</b> Operator Latency and Memory. End-to-end attention-operator latency (bars, left axes) and maximum per-rank peak allocation (markers, right axes) for the training forward and backward passes and decoding with tensor parallelism $TP = 8$ on 8 H100 GPUs. CoWA has the lowest latency and decoding-operator peak allocation among the tested methods at long sequence lengths.
+      <span class="ex">Panels left to right are training forward, training backward and inference decoding; bars are latency (left axis, log) and dots are per-rank peak memory (right axis, log, MiB). Three things to look for: <b>(1) at short lengths (1K–8K) CoWA coincides with or beats FullAttn</b>, since the budget is already near-total and the window bookkeeping is negligible; <b>(2) as length grows, MoBA (orange) and DSA (green) shoot up past 16K</b> — MoBA's backward bar is simply missing at 128K (OOM) and its forward memory marker is already in the $10^4$ MiB range; <b>(3) CoWA (red) is at the bottom in all three panels</b>, most strikingly in decoding, where visiting only visible blocks keeps its memory marker near $10^0$ while FullAttn's blue markers climb to about 64 MiB.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+  <p>Concretely at 128K [organized from Table 6]: CoWA forward 21.758 ms, backward 51.509 ms, decode 0.015 ms against FullAttn's 159.987 / 441.230 / 0.045 ms — <b>operator-level speedups of 7.4× / 8.6× / 3.0×</b>. On memory, CoWA's forward and backward peaks (580 / 1,804 MiB) are digit-for-digit identical to FullAttn's, while its decode peak of 8.441 MiB is 7.6× below FullAttn's 64.004 MiB. MoBA's backward pass exceeds the per-rank memory limit at 128K; DSA's 128K forward takes 93.671 ms despite a selected budget a quarter of CoWA's, which the paper attributes to indexer cost.</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6 full latency and memory results for the four methods at eight sequence lengths, for forward/backward/decoding">
+    <figcaption>
+      <b>Table 6:</b> Latency and Memory Benchmark Results. End-to-end latency (ms) and peak memory (MiB) for the training forward and backward passes and inference-time decoding at every sequence length. Latency is the synchronized tensor-parallel group latency, and memory is the maximum per-rank peak allocation.
+      <span class="ex">The full dataset. Several ratios can be checked by hand: at 128K, FullAttn→CoWA forward $159.987/21.758 \approx 7.35$ (the paper reports 7.4×), backward $441.230/51.509 \approx 8.57$ (8.6×), decode $0.045/0.015 = 3.0$; decode memory $64.004/8.441 \approx 7.58$ (7.6×). Two further details matter: <b>(1) FullAttn's and CoWA's training forward/backward memory are identical digit for digit</b> (580 / 1,804 MiB), so CoWA's memory advantage appears only on the decoding path — consistent with an implementation that visits only visible KV blocks; <b>(2) MoBA's memory column is already at the 9,029 / 11,639 MiB scale past 32K and its 128K backward is OOM</b>, with a 589.650 MiB decode footprint at 128K — roughly 70× CoWA's [estimated].</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption>
+  </figure>
+  </div>
+  <div class="note"><b>Measurement caveat (important):</b> these are <b>operator-level end-to-end</b> timings, not full model training-step times. The paper spells out what each path includes: MoBA covers block-representative construction, router logits, TopK, index construction, data rearrangement and output merging; DSA covers BF16 indexer inputs, FP8 quantization, indexer logits, TopK/indices and sparse MLA; CoWA covers its fused window-range and masking logic. <b>Model-level QKV/output projections, MLP layers, communication and optimizer updates are out of scope.</b> The 7.4×/8.6×/3.0× should therefore be read as <em>attention-operator</em> speedups, not machine-level ones; the model-level payoff is the training FLOPs of §7.</div>
+</section>
+
+<!-- ============ s7 ============ -->
+<section id="s7">
+  <div class="sec-no">07 · Experiments III</div>
+  <h2 class="sec">Experiment III: scaling from 0.6B to 14B, and 14B/32B model evaluation</h2>
+
+  <h3>7.1 Configuration: five sizes, two training stages</h3>
+  <p>Training runs on 128 H100 GPUs with Megatron-LM; the data is SmolLM-Corpus, the tokenizer is Qwen3's, the optimizer is AdamW with a WSD schedule, and the random seed is fixed at 42. Each size is trained in two stages: pre-training (PT, sequence length 4,096) and long-context training (LCT, 32,768), where LCT initializes from the final PT checkpoint at a constant learning rate. Across the five sizes — 0.6B / 1.7B / 4B / 8B / 14B — layers go from 28 to 40, $d_{model}$ from 1024 to 5120 and QO heads from 16 to 40, <b>while the KV-head count stays fixed at 8 throughout</b>. That is worth noting now; the commentary returns to it.</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7 scaling-law model and hyper-parameter configurations: parameters, tokens, learning rates, layers, dimensions, heads and token budgets for FullAttn/MoBA/DSA/CoWA at five sizes">
+    <figcaption>
+      <b>Table 7:</b> Self-Attention Variants Scaling Laws Configurations. The model and hyperparameter configurations used in our self-attention variants scaling laws experiments.
+      <span class="ex">Four rows per size (FullAttn / MoBA / DSA / CoWA). Beyond the shared columns, the differences concentrate in head configuration and budgets: FullAttn and CoWA use 8 KV heads, MoBA uses one KV head per QO head (16/16, 32/32, 40/40), DSA uses one latent head with $d_{qk}=576$ / $d_v=512$. Budget columns (PT Bgt / LCT Bgt): CoWA 1,408 / 4,992, MoBA 1,536 / 5,120, DSA 352 / 1,248 (a quarter, since its PST FLOPs are ~4×). The matching criterion is "approximately match <b>forward selected-attention FLOPs</b>", not head counts or raw token counts — stated plainly, along with the acknowledgement that this <b>does not require identical end-to-end training FLOPs</b>. Token volumes run from 12B/1.5B at 0.6B to 296B/36B at 14B.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>7.2 The FLOPs ledger: why pre-training saves 3.1% and long context saves 28.5%</h3>
+  <p>The x axis is cumulative training FLOPs as reported by Megatron-LM, covering the complete model computation. To expose the attention-specific contribution, the paper additionally <b>measures</b> the legal attention connections actually executed under each configuration instead of assigning the final-query budget to every query. With $\bar{s}$ the mean number of selected keys per query and per QO head, the sequence-dependent core-attention cost per token and layer is</p>
+  <div class="math">$$C_{\text{core}} = 8\,\bar{s}\,h\,d_{qk} + 6\,\bar{s}\,h\,d_{v}$$</div>
+  <p>where the QK side carries a factor of 8 because the backward pass recomputes scores and the PV side 6 (one multiply-accumulate counts as 2 FLOPs). FullAttn has $\bar{s} = (n+1)/2$ over the causal triangle; CoWA's measured values are $\bar{s} = 1{,}040.17$ (4K pre-training) and $\bar{s} = 2{,}930.08$ (32K long-context training). MoBA and DSA use their causally clipped selected supports, with routing and indexing costs counted in their totals.</p>
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4 scaling laws: perplexity against training FLOPs for pre-training and long-context training, with FullAttn/MoBA/DSA/CoWA">
+    <figcaption>
+      <b>Figure 4:</b> Scaling Laws. Perplexity as a function of training FLOPs for models from 0.6B to 14B parameters during 4K pre-training (left) and 32K long-context training (right). Each marker reports final perplexity; its outer ring denotes one standard deviation over the perplexity measurements collected during training. CoWA closely follows FullAttn in perplexity while requiring fewer FLOPs.
+      <span class="ex">The x axis is cumulative training FLOPs (log) and the y axis perplexity; each marker is one model size and the outer ring is one standard deviation over perplexity measurements during training. <b>Left (4K pre-training)</b>: the four curves nearly coincide, with CoWA marginally to the left. <b>Right (32K long-context training)</b>: the curves stratify clearly, and red (CoWA) sits furthest left at equal perplexity — at the rightmost 14B point the perplexity difference from FullAttn is under 0.01 while its x coordinate is visibly smaller. Two cautions: the rings overlap heavily, so these curves are statistically hard to separate and "comparable" is the honest reading rather than "better"; and the vertical separation appears mainly in the long-context stage, which matches the shape of attention cost as sequence length grows.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+  <p>Hence the paper's central efficiency claim: at 14B, CoWA's pre-training perplexity matches FullAttn's and the two differ by less than 0.01 after long-context training, while <b>total training FLOPs fall by 3.1% (4K stage) and 28.5% (32K stage)</b>. The source of the asymmetry is clear: dense attention's cost grows with sequence length, whereas in the 32K stage CoWA achieves full coverage on a per-QO-head budget of 4,992 with no router or indexer FLOPs at all. In pre-training the sequence is only 4K, the shared window of 1024 occupies a quarter of it, and only 3,072 tokens' worth of long-range cost is on the table — so the saving is naturally limited.</p>
+
+  <h3>7.3 Model evaluation: four 14B variants, and 32B through continued training</h3>
+  <p>Evaluation comes in two groups: at 14B, all four attention variants from the scaling-law study; at 32B, only FullAttn and CoWA, both produced by a <b>separate long-context continued-training</b> run (64B tokens, sequence 32,768, batch 4M, constant learning rate $1\times10^{-5}$, 64 layers, $d_{model}$ 5,120, 64 QO heads, 8 KV heads). Every task is run with five seeds (0, 42, 233, 666, 1234) and reported as mean ± standard deviation, using the EleutherAI LM Evaluation Harness on 8 H100 GPUs.</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2 model-level evaluation summary: knowledge, reasoning, RULER 32K and RULER 128K averages at 14B and 32B">
+    <figcaption>
+      <b>Table 2:</b> Model-Level Evaluation Summary. Average knowledge, reasoning, and RULER scores at 14B and 32B. RULER is evaluated at the native 32K context length and under YaRN extrapolation to 128K. Detailed per-task results and uncertainty estimates are reported in Appendix B.
+      <span class="ex">The headline table. At 14B: CoWA knowledge 72.70 / reasoning 64.87 / RULER-32K 89.13 / RULER-128K 66.60 versus FullAttn's 72.32 / 64.46 / 89.42 / 65.84; MoBA 70.58 / 59.71 / 87.17 / 61.52 and DSA 70.23 / 63.28 / 87.67 / 64.05. At 32B: CoWA 76.07 / 75.53 / 92.58 / 81.78 against FullAttn 75.62 / 75.67 / 92.70 / 82.03. <b>Bold and underlining mark the best and second-best result in each column and scale</b>, but adjacent numbers are typically within 0.5 points while the per-task standard deviations in the detailed tables run 0.3–1.5 and reach ±3.5 on GPQA-Diamond — so "CoWA is higher on 14B knowledge and reasoning" should not be read as a stable advantage. The paper's own wording is comparable.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+  </div>
+  <p>The three detailed tables (8/9/10) carry more information than the summary, in particular <em>which</em> tasks gained and which lost:</p>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table8.png" alt="Table 8 knowledge benchmark detail: per-task scores and standard deviations for MMLU, MMLU-Pro, BBH, HellaSwag, OBQA, WinoGrande">
+    <figcaption>
+      <b>Table 8:</b> Knowledge Benchmark Results. Knowledge evaluation of the scaling-law models at 14B and the continued-trained models at 32B. CoWA produces averages comparable to FullAttn at both scales and remains close across individual tasks.
+      <span class="ex">Task by task, the pattern repeats at both scales: CoWA is <b>higher on MMLU and BBH</b> (14B: 79.04±0.28 vs 78.21±0.31; 83.64±0.51 vs 82.59±0.48) and <b>slightly lower on MMLU-Pro and HellaSwag</b> (64.89 vs 64.96; 80.3 vs 80.64). That looks like a systematic tilt rather than noise: knowledge-heavy multiple choice with reasoning (MMLU/BBH) benefits, while distractor-style multiple choice (MMLU-Pro) and commonsense continuation (HellaSwag) lose a little. MoBA and DSA trail markedly on the same table, especially MMLU-Pro (58.73 / 59.92 against 64.96).</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+  </div>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table9.png" alt="Table 9 reasoning benchmark detail: per-task scores for PIQA, GSM8K, Hendrycks-Math, ARC-C, AGIEval, GPQA-Diamond">
+    <figcaption>
+      <b>Table 9:</b> Reasoning Benchmark Results. Reasoning evaluation of the scaling-law models at 14B and the continued-trained models at 32B. CoWA achieves average scores comparable to FullAttn at both scales.
+      <span class="ex">Two numbers stand out. <b>On Hendrycks-Math, CoWA's 62.31±0.62 sits right on FullAttn's 62.46±0.65, while MoBA scores only 39.0±1.38 and DSA 55.99±0.82</b> — sparse attention hurts mathematical reasoning far more than the averages suggest, and CoWA is essentially lossless there. <b>GPQA-Diamond carries a standard deviation of ±3.17 to ±3.56</b>, and that is where CoWA's 42.33 against FullAttn's 39.87 comes from — a ~2.5-point lead inside a 3-point error bar, which is exactly why the paper notes that the 14B reasoning "gain" is largely driven by this single task. Excluding GPQA-Diamond, every per-task difference is within 0.26 points at both scales.</span>
+          <span class="pgref">Report p.20</span>
+    </figcaption>
+  </figure>
+  </div>
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/table10.png" alt="Table 10 RULER retrieval detail: per-task scores at native 32K and YaRN 128K for the NIAH variants and RULER-VT/CWE/FWE/QA">
+    <figcaption>
+      <b>Table 10:</b> Retrieval Benchmark Results. RULER evaluation at the native 32K context length and under YaRN extrapolation to 128K. CoWA achieves average scores close to FullAttn at both context lengths. NIAH-S averages NIAH-S-1, NIAH-S-2, and NIAH-S-3; NIAH-MK averages NIAH-MK-1, NIAH-MK-2, and NIAH-MK-3; and RULER-QA averages RULER-QA-SQuAD and RULER-QA-HotpotQA.
+      <span class="ex">Four blocks: 14B/32B × native 32K / YaRN 128K. Specifically: at 14B native 32K, CoWA 89.13 against FullAttn 89.42, a 0.29 gap — <b>with RULER-QA actually higher (57.74±1.14 vs 56.28±1.2) and NIAH-MK lower (96.96±0.71 vs 98.0±0.65)</b>. Under YaRN extrapolation to 128K the gaps widen: at 14B NIAH-MQ is 84.6±0.79 against 88.25±0.69, but CoWA scores <b>13.22±1.12 on RULER-CWE versus 5.76±0.46</b> — a task where every method is weak and CoWA is the only one still in double digits. <b>Note that NIAH-MK at YaRN 128K sits in the 55–57 range</b>, i.e. extrapolation itself costs a great deal, so that column should not be compared directly with the native 32K column.</span>
+          <span class="pgref">Report p.20</span>
+    </figcaption>
+  </figure>
+  </div>
+  <div class="takeaway"><b>Section 7 in three sentences:</b> ① across 0.6B→14B, CoWA buys perplexity indistinguishable from FullAttn for less training compute; ② the resulting models are "comparable" rather than "better" on knowledge, reasoning and long-context retrieval, with per-task wins and losses; ③ <b>almost all of the FLOPs saving comes from the long-context stage</b> (28.5% vs 3.1%), which matches the motivation exactly — what CoWA removes is the long-range connection cost that dense attention recomputes at long sequences.</div>
+</section><!-- ============ s8 ============ -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary: three strengths, five boundaries, and a list of things to test next</h2>
+
+  <h3>8.1 Three design decisions worth learning from</h3>
+  <p><b>First, coverage was turned into a single ablatable variable.</b> Most sparse-attention papers ablate by "removing component A and measuring the drop", which is not a clean variable. CoWA freezes the per-head window width and varies only how many <em>distinct</em> long-range windows are spread across the eight KV heads, so four coverage levels — 12.5% / 25% / 50% / 100% — map directly onto accuracy (Table 1). Better still, the duplicated layouts repeat the segments <b>closest to the current query</b>, giving the control arms the freshest information. That bias runs against CoWA, and it still wins.</p>
+  <p><b>Second, "selection overhead" was turned from a slogan into a ledger.</b> The paper keeps insisting that two methods with the same selected-token count can differ substantially end to end. Table 3 lays out MoBA's $O(n^2hd_{qk}/B)$ and DSA's $O(n^2h_Id_I)$ asymptotically, adds an "auxiliary state" column, and Figure 3 then cashes it out in measurements. This chain gives the long-sequence reversal a mechanism rather than leaving it as a nicer-looking curve.</p>
+  <p><b>Third, the distributed constraint was folded into the formula.</b> Breakpoints are evaluated with the <b>global</b> KV-head index (Equation 6) rather than the local one. The cost is a subscript; the benefit is that complementarity becomes an invariant across ranks — and when $TP = H_k = 8$ it yields the tidy division of one long-range band per rank [estimated; see §3.5]. Switching to local indices would give every rank "band 0" and break the design under TP — an easy trap for an implementer to fall into.</p>
+
+  <h3>8.2 Where the ideas come from</h3>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>CoWA's components and the upstream work the paper credits (organized from the paper's own inline citations; not a table from the paper)</caption>
+    <thead><tr><th>Component / design point</th><th>Upstream credited by the paper</th><th>What this work changes or integrates</th></tr></thead>
+    <tbody>
+      <tr><td>Blocked execution with online softmax</td><td>FlashAttention (Dao et al., 2022)</td><td>Keeps block traversal and the online-softmax recurrence, but visits only the legal KV blocks computed from the position rule; the backward pass reuses the stored logsumexp to reconstruct probabilities exactly</td></tr>
+      <tr><td>Near-diagonal sliding window</td><td>Longformer (Beltagy et al., 2020); SWA</td><td>No longer each head's only visible range but one segment shared by all KV heads; actual sparsification happens at long range</td></tr>
+      <tr><td>Prefix sink tokens</td><td>Attention-sink / first-token work (Barbero et al., 2025)</td><td>Folded into the window definition as a shared sink window, duplicated by all $H_k$ heads together with the near window</td></tr>
+      <tr><td>Assigning causal-distance bands to heads</td><td>SPAttention (ref. [66])</td><td>Moved from MHA heads to GQA KV heads, plus long-context, decoding and tensor-parallel execution, plus a coverage ablation (the paper's footnote notes the released MEHC implementation is shared-local and lacks these)</td></tr>
+      <tr><td>QO heads sharing K/V</td><td>GQA (Ainslie et al., 2023)</td><td>Window assignment binds to the KV head; the group size $H_q/H_k$ sets how often a long-range key is duplicated</td></tr>
+      <tr><td>Associative-recall evaluation setup</td><td>Zoology (Arora et al., 2024)</td><td>Keeps the 256 key-value pairs and the power-law query sampling ($a=0.01$); explicitly adds no random padding or noise tokens</td></tr>
+      <tr><td>Long-context extrapolation and evaluation</td><td>YaRN (ref. [41]), RULER (ref. [26]), LM Evaluation Harness (ref. [17])</td><td>Two evaluation regimes (native 32K and YaRN 128K) with five fixed seeds and identical decoding settings</td></tr>
+      <tr><td>Tensor-parallel training</td><td>Megatron-LM (ref. [47])</td><td>Windows defined by global KV-head index keep complementarity stable across ranks; 128-GPU training</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Citations follow the paper's own inline labels; this page did not verify each bibliography entry.</p>
+
+  <h3>8.3 Boundaries worth keeping in mind</h3>
+  <p><b>① $H_k$ is a hard constraint, and it points against the current architectural current.</b> The number of complementary intervals <em>is</em> the number of KV heads. The paper fixes $H_k = 8$ throughout, while a number of efficient architectures are moving toward fewer KV heads or a single latent KV — the paper's own DSA baseline uses one latent head. At $H_k=1$ collective coverage degenerates to dense causal attention, as the paper itself states. So how much is left at $H_k = 2$ or $4$? Cutting distant history into four bands instead of eight means doubling the long-range window per head to keep full coverage, which also raises the shared windows' duplicated share. No $H_k$ sensitivity curve is given, and that parameter is what decides whether the design generalizes.</p>
+  <p><b>② Coverage is not equivalence, and how the gap behaves at longer sequences is untested.</b> The paper supplies the caveat itself: full causal coverage guarantees direct access, but not the same head-specific interactions or outputs as FullAttn. Mechanically it is clear why — each QO head normalizes over its own visible set, so <b>the softmax normalizer changes</b> and CoWA is a different distribution. At 8K the measured gap is 0.24 points (89.73 vs 89.97). But quality is only evaluated to 32K native (plus YaRN 128K), and associative recall stops at 8K, whereas the efficiency advantage is largest at 128K. In other words, <b>whether the distributional difference from incomplete-per-head coverage grows with length is not covered by the evaluation range, and the uncovered range is exactly where the design is fastest</b>.</p>
+  <p><b>③ Long-range redundancy is exactly 1.</b> By Equation 5 each long-range key falls inside one KV head's support set, so how many QO heads directly see a distant token equals the group size $H_q/H_k$ (2 at 0.6B, 5 at 14B, 8 at 32B), while a near-window token is visible to all $H_q$ heads. That <em>is</em> the mechanism that saves duplicates, but it also makes distant information a <b>single-point read</b>: no multi-head redundancy, no voting, no "several heads corroborating the same distant evidence". The retrieval task explicitly adds no random padding or noise, so whether a single-point read suffices under distractors is untested. This is the experiment set I would most like to see added.</p>
+  <p><b>④ Training-time load imbalance is not addressed.</b> Equal-width allocation is stated to serve <b>decoding</b> load balance; equal-area (or equal-work) allocation is "outside the scope of this work". The paper also acknowledges that even with equal widths, heads' actual work can differ (earlier queries have their support sets clipped by causality). In full-sequence training this means attention work can differ across ranks within one TP group, while ranks are synchronized — that kind of imbalance eats directly into the efficiency gain. What is reported is operator-level synchronized wall-clock, with no per-head load or inter-rank wait distribution.</p>
+  <p><b>⑤ The efficiency numbers need their scope read carefully.</b> The 7.4×/8.6×/3.0× and the memory comparisons are all <b>attention-operator-level</b>: QKV/output projections, MLP, communication and optimizer updates are excluded, as the paper lists explicitly. The four methods also use different KV-head configurations (CoWA 8, MoBA 64, DSA a single latent head), so the memory curves are not an equal-head-count comparison — the paper discloses rather than dodges this, but a reader should still treat them as "each method in its native configuration", not as a pure mechanism comparison. The 8.4 MiB decoding figure is an <b>operator peak</b>, not resident KV cache at serving time; §2.3 of the paper goes out of its way to distinguish the two, and window-aware offload/prefetch is listed as future work.</p>
+
+  <h3>8.4 Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><b>The window split for the scaling-law and long-context stages is not disclosed.</b> The paper gives the per-QO-head total budgets (1,408 / 4,992) and, for associative recall, $w_{\text{sink}}=1$, $w_{\text{near}}=1023$; how the long-context and operator-benchmark configurations divide sink / near / long-range is not itemized. The check in §3.5 shows every disclosed budget lands exactly on "$1024$ shared + eight equal bands = full coverage" [estimated], but the paper never states that split outright, so a reproducer cannot verify the window parameters.</li>
+    <li><b>The gap between the measured $\bar{s}$ and the nominal budget is left unexplained.</b> The paper reports $\bar{s} = 1{,}040.17$ (4K PT) and $2{,}930.08$ (32K LCT) against nominal per-QO-head budgets of 1,408 and 4,992. In principle the difference comes from causal clipping, window overlap and sequence packing, but no breakdown is given, so a reader cannot reconcile the 3.1% / 28.5% FLOPs savings item by item. A "budget → actual support size → FLOPs" reconciliation table would close this.</li>
+    <li><b>No quality curves at longer native sequence lengths.</b> Quality is measured at 32K native / YaRN 128K while the efficiency advantage is largest at 128K; native 64K–128K long-context training with RULER evaluation would be the direct test of "coverage does not degrade at extreme lengths".</li>
+    <li><b>No $H_k$ sensitivity.</b> Everything is fixed at eight KV heads. A coverage–quality–efficiency curve for $H_k \in \{2,4,8,16\}$ is the single most informative experiment for scoping the design.</li>
+    <li><b>32B is compared only against FullAttn and is outside the scaling law.</b> The 32B answer comes from a separate continued-training experiment with just two rows; no 32B results for MoBA/DSA, and NSA appears only in the 8K associative recall. That leaves "does CoWA's advantage over dynamic sparsity survive scale?" without evidence.</li>
+    <li><b>Retrieval under distractors, and training-stability diagnostics.</b> Associative recall explicitly omits random padding and noise; and the effect of heterogeneous per-head visible sets on gradient scale and per-head load is visible only through final perplexity and one standard-deviation ring, with no intermediate diagnostics.</li>
+  </ul>
+  <div class="note"><b>One-line placement:</b> CoWA reads less like "making attention sparse" and more like <b>re-ordering the cost structure of sparse attention</b>. Using coverage as an ablatable dimension, it trades duplicated long-range connections for complementary division of labour, paying with single-point reads and a dependence on $H_k$. Within the range it measured, the trade is favourable — and the implementation rule is simple enough to land on training, decoding and tensor parallelism at once.</div>
+</section>
+
+<!-- ============ s9 ============ -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Keep this handy while reading; abbreviations in the prose also carry hover definitions.</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Reading glossary (abbreviations with dotted underlines in the prose carry the same definitions on hover)</caption>
+    <thead><tr><th>Term</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>CoWA</td><td>CoWindow Attention</td><td>This paper's method: shared near window + shared prefix-sink window + one complementary long-range band per KV head</td></tr>
+      <tr><td>FullAttn</td><td>Full Attention</td><td>Standard dense causal attention: every head sees the complete causal prefix</td></tr>
+      <tr><td>SWA</td><td>Sliding-Window Attention</td><td>Fixed-length sliding window only, no long-range access; the local reference baseline here</td></tr>
+      <tr><td>GQA</td><td>Grouped-Query Attention</td><td>Several QO heads share one group of KV heads; $H_q/H_k$ is the group size</td></tr>
+      <tr><td>QO / KV head</td><td>Query-Output / Key-Value head</td><td>QO heads produce queries and outputs; KV heads supply K/V. Under GQA there are more of the former</td></tr>
+      <tr><td>$\delta(i_q,i_k)$</td><td>Bottom-right-aligned causal distance</td><td>The paper's distance $i_q+(N_k-N_q)-i_k$, unifying training, prefill and decoding</td></tr>
+      <tr><td>$w_{\text{sink}}$ / $w_{\text{near}}$</td><td>Prefix-sink width / near-window width</td><td>Widths of the two shared windows; 1 / 1023 in the associative-recall configuration, 1024 in total</td></tr>
+      <tr><td>$L$ / $b_{h_k}$</td><td>Long-range span / breakpoints</td><td>The span left after the shared windows, and the cut points that divide it evenly across $H_k$ KV heads</td></tr>
+      <tr><td>Collective coverage</td><td>Collective coverage</td><td>The union of all heads' visible sets equals the full causal prefix (Equation 4); the paper's core property</td></tr>
+      <tr><td>TP</td><td>Tensor Parallelism</td><td>Requires $TP \le H_k$ here; windows are assigned by global KV-head index</td></tr>
+      <tr><td>$\bar{s}$</td><td>Mean selected keys per query per QO head</td><td>Measured mean support size used for FLOP accounting; CoWA 1,040.17 (4K) / 2,930.08 (32K)</td></tr>
+      <tr><td>PST FLOPs</td><td>Per-Selected-Token FLOPs</td><td>Forward QK+PV FLOPs contributed by one selected key token, $2h(d_{qk}+d_v)$; used to align budgets across methods</td></tr>
+      <tr><td>MoBA</td><td>Mixture-of-Block Attention</td><td>Block-level dynamic sparse baseline: block pooling + routing + TopK + rearrangement + merging</td></tr>
+      <tr><td>DSA</td><td>DeepSeek Sparse Attention</td><td>Token-level dynamic sparse baseline: lightning indexer scoring + TopK + sparse MLA</td></tr>
+      <tr><td>NSA</td><td>Native Sparse Attention</td><td>Natively trainable sparse baseline that appears only in the 8K associative recall</td></tr>
+      <tr><td>Seer / InfLLMv2</td><td>—</td><td>Two dynamic sparse baselines in the recall study; both near 10% accuracy at 8K</td></tr>
+      <tr><td>online softmax</td><td>Online (streaming) softmax</td><td>Recurrent normalization when attention is computed block by block; stores the $m,\ell,O$ triplet</td></tr>
+      <tr><td>logsumexp $\ell$</td><td>Log-sum-exp state</td><td>The paper stores $\ell = m + \log(\ell)$ and reconstructs probabilities from it in the backward pass, so no attention matrix is saved</td></tr>
+      <tr><td>split-KV</td><td>Split-KV decoding</td><td>Distributes a decode step's visible KV blocks across programs and merges via partial online-softmax states</td></tr>
+      <tr><td>RULER</td><td>RULER long-context benchmark</td><td>Long-context retrieval suite: NIAH variants, variable tracking, and QA aggregates</td></tr>
+      <tr><td>NIAH-S/MK/MQ/MV</td><td>Needle-in-a-Haystack variants</td><td>Single-needle, multi-key, multi-query and multi-value retrieval subtasks</td></tr>
+      <tr><td>YaRN</td><td>Yet another RoPE extensioN</td><td>RoPE position extrapolation; used here for the 128K evaluation</td></tr>
+      <tr><td>HBM</td><td>High Bandwidth Memory</td><td>GPU device memory; during decoding each rank still keeps its local KV heads' full history resident there</td></tr>
+      <tr><td>WSD</td><td>Warmup-Stable-Decay</td><td>Learning-rate schedule used by the scaling-law runs</td></tr>
+      <tr><td>SmolLM-Corpus</td><td>—</td><td>Pre-training corpus used by the scaling-law experiments (Ben Allal et al., 2024)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    English edition of the reading notes for arXiv:2609.32704v1, <em>CoWindow Attention: Full Causal Coverage Is a Collective Property</em>. Figures and tables are extracted from the paper at 300 DPI and scaled proportionally (never cropped); the paper's tables are shown as high-resolution images. Commentary and markings are the editor's; anything <b>[organized]</b> or <b>[estimated]</b> is labelled as such.<br>
+    Paper: <a href="https://arxiv.org/abs/2609.32704">arXiv:2609.32704</a> · Code released as flash-sparse-attention (named in the paper) · <a href="CoWindow-Attention论文精读_HTML.html">中文精读版</a><br>
+    <span style="opacity:.75">Dark mode · click any image for the original · print-friendly · section jumps in the top bar</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // dark mode: remember preference, default follows system
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox: click an image to view the original
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // back to top
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>
