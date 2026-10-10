@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="KITE deep-read: KV-Invariant Transformer Expansion and StepFun's two-tower SST — grow the model where it does not touch attention KV, so prefill stays source-sized. All 13 exhibits embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, KITE, SST, Step Scale Transformer, KV-invariant expansion, upcycling, MoE, prefill, decode, YOCO, efficient inference">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · KITE: KV-Invariant Transformer Expansion (SST)">
+<meta property="og:description" content="Add capacity only on the side that produces no KV: a 33.8B source expanded to 67B whose bulk prefill still runs 1.12B active body parameters — lower training loss and lower inference cost than 47B / 63B classic transformers at the same cumulative training compute.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · KITE: KV-Invariant Transformer Expansion (StepFun SST)</title>
+<style>
+  /* ===== Illustrated deep-read styles (paper-reading-html skill v2) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">KITE/SST<span> · deep-read</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Observation</a>
+      <a class="jump" href="#s4">Method</a>
+      <a class="jump" href="#s5">Training</a>
+      <a class="jump" href="#s6">Experiments</a>
+      <a class="jump" href="#s7">Design space</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文精读版"
+         onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark / light" title="Toggle dark / light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.27294 · StepFun</div>
+    <h1>KITE: grow only the part that produces no KV<br>— KV-Invariant Transformer Expansion and the two-tower SST</h1>
+    <div class="subtitle">Train a small model first, then expand capacity in the region that does not take part in KV construction, and keep training. At inference, bulk prefill still runs only the small tower. StepFun's SST expands a 33.8B source into a 67B MoE (2.15B active body parameters per decode token) that beats 47B / 63B classic transformers on training loss at comparable cumulative training compute, with an analytical inference cost 6.7% / 31.6% lower.</div>
+    <div class="meta">
+      <span>Authors: Zhiheng Hu, Yixun Wei, Jian Zhou, Yizhuang Zhou, Ji Li, Xing Chen, Yang Li, Bojun Wang, Yibo Zhu, Xiangyu Zhang, Daxin Jiang (StepFun)</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2609.27294">arXiv:2609.27294</a> (2026-09-23)</span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">KV-Invariant</span><span class="pill">Upcycling expansion</span><span class="pill">Two-tower Prefiller/Decoder</span><span class="pill">MoE 67B · 2.15B active</span><span class="pill">Prefill/decode cost split</span><span class="pill">Input-heavy agentic load</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Reading path (every exhibit sits inside the prose that explains it)</h2>
+  <ol>
+    <li><a href="#s1">Overview: what it claims, where the numbers are</a></li>
+    <li><a href="#s2">Background: saving on one axis is not saving</a></li>
+    <li><a href="#s3">Observation: agentic traffic is input-dominated</a></li>
+    <li><a href="#s4">Method: KITE's principle and SST (with a layer/parameter walkthrough)</a></li>
+    <li><a href="#s5">Training &amp; systems: expansion, continuation, compute budget</a></li>
+    <li><a href="#s6">Experiments: loss, downstream tasks, inference cost</a></li>
+    <li><a href="#s7">Design space and related work</a></li>
+    <li><a href="#s8">Commentary: lineage, limits, accounts to watch</a></li>
+    <li><a href="#s9">Glossary (jump back anytime)</a></li>
+  </ol>
+</nav>
+<!-- ===== s1 Overview ===== -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: what grows does not touch the KV</h2>
+  <p class="lead">This paper proposes <strong>KITE (KV-Invariant Transformer Expansion)</strong>, a model-scaling paradigm: when a model is grown from a smaller size, <strong>all new capacity is placed in the region that does not determine the attention K/V</strong>. As a result, building the KV cache at inference (bulk prefill) only ever runs the original, smaller part of the model; the added "KV-reading" capacity shows up only in decode and in predicting the first output token at the prompt boundary. The concrete instantiation is <strong>SST (Step Scale Transformer)</strong>: two same-depth Transformer towers executed <em>sequentially</em> — a <em>Prefiller</em> that produces layer-wise KV, and a <em>Decoder</em> that reads that KV to predict the next token.</p>
+  <p>The problem it attacks is a <strong>joint</strong> one across three cost axes: training compute, prefill compute, and decode compute. Existing routes each carry a debt — progressive upcycling saves training but you then serve the full-size model for less-than-full-size quality; YOCO-style KV reuse saves prefill but can cost quality, and recovering that quality amounts to a training-cost loss. KITE pays all three at once: training is saved (new capacity appears partway through), prefill is saved (the added part does not produce KV), and quality is not conceded (lower training loss at the same compute).</p>
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: KITE training route and the observed three-way trade-offs (63B classic and 67B SST against the 47B reference)">
+    <figcaption>
+      <b>Figure 1:</b> KITE: training route and observed trade-offs. Both panels use the same 47B transformer trained from scratch as the reference; lower is inward. Active counts exclude embedding/head. The inference proxy is 0.75p + 0.25d, where p and d are bulk-prefill and decode active-body counts normalized to the reference.
+      <span class="ex">Three exhibits stacked into one: on top, the training route (1. train small → 2. add KV-reading capacity → 3. continue training); below, two triangular radars sharing the same grey dashed reference — the same 47B transformer trained from scratch. The three axes are <b>training loss (zoomed 75×)</b>, <b>training compute</b>, and the <b>inference-cost proxy</b>. <b>Left, 63B classic</b>: its inference proxy is <b>+36.5%</b> versus 47B (both prefill and decode active counts are larger, 2.02B/2.02B), while its loss is better by 0.0085. <b>Right, 67B SST</b>: loss better by <b>0.0106</b>, training compute 1.00×, and the inference proxy <em>lower</em> by <b>6.7%</b> — because bulk prefill runs only 1.12B active body parameters (less than the 47B's 1.48B), paid for by a heavier decode at 2.15B (slightly above the 63B's 2.02B). The caption insists that "area is not a score": the triangle only shows the direction on all three axes at once, and the proxy is an analytical estimate, not a measured serving speedup.</span>
+          <span class="pgref">Report p.1</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to open the original high-resolution version; click again or press Esc to close.</p>
+  <div class="note"><b>Reading conventions:</b> every number on this page follows the paper's own values; anything this page organizes, generalizes or recomputes is explicitly marked <b>[organized]</b> or <b>[estimated]</b>, so the two accounting bases never blur. Notation follows the paper: $L$ is the number of layers per tower, $p$ the bulk-prefill active body count, $d$ the decode active body count; active counts are body-only (excluding embedding/head).</div>
+  <div class="kv">
+    <div class="item"><div class="k">Source → expanded</div><div class="v">33.819B → 66.959B<small>The Prefiller keeps the source tower; the Decoder is the addition (Table 2)</small></div></div>
+    <div class="item"><div class="k">Active body (prefill / decode)</div><div class="v">1.120B / 2.155B<small>vs 47B: 1.477/1.477; vs 63B: 2.016/2.016</small></div></div>
+    <div class="item"><div class="k">Training EMA-200 loss</div><div class="v">1.5900<small>47B classic 1.6006; 63B classic 1.5921</small></div></div>
+    <div class="item"><div class="k">Inference proxy (75:25)</div><div class="v">0.933<small>6.7% below 47B = 1; 31.6% below 63B = 1.365</small></div></div>
+    <div class="item"><div class="k">Cumulative training tokens</div><div class="v">390.54B<small>167.98B source + 222.55B continuation; ≈ 100% of B<sub>ref</sub></small></div></div>
+    <div class="item"><div class="k">Seven downstream tasks</div><div class="v">Best on all<small>OpenBookQA 75.00, MMLU 60.54, GSM8K 58.38, MATH 34.36, HumanEval 37.80, MBPP 51.40, BBH 52.74 (Table 3)</small></div></div>
+  </div>
+  <div class="takeaway"><b>In one line:</b> KITE is not another attention trick — it is an architecture-level answer to "<strong>where</strong> to grow": no capacity is added to any path that must produce future KV. SST is the plainest possible implementation of that rule (two towers in sequence, layer-aligned KV reuse), and the paper says outright it is probably not the best design — only enough to demonstrate the paradigm. The boundary condition worth memorizing: <em>future KV production must not depend on historical Decoder states</em>; what that buys is prefill that is always priced at the source model's size.</div>
+</section>
+
+<!-- ===== s2 Background ===== -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Motivation</div>
+  <h2 class="sec">Background: saving on one axis is not saving</h2>
+  <p>LLMs exhibit strong scaling behaviour — scale buys capability (Kaplan et al., 2020; Hoffmann et al., 2022) — and the bill for that scale arrives on both the training and the inference side. Making models larger at lower compute cost is therefore one of the central problems, and the paper stresses that the goal is not merely to spend less: <strong>it is to train or serve a stronger model under the same budget</strong>.</p>
+  <p><abbr title="Mixture-of-Experts: sparse expert routing, only a few experts active per token">MoE</abbr> is the success story here (Switch Transformers, Fedus et al., 2022; Shazeer et al., 2017): at a fixed parameter count, sparse expert routing reduces training <em>and</em> inference computation at once. The paper's point is what that success hides — <strong>a saving on only one side may not improve the overall trade-off</strong>. Two existing one-sided routes make the contrast concrete:</p>
+  <ul class="tight">
+    <li><strong>Progressive <abbr title="Growing a small checkpoint into a larger model instead of training from scratch">upcycling</abbr></strong> (Net2Net: Chen et al., 2016; SPARKLING: Yu et al., 2026): train a small model, grow it into the target partway through, so most tokens run on a cheaper graph. What is saved is <em>training</em> — but upcycled models are generally perceived to underperform same-size models trained from scratch, so the saving is paid back at inference: you serve the full target model and still get less than full target quality.</li>
+    <li><strong>KV reuse</strong> (the YOCO family: Sun et al., 2024; DeepSeek-V4.1-Flash, 2026; KV-Mirror, WeChat AI, 2026): deeper layers reuse keys and values computed by shallower ones, keeping prefill affordable as the model grows. What is saved is <em>inference prefill</em> — but removing KV-producing layers can sacrifice quality, and recovering it typically needs a larger model or longer training, which is effectively a <em>training-cost</em> loss.</li>
+  </ul>
+  <p>KITE's move is to put both accounts on one table: <strong>scale the model by expanding only the region that does not affect KV</strong>. The added capacity appears partway through training (cheap training), takes no part in KV computation (cheap prefill), and joint training of the two towers absorbs the quality debt. The paper also notes this route is <strong>orthogonal</strong> to earlier designs such as MoE and hybrid attention — the MoE layers inside SST are the proof by construction.</p>
+</section>
+
+<!-- ===== s3 Observation ===== -->
+<section id="s3">
+  <div class="sec-no">03 · Observation</div>
+  <h2 class="sec">Observation: agentic traffic is input-dominated, so prefill is where to save</h2>
+  <p>Why target prefill rather than decode? The argument comes from the shape of real agentic workloads: repeated model calls process accumulated context plus new tool outputs (SWE-agent: Yang et al., 2024; ReAct: Yao et al., 2023), and even with prompt caching a substantial amount of uncached input remains. To quantify this, the paper pulls public OpenRouter model activity (August 22 – September 20, 2026 UTC) for six models:</p>
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: input/output tokens and uncached-input charge share for six OpenRouter models">
+    <figcaption>
+      <b>Table 1:</b> Input demand in selected OpenRouter traffic. Input includes cached tokens; output includes reasoning tokens. Charge share is uncached-input charges divided by uncached-input plus output charges, excluding cache-read charges. Estimates aggregate available standard and Batch activity within August 22–September 20, 2026 (UTC), using September 21 base prices. Details appear in Appendix A.
+      <span class="ex">Each column is starker than the last: <b>input/output tokens</b> run from 37.79× (Gemini 3.7 Flash, the mildest) to 106.43× (GPT-6 Astra); after removing cache reads, <b>uncached input/output</b> is still 10.15×–16.29×; and the <b>uncached-input charge share</b> lands in 67.4%–76.7% — two-thirds to three-quarters of the uncached-input-plus-output bill is spent reading input. That is the paper's basis for prioritizing prefill savings and for using 75:25 as its representative prefill:decode cost mix. Note the basis: these are analytical estimates from token volumes and list prices, not measured GPU costs, and the selected traffic is not separately labelled agentic.</span>
+          <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+  <p>The accounting is given in Appendix A: with $P$ total input tokens, $C$ cache-read tokens, $U = P - C$ uncached input, and $D$ output tokens (including reasoning), the estimated uncached-input charge $A$ and output charge $O$ combine into a bill share:</p>
+  <div class="math">$$A = 10^{-6}\sum_v U_v a_v,\qquad O = 10^{-6}\sum_v D_v o_v,\qquad s_{\text{uncached}} = \frac{A}{A+O}. \tag{6}$$</div>
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: the U/C/D token volumes and A/O charges underlying Table 1">
+    <figcaption>
+      <b>Table 4:</b> Components underlying Table 1. Token counts are in billions; estimated charges are in millions of USD. U is uncached input, C cached input, and D output. Ratios use unrounded totals.
+      <span class="ex">Table 1's ratios decomposed back into raw quantities: uncached input $U$, cached input $C$, output $D$ (billions), and the estimated charges $A$, $O$ (millions of USD). Two contrasts stand out. First, caching is already doing heavy lifting — Gemini 3.7 Flash shows 5722B cached against 2100B uncached (about 2.7×) — yet the remaining uncached input is still the dominant line item. Second, output volume is a rounding error next to input (Astra: 24.3B vs 356.2B), while output is priced about 5× the input rate (10/50, 2/10, 0.75/3.75 per million tokens), which is the paper's explanation for why output charges do not vanish despite the small volume — although uncached input still takes the larger share. The paper also states what is out of scope: cache-write premiums, context-length and provider-specific pricing, historical price changes, non-token fees — and that these are estimates, not invoices.</span>
+          <span class="pgref">Report p.10</span>
+    </figcaption>
+  </figure>
+  <p>With that weight in hand the paper defines an analytical inference-cost proxy: <strong>$\text{proxy} = w\,p + (1-w)\,d$</strong>, where $p$ and $d$ are bulk-prefill and decode active body counts normalized to 47B classic, and $w = 0.75$ means a 75:25 P:D mix. Figure 1 uses it to place 0.933 (SST) against 1.365 (63B); §6's Figure 5 sweeps the same weight from 0:100 to 100:0 to see who is cheaper where.</p>
+  <div class="note"><b>Basis warning [organized]:</b> the paper repeats that these are <b>analytical cost estimates, not measured serving speedups</b> — the proxy only compares how many parameters each token engages, leaving out kernel efficiency, communication, KV memory bandwidth, batching and scheduling. Every "x% lower" on this page inherits that basis.</div>
+</section><!-- ===== s4 Method ===== -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">Method: KITE's principle and the two-tower SST</h2>
+  <h3>4.1 The design principle: a structural invariant, not frozen weights</h3>
+  <p>The paper splits a causal model into a <strong>Prefiller</strong> $P$ that produces reusable attention memory and a <strong>Decoder</strong> $D$ that predicts:</p>
+  <div class="math">$$(M_t,\, z_t) = P(x_{1:t};\,\theta_P),\qquad \ell_t = D(x_t,\, z_t,\, M_t;\,\theta_D), \tag{1}$$</div>
+  <p>Here $M_t$ is the reusable attention memory (the layer-wise K/V), $z_t$ optional Prefiller features at position $t$, and $\ell_t$ the next-token logits. The procedure: finish the small-model (source) stage, then <strong>expand $D$ from the intermediate checkpoint</strong> while retaining the Prefiller graph and the memory interface; both parts then continue training jointly.</p>
+  <p>The paper is explicit that <strong>the invariant is structural — neither weights nor KV values are frozen</strong>. What is constrained are three things:</p>
+  <ul class="tight">
+    <li>the Decoder must not <strong>produce</strong> memory that future positions need (K/V comes only from the Prefiller);</li>
+    <li>to skip Decoder history during generation, a retained Decoder position's representation must be <strong>independent of the omitted Decoder positions given the Prefiller outputs</strong>;</li>
+    <li>bulk prefill — the prompt-wide KV construction performed by the Prefiller — <strong>must not grow with the expansion</strong>.</li>
+  </ul>
+  <p>Under those restrictions prediction capacity can grow freely while the thing prefill is priced on (tokens × source-tower size) stays fixed. Only two "corners" remain necessary: the readout at the final prompt position for the first output token, and the Decoder's work during decode.</p>
+
+  <h3>4.2 SST: two same-depth towers, layer-aligned KV reuse</h3>
+  <p>SST instantiates the principle with two Transformer towers (Prefiller and Decoder, 18 layers each in the experiments). The Prefiller runs first and produces <strong>layer-wise</strong> KV; each Decoder block computes its own query and reads the corresponding Prefiller layer's KV:</p>
+  <div class="math">$$q^{D}_{l,t} = Q^{D}_{l}\!\left(h^{D}_{l-1,t}\right),\qquad a^{D}_{l,t} = \mathrm{Attn}\!\left(q^{D}_{l,t},\; K^{P}_{l}\!\left[I_l(t)\right],\; V^{P}_{l}\!\left[I_l(t)\right]\right). \tag{2}$$</div>
+  <p>where $Q^D_l$ includes query projection and normalization and $I_l(t)$ is the set of positions allowed by the original causal full/sliding mask. Both towers keep the source model's position ids. The Decoder has independent block parameters, and its residual and FFN/MoE operations are <strong>token-local</strong> — that is the root reason its historical positions can be omitted.</p>
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: KITE instantiated with SST — Stage 1 trains the Prefiller, expansion adds the Decoder, Stage 2 trains both jointly">
+    <figcaption>
+      <b>Figure 2:</b> KITE instantiated with SST. Stage 1 trains the Prefiller; expansion adds a Decoder initialized from the source weights, and Stage 2 continues training both towers jointly. Within Stage 2, the Prefiller executes in full before the Decoder. Each Decoder block uses aligned Prefiller KV. A token-local entry bridge combines the separately normalized embedding and final Prefiller state. The final Decoder state is normalized and passed to the shared output norm and LM head for prediction.
+      <span class="ex">Left: the pre-expansion source transformer (Stage 1 trains only this). Middle, <b>Expand</b>: the source weights are copied into both the Prefiller and the Decoder. Right: the expanded SST, where three kinds of wiring are colour-coded. <b>Green (shared KV)</b> is layer-aligned reuse — $K_L, V_L$ flow from Prefiller layer $L$ straight into Decoder layer $L$. <b>Orange (token-local bridge)</b> is everything that stays inside a token: the embedding and the "Final Prefiller state" are each RMS-normalized and summed, entering the Decoder through the <b>Entry bridge</b>; the Decoder's final state then goes through RMSNorm (no affine) and the shared output norm + LM head. <b>Blue dashed (new Decoder)</b> marks what expansion added. Note the KV outputs are drawn only on the Prefiller blocks (green arrows pointing right) — the Decoder itself produces no KV.</span>
+          <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+  <p>The entry bridge and the readout are deliberately lightweight. For the shared embedding/stem $e_t$ and the final Prefiller state $h^{P}_{L,t}$, the entry bridge is a sum of <strong>parameter-free</strong> RMS operations:</p>
+  <div class="math">$$h^{D}_{0,t} = \mathrm{RMS}_\epsilon(e_t) + \mathrm{RMS}_\epsilon\!\left(h^{P}_{L,t}\right),\qquad \mathrm{RMS}_\epsilon(v) = \frac{v}{\sqrt{\mathrm{mean}(v^2)+\epsilon}}, \tag{3}$$</div>
+  <p>with $\epsilon = 10^{-5}$. The Decoder's final state produces the logits through the shared output normalization and head:</p>
+  <div class="math">$$\ell_t = W_{\text{out}}\,\mathrm{Norm}_{\text{out}}\!\left(h^{D}_{L,t}\right). \tag{4}$$</div>
+  <p>The two towers <strong>share one copy</strong> of the embedding, output normalization and output head (embedding and head weights are untied). Gradients reach the Prefiller along two paths — the entry bridge and the reused KV. Given the Prefiller outputs, each Decoder position is independent of earlier Decoder states, which is what makes "prefill computes only the final position" a mathematical property rather than an engineering approximation.</p>
+
+  <h3>4.3 Grounding the configuration in layer numbers and parameters</h3>
+  <p>The comparison ladder has four points: the 33.819B source, 66.959B SST, and the family's 47B / 63B classic transformers (same tokenizer, data recipe, training protocol and evaluation sets). Start with the architecture:</p>
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: model configurations (Source / SST / 47B classic / 63B classic)">
+    <figcaption>
+      <b>Table 2:</b> Model configurations.
+      <span class="ex">Seven rows carry the accounting: the source tower and each SST tower are <strong>18 layers, hidden 2304, 16 MoE layers, 512 routed experts with 8 selected, SSSF attention</strong> — SST's "18 + 18" means two towers. The baselines instead go deeper and wider (47B: 20 layers / 2560, 18 MoE layers; 63B: 22 layers / 2816, 20 MoE layers). Three numbers matter most: total parameters <strong>33.819 → 66.959</strong>; decode active body parameters SST <strong>2.155</strong> (above the 63B's 2.016) against 47B's 1.477; and SST's prefill active body count of only <strong>1.120</strong> — 24% <em>below</em> the 47B classic's 1.477. The table note adds two conventions: each tower starts with two dense FFN layers, and SSSF means three sliding-window layers followed by one full-attention layer, with an SF remainder for 18/22 layers.</span>
+          <span class="pgref">Report p.5</span>
+    </figcaption>
+  </figure>
+  <p>Then down to geometry and the parameter ledger. Appendix B gives each tower's detailed dimensions and the "effective architecture" convention:</p>
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: detailed geometry — dense FFN width, expert width, head dimension, RoPE dimension, Q/KV heads">
+    <figcaption>
+      <b>Table 5:</b> Detailed geometry. Source/SST dimensions apply to each tower; both have two initial dense FFN layers. RoPE denotes rotary position embeddings.
+      <span class="ex">The last two rows are the ones to remember: <strong>full/sliding Q heads are 24/40 while KV heads are only 8</strong> — GQA-style sharing, identical for the source, SST and the 47B; only the 63B raises Q heads (to 32/48). That is why the 63B, "just a few layers deeper", carries a decode active count of 2.016B: it also widens the FFN (dense 5120, expert 640) and the Q projection. RoPE dimensions (64/128 for full/sliding) and head dim 128 are uniform across the ladder. The note also states that only the Prefiller keeps K/V projections and K normalization — see the ledger after Table 6.</span>
+          <span class="pgref">Report p.10</span>
+    </figcaption>
+  </figure>
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: architectural parameter counts (total, embedding/head, body, decode active, Prefiller-only active)">
+    <figcaption>
+      <b>Table 6:</b> Architectural parameter counts in billions, rounded to three decimal places.
+      <span class="ex">This is where "prefill is cheap" comes from. Read the rows together: SST has the largest total (66.959 &gt; the 63B's 62.691) and comparable embedding+head (0.594 / 0.660 / 0.725), but <strong>decode active body 2.155 and Prefiller-only active body 1.120</strong> are two different quantities — decode runs both towers, whereas prefill (and any cache-building-only stage) runs the Prefiller alone. The paper's counting convention: active body counts exclude embedding/head, count Top-8 routed experts per MoE layer plus shared experts, routers and the remaining per-token body weights from configured tensor shapes, and are checked against the exported weight inventory. The exported vocabulary has 128,815 rows (the padded training vocabulary is 128,896). The output head is excluded from active-body counts to avoid treating the full embedding matrix as a per-token multiply, but the paper notes it still contributes prompt-boundary and decode work in measured serving cost.</span>
+          <span class="pgref">Report p.10</span>
+    </figcaption>
+  </figure>
+  <div class="note"><b>Walkthrough [estimated]: where 66.959 and 2.155 come from.</b> Treat SST as "the source tower twice, minus the shared pieces kept once, minus what the Decoder does not need": $2 \times 33.819 = 67.638$; subtract the duplicated embedding/head ($0.594$, kept once) to get $67.044$; then subtract the K/V projections and K normalization the Decoder lacks — roughly $2 \times 2304 \times (8 \times 128) \approx 4.72$M parameters per layer, $\times 18$ layers $\approx 85$M — landing on $66.959$, matching Table 6. The same 85M explains the active counts: SST decode active $2.155 = 1.120$ (Prefiller) $+ 1.035$ (Decoder = the source's 1.120 minus the 0.085 it does not carry), while prefill active is simply $1.120$. The paper only publishes the end numbers (Tables 2/5/6 plus Appendix B's conventions); this decomposition is this page's reading of that basis, offered for cross-checking.</div>
+  <p>Finally, the execution in three stages (§2.3 — the paragraph most worth memorizing):</p>
+  <ul class="tight">
+    <li><strong>Training.</strong> After expansion both towers train jointly: the Prefiller processes the full sequence, the Decoder computes every supervised position, and gradients flow into the Prefiller through the reused KV as well as through the two entry paths ($e$ and $h^P_L$).</li>
+    <li><strong>Prefill.</strong> The Prefiller processes the full prompt $x_{1:n}$ and produces the layer-wise KV cache; the Decoder needs to compute <strong>only the final position $n$</strong> (attending to Prefiller KV) to predict the first output token — earlier Decoder positions are omitted entirely because its operations are token-local.</li>
+    <li><strong>Decode.</strong> Each new token passes through both towers: the Prefiller extends the KV cache and the Decoder reads it to form the next-token prediction.</li>
+  </ul>
+  <div class="takeaway"><b>In one line:</b> the design decouples expansion from KV construction — new capacity exists as a Decoder tower that only adds decode and prompt-boundary work, while the Prefiller stays bit-for-bit aligned with the source so the KV cache is structurally identical. The price is stated plainly: <strong>decode gets heavier</strong> (1.12B → 2.155B), which is why the bet is on prefill-dominated workloads (§3 and Figure 5).</div>
+</section>
+
+<!-- ===== s5 Training & Systems ===== -->
+<section id="s5">
+  <div class="sec-no">05 · Training &amp; Systems</div>
+  <h2 class="sec">Training and systems: how the expansion is wired, and how the budget is counted</h2>
+  <h3>5.1 Expansion and continued training</h3>
+  <p>The expansion itself is plain: <strong>each source layer is copied into the corresponding layers of the Prefiller and the Decoder</strong>, and the two towers share a single copy of the embedding, output normalization and output head. Both towers then train jointly in <abbr title="Brain Floating Point 16 — the 16-bit format used for training here">BF16</abbr>, reusing the source model's Muon (Liu et al., 2025) and Adam (Kingma &amp; Ba, 2014) parameter groups: <strong>optimizer states are retained for the Prefiller and the shared parameters, and initialized fresh for the Decoder</strong>; all groups continue on the source's cosine learning-rate schedule, with the remaining decay extended over the continuation stage and no separate warmup for the Decoder (details in Appendix D).</p>
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: training route to the evaluated SST checkpoint (167.98B source tokens + 222.55B joint tokens)">
+    <figcaption>
+      <b>Figure 3:</b> Training route to the evaluated SST checkpoint: 13,350 source steps followed by 17,687 continuation steps.
+      <span class="ex">One timeline, two lifetimes: <strong>source training, 167.98B tokens (13,350 steps)</strong> → the small light block is the checkpoint conversion, where weights are copied into both towers → <strong>joint Prefiller/Decoder training, 222.55B tokens (17,687 steps)</strong>, for <strong>390.54B tokens and 31,037 updates</strong> in total. The in-figure note — "cumulative training tokens; source and continuation are both included" — is the anchor of the paper's basis: every training-cost figure reported for SST contains the source stage. That is precisely what licenses the FLOP-matched comparison against from-scratch baselines.</span>
+          <span class="pgref">Report p.5</span>
+    </figcaption>
+  </figure>
+
+  <h3>5.2 Cumulative training compute: how three models end up "comparable"</h3>
+  <p>The paper aligns budgets in theoretical FLOPs. For source and continuation token counts $D_s$, $D_c$ and forward FLOPs/token $f_s$, $f_c$ (all under the <strong>effective architecture</strong>):</p>
+  <div class="math">$$C_{\text{train}} = 3\,(D_s f_s + D_c f_c), \tag{5}$$</div>
+  <p>where the factor of three approximates forward-plus-backward. The evaluated 47B classic checkpoint defines the reference $B_{\text{ref}} \approx 5.16836\times 10^{21}$ FLOPs, with forward coefficients of 3.887488B (47B), 5.148513B (63B), 3.087252B (source) and 5.410678B (SST) FLOPs/token — SST keeps both towers' attention and FFN/MoE but only <strong>one</strong> embedding, output head and set of KV projections.</p>
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: training budgets at the final checkpoints (tokens and relative training FLOPs)">
+    <figcaption>
+      <b>Table 7:</b> Training budgets at the final checkpoints. Theoretical training FLOPs are normalized to the 47B classic reference.
+      <span class="ex">Three rows spell out what "comparable compute" means literally: 47B reaches 1.000 $B_{\text{ref}}$ with <strong>443.16B tokens</strong>; 63B needs only <strong>334.62B</strong> to hit ≈1.000 (each token is more expensive); SST lands at ≈1.000 with <strong>390.54B</strong> including its source stage. So the alignment is not on tokens but on <em>theoretical cumulative FLOPs</em> — SST's token count sits between the two precisely because its first 43% of tokens ran on the cheaper source graph.</span>
+          <span class="pgref">Report p.11</span>
+    </figcaption>
+  </figure>
+  <div class="note"><b>Cross-check [estimated]:</b> recompute with Equation (5) and the paper's coefficients — SST: $3\times(167.98\text{B}\times 3.087252 + 222.55\text{B}\times 5.410678) \approx 3\times(5.186\times10^{20} + 1.2042\times10^{21}) \approx 5.168\times10^{21}$; 47B: $3\times 443.16\text{B}\times 3.887488 \approx 5.168\times10^{21}$; 63B: $3\times 334.62\text{B}\times 5.148513 \approx 5.168\times10^{21}$. All three land within a tenth of a percent of $B_{\text{ref}}$ — "comparable cumulative training compute" is a computed match, not a loose claim.</div>
+
+  <h3>5.3 Recipe and the continuation scheduler</h3>
+  <p>Appendix D supplies the reproducibility-relevant settings: continuation runs on <strong>128 NVIDIA H800 GPUs</strong>, expert parallelism 8, sequence length 4,096, global batch 3,072 sequences; the source peak base learning rate is about $1.03302\times10^{-3}$; the continuation base weight decay is 0.15 with inherited parameter-group multipliers; the source/SST/63B token batch is 12,582,912 (14,680,064 for the 47B). Muon uses six Newton–Schulz steps with packed attention split by head and GLU split by projection type; Adam uses $\epsilon = 10^{-15}$. The entry and final-state RMS operations accumulate in FP32 and return the input dtype.</p>
+  <p>The continuation learning rate does not re-warm-up; it <strong>resumes the source cosine phase</strong>. With $u$ the continuation tokens consumed, $U = 222{,}553{,}964{,}544$ the configured continuation horizon, and $q_0$ the source's normalized cosine phase at conversion:</p>
+  <div class="math">$$q(u) = q_0 + (1-q_0)\min(u/U,\,1), \tag{7}$$</div>
+  <div class="math">$$\eta(u) = \eta_{\min} + \left(\eta_{\text{anchor}} - \eta_{\min}\right)\frac{1+\cos\!\left(\pi q(u)\right)}{1+\cos(\pi q_0)}, \tag{8}$$</div>
+  <p>with $\eta_{\text{anchor}} \approx 5.96548\times10^{-4}$ and $\eta_{\min} \approx 1.03302\times10^{-4}$. The source schedule warms up over 12.582912B tokens and decays until 335.9605248B; <strong>conversion occurs at 167.9818752B tokens</strong> — and the paper notes explicitly that $q_0$ is measured within the post-warmup decay interval, <em>not</em> by dividing the conversion position by the whole horizon.</p>
+  <div class="note"><b>Reproducibility view [organized]:</b> the paper discloses kit-level settings (GPU count, parallelism, batch, optimizers, LR schedule, token counts) but says only that the data recipe is "the same" as the baselines, without a mix; and a 128×H800 run is not something a third party reproduces cheaply. The evidence is therefore a <b>controlled comparison inside the authors' own ladder</b>, not an independently reproducible experiment — picked up again in §8.</div>
+</section><!-- ===== s6 Experiments ===== -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">Experiments: loss, downstream tasks, inference cost</h2>
+  <h3>6.1 Training loss: a spike at conversion, then a crossing</h3>
+  <p>The essential curve first: SST's loss <strong>rises at conversion and then falls monotonically through continuation</strong>, ending lowest of the three. Final checkpoints report an EMA-200 training loss of <strong>1.5900</strong> for SST (at 390.54B tokens), against 1.6006 for 47B classic (443.16B tokens) and 1.5921 for 63B classic (334.62B tokens) — i.e. lower training loss than both references at comparable cumulative training compute.</p>
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: training LM loss (EMA-200) against tokens and theoretical cumulative compute, two panels">
+    <figcaption>
+      <b>Figure 4:</b> Training LM loss (EMA-200) against tokens and theoretical cumulative compute. Conversion occurs at 167.98B tokens (0.301B<sub>ref</sub>).
+      <span class="ex">The left panel is against cumulative tokens, the right against relative theoretical compute $B_{\text{ref}}$. Three things to read: (1) <b>the conversion spike</b> — the source model (grey) sits near 1.75 at 167.98B tokens, and SST (teal) jumps to about 1.89 at the same x-coordinate: that is the cost of changing the prediction graph and adding a Decoder, which continuation then digests; (2) <b>the steeper slope</b> — the teal curve crosses both the 47B and 63B curves (around 200B tokens, or roughly 0.55 $B_{\text{ref}}$ on the right) and stays below to the end; (3) <b>how tight the finish is</b> — at 1.0 $B_{\text{ref}}$ all three curves sit in the 1.59–1.60 band, teal lowest. Caption conventions: EMA span 200, `adjust=False`, restarted after conversion, computed before plot subsampling with the final observation retained. <i>Values here are read off the plot; exact endpoints come from the prose and Table 7.</i></span>
+          <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.2 Downstream tasks: best on all seven, plus NLL</h3>
+  <p>The paper scores seven tasks at the final checkpoints and adds held-out token NLL on ARXIV over the same 1,024 frozen packed-4K samples for all three models:</p>
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: scores on seven downstream tasks plus held-out ARXIV NLL">
+    <figcaption>
+      <b>Table 3:</b> Scores (%) on seven downstream tasks and held-out ARXIV token NLL (lower is better), evaluated at comparable cumulative theoretical training FLOPs, including both training stages for SST. OpenBookQA combines the validation and test splits; MMLU uses the test split, and MATH uses the full test set.
+      <span class="ex">SST tops all eight rows, but the margins come in two tiers. <b>Wide margins:</b> OpenBookQA 75.00 (+4.00 over 63B, +6.50 over 47B), HumanEval 37.80 (+4.87 over 63B, which here falls <em>below</em> the 47B), GSM8K 58.38 (+3.34 over 63B). <b>Narrow margins:</b> MMLU 60.54 (+1.15), MATH 34.36 (+1.22), BBH 52.74 (only +0.18 over 63B), MBPP 51.40 (+0.60), and ARXIV NLL 1.4421 (0.0003 below the 63B). So "SST's lowest training loss translates into the best downstream performance" holds — but several gaps against the 63B are near noise level and should not be over-read.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.3 Inference cost: what is being traded, and where it pays</h3>
+  <p>Figure 5 sweeps the §3 proxy $\text{proxy} = w\,p + (1-w)\,d$ (normalized to 47B classic) across prefill:decode mixes:</p>
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: estimated inference cost across prefill:decode cost mixes, normalized to 47B classic">
+    <figcaption>
+      <b>Figure 5:</b> Estimated inference cost across P:D cost mixes, normalized to 47B classic. Shading spans the six-model OpenRouter reference range; open circles mark break-even points and the filled circle marks 75:25.
+      <span class="ex">Teal is SST; the two reference lines are 47B (1.0) and 63B (1.365); prefill share increases left to right. The open circles are <strong>break-evens</strong>: SST draws level with 63B at <strong>13.4:86.6</strong> and with 47B at <strong>65.5:34.5</strong>. The green shading is the observed uncached-input bill range of the six OpenRouter models (67.4–76.7%), and the filled circle marks the representative 75:25 point, where SST is <strong>6.7% below 47B</strong> and <strong>31.6% below 63B</strong>. The rule: <em>the more prefill-dominated the workload, the better SST looks</em>; on decode-dominated workloads (right side) its 2.155B decode active count makes it dearer than the 47B. Across the highlighted band the paper reports SST 1.3–7.9% below 47B and 27.7–32.5% below 63B.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+  <div class="note"><b>Basis restated:</b> both Figure 1 and Figure 5 are <strong>analytical proxies</strong> (parameter counts under a cost weighting), and the paper's own words are "analytical cost estimates, not measured serving speedups". In a real deployment SST executes asymmetrically — prefill runs only the Prefiller, decode runs both towers — so scheduling, memory and kernel efficiency all move the actual number, and none of that is measured here.</div>
+</section>
+
+<!-- ===== s7 Design space ===== -->
+<section id="s7">
+  <div class="sec-no">07 · Design Space &amp; Related Work</div>
+  <h2 class="sec">Design space: SST is one point in it</h2>
+  <p>The discussion chapter lays out both the boundary and the degrees of freedom: SST is <strong>one</strong> realization of KITE, not a unique prescription. Its aligned layer-wise KV reuse, entry bridge and Decoder-only readout are specific choices; the central requirement is only that <strong>the added capacity must not extend the KV-producing computation or introduce dependencies on historical Decoder states</strong>.</p>
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: connectivity choices within KITE (a) and three KV assignments (b)">
+    <figcaption>
+      <b>Figure 6:</b> Connectivity choices within KITE. (a) An SST-style backbone with optional hidden-state connections at the Decoder entry, intermediate layers, and output readout. Dashed paths indicate design choices, not connections that must be enabled together. (b) Three illustrative KV assignments: aligned layer-wise reuse, reversed pairing, and reuse of one Prefiller KV source across multiple Decoder layers. The KV-producing computation remains on the Prefiller side; the illustrated choices are not assumed to have equal cost or quality.
+      <span class="ex">(a) draws three <strong>optional</strong> hidden-state paths in orange dashes: <b>Output fusion</b> (Prefiller representations contributing to the final readout), <b>Intermediate bridge</b> (feeding Prefiller state into Decoder layer $l$), and <b>Entry bridge</b> (what SST uses today). Grey solid lines are the backbone (Prefiller → Decoder KV reads) and green arrows the KV access. (b) is a three-layer example of three KV assignments: <b>Aligned</b> (current SST, same layer to same layer), <b>Reversed</b> (a Decoder reads Prefiller layers in reverse order), and <b>Shared source</b> (several Decoder layers reuse one Prefiller layer's KV). Two caveats in the caption: KV production always stays on the Prefiller side, and the illustrated choices are <em>not</em> assumed to have equal cost or quality. The paper states it explores only a limited part of this space and reports the selected SST configuration rather than an optimal connectivity pattern.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+  <p>Placing SST on the map of prior work (§6, citations in the paper's own terms):</p>
+  <ul class="tight">
+    <li><strong>Model growth.</strong> Net2Net (Chen et al., 2016) studies function-preserving growth; SPARKLING (Yu et al., 2026) examines signal preservation and symmetry breaking in width-progressive learning. SST differs by <em>not</em> being function-preserving: aligned initialization changes the prediction graph, and joint adaptation afterwards pays for it. Dense-to-MoE upcycling (Sparse Upcycling: Komatsuzaki et al., 2022; He et al., 2024) turns a dense checkpoint into sparse experts, whereas SST adds a Decoder tower to a source that is already a sparse MoE.</li>
+    <li><strong>The KV-shrinking family.</strong> <abbr title="Multi-Query Attention: all query heads share one KV head">MQA</abbr> (Shazeer, 2019) and <abbr title="Grouped-Query Attention: query heads share KV heads within groups">GQA</abbr> (Ainslie et al., 2023) reduce stored attention state by sharing KV heads; Cross-Layer Attention (Brandon et al., 2024) extends sharing across adjacent layers. The paper's positioning: SST does <em>not</em> shrink KV — it expands capacity without extending the KV-producing path.</li>
+    <li><strong>The YOCO family.</strong> YOCO (Sun et al., 2024) separates cache-producing from cache-consuming computation and exploits it for prefill early exit; SST applies that execution pattern to <strong>staged model growth</strong> — YOCO's cross-decoder shares one global KV representation, while SST reads aligned layer-wise KV and is constructed by source-to-target expansion. Also in this family: DeepSeek-V4.1-Flash (2026, exhibit ⑥ in this collection) and KV-Mirror (WeChat AI, 2026).</li>
+    <li><strong>Recursion / weight tying.</strong> Mixture-of-Recursions (Bae et al., 2025) explores recursive KV sharing; from the architectural view, fixed-KV looping can be read as a parameter-tied special case of the family KITE belongs to. SST instead uses independent Prefiller and Decoder parameters, expanding capacity without extending the KV-producing path.</li>
+  </ul>
+  <div class="takeaway"><b>In one line:</b> this chapter upgrades "a model" into "a searchable design space" — KV assignment, hidden-state connections, bridge operators and the capacity split between towers are all open dimensions. The practical takeaway: if you work on YOCO-style or CLA-style architectures, <strong>the constraint "expand only on the consuming side" transfers directly</strong>.</div>
+</section>
+
+<!-- ===== s8 Commentary ===== -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary: lineage, strengths, and what still needs measuring</h2>
+  <h3>8.1 Where the pieces come from</h3>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Technical lineage (organized from the paper's inline citations; it is not a table from the paper, and the references themselves were not audited item by item here)</caption>
+    <thead><tr><th>Component</th><th>Upstream as labelled by the paper</th><th>What this generation changes</th></tr></thead>
+    <tbody>
+      <tr><td>Two-stage execution (cache producer / consumer split)</td><td>YOCO (Sun et al., 2024); DeepSeek-V4.1-Flash (2026); KV-Mirror (WeChat AI, 2026)</td><td>Applied to staged model growth: reads aligned layer-wise KV (not one global KV) and is built by expanding a source checkpoint</td></tr>
+      <tr><td>Model growth / knowledge transfer</td><td>Net2Net (Chen et al., 2016); SPARKLING (Yu et al., 2026)</td><td>Not function-preserving: copying into two towers changes the prediction graph; joint continued training adapts</td></tr>
+      <tr><td>Sparse upcycling</td><td>Sparse Upcycling (Komatsuzaki et al., 2022); Upcycling LLMs into MoE (He et al., 2024)</td><td>The source is already a sparse MoE; SST adds a Decoder tower rather than densifying or sparsifying</td></tr>
+      <tr><td>KV head sharing</td><td>MQA (Shazeer, 2019); GQA (Ainslie et al., 2023)</td><td>KV head count unchanged (8 across the ladder); the goal is to keep the KV producer from growing, not to shrink KV</td></tr>
+      <tr><td>Cross-layer KV sharing</td><td>Cross-Layer Attention (Brandon et al., 2024)</td><td>Sharing direction changes from adjacent layers to cross-tower same-layer (Aligned), with Reversed / Shared source variants discussed in §5</td></tr>
+      <tr><td>Fixed-KV looping</td><td>Mixture-of-Recursions (Bae et al., 2025)</td><td>Viewed as a parameter-tied special case; SST keeps two independent, untied towers</td></tr>
+      <tr><td>Evidence of input-heavy demand</td><td>SWE-agent (Yang et al., 2024); ReAct (Yao et al., 2023)</td><td>Instead of a single citation, the paper mines public OpenRouter activity (Tables 1/4) to quantify the uncached-input share</td></tr>
+      <tr><td>Optimizers and positions</td><td>Muon (Liu et al., 2025); Adam (Kingma &amp; Ba, 2014); RoPE (Su et al., 2021)</td><td>Continuation keeps the source parameter groups and cosine phase; both towers keep the source position ids</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>8.2 Three things this paper does well</h3>
+  <ul class="tight">
+    <li><strong>It makes "where to grow" a first-class question.</strong> Most expansion/upcycling work asks <em>how much</em>; this one asks <em>which region can grow without breaking what</em>. The KV invariant is a reusable architectural constraint, not just one diagram.</li>
+    <li><strong>It reports all three cost axes, transparently.</strong> The training budget includes the source stage (390.54B tokens), $B_{\text{ref}}$ and all four forward coefficients are published, and the recomputation checks out (§5.2). On the inference side it uses an analytical proxy and says so repeatedly — considerably more honest than a vague "faster".</li>
+    <li><strong>The ladder is cleanly controlled.</strong> Same tokenizer, data recipe, protocol and evaluation sets; the 47B/63B baselines come from the same family by depth/width and SST sits on top of it — separating the scaling paradigm from the model-family variable. Seven downstream tasks plus held-out NLL all point the same way.</li>
+  </ul>
+
+  <h3>8.3 Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><strong>No measured serving speedup.</strong> The whole inference case is the 0.75p+0.25d proxy; there is no end-to-end throughput, TTFT/TPOT or memory measurement. SST executes asymmetrically (prefill on the Prefiller, decode on both towers), so cache layout, scheduling granularity and kernel shapes all change in a real engine — worth measuring how much of the "parameters saved at prefill" actually converts into wall-clock on vLLM or SGLang. The paper's own conclusion stops at "without establishing ... measured serving speedup".</li>
+    <li><strong>No sensitivity scan over the expansion point.</strong> The 167.98B / 222.55B split (43:57) is given; there is no sweep of "when to expand" or "how much to expand", and no side-by-side of SST-style loss-compute curves for different conversion points — arguably the paradigm's most important hyperparameter.</li>
+    <li><strong>Capacity allocation unexplored.</strong> Equal depth and width for both towers (18 layers / 2304 each) is a design choice, and the paper says outright that optimal connectivity and capacity allocation remain open. A shallower or narrower Decoder, or the Reversed / Shared source assignments of §5, are the obvious next questions.</li>
+    <li><strong>Single runs and statistical basis.</strong> All numbers come from one training run: the loss margin over 63B (0.0021) and small downstream gaps (e.g. BBH +0.18) have no seeds or repeats behind them, and evaluation sampling details beyond shot counts are not disclosed.</li>
+    <li><strong>The two-tower KV/memory account is not laid out.</strong> By construction the Decoder produces no KV, so the cache should be source-sized — but the paper gives no actual KV-cache size, activation memory or prefill batching efficiency. For practitioners, those decide whether an analytical saving becomes an engineering one. Also: the data recipe is only "the same" as the baselines, without a mixture.</li>
+  </ul>
+
+  <h3>8.4 One-sentence verdict</h3>
+  <p>This is a <strong>paradigm paper</strong>: its real contribution is the constraint ("expansion must not touch KV") plus one simple, transparently accounted instantiation (SST) that shows all three axes moving the same way at one compute point. Its weaknesses are equally clear — every "cheaper" is analytical, and every "better" comes from a single run on one ladder. Read it as method: <em>whenever part of a model grows, ask first whether it sits on the path that must produce future state.</em></p>
+</section>
+
+<!-- ===== Glossary ===== -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Come back here whenever an abbreviation bites; dotted-underlined terms in the prose also show their gloss on hover.</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Reading glossary (hover the dotted terms in the prose to see the same definitions)</caption>
+    <thead><tr><th>Term</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>KITE</td><td>KV-Invariant Transformer Expansion</td><td>The paper's scaling paradigm: added capacity is placed where it does not affect KV construction</td></tr>
+      <tr><td>SST</td><td>Step Scale Transformer</td><td>KITE's instantiation: two same-depth towers, Prefiller then Decoder</td></tr>
+      <tr><td>Prefiller</td><td>—</td><td>First tower: processes the full prompt and produces layer-wise KV; the only part with K/V projections and K normalization</td></tr>
+      <tr><td>Decoder</td><td>—</td><td>Second tower: computes its own queries and reads aligned Prefiller KV; produces no KV, all operations token-local</td></tr>
+      <tr><td>bulk prefill</td><td>—</td><td>The prompt-wide KV construction; in KITE only the Prefiller runs it, so its cost does not grow with expansion</td></tr>
+      <tr><td>decode</td><td>—</td><td>Autoregressive generation, one token at a time; each new token passes through both towers</td></tr>
+      <tr><td>active body parameters</td><td>—</td><td>Per-token body parameters (excluding embedding/head), counted from configured shapes with Top-8 routed experts etc.</td></tr>
+      <tr><td>Upcycling</td><td>—</td><td>Initializing a larger model from a smaller checkpoint; KITE is the "expand partway through training" variant</td></tr>
+      <tr><td>YOCO</td><td>You Only Cache Once</td><td>Architecture family separating cache production from consumption so deep layers reuse shallow KV; DeepSeek-V4.1-Flash and KV-Mirror belong to it</td></tr>
+      <tr><td>SSSF</td><td>Sliding-Sliding-Sliding-Full</td><td>Attention pattern: three sliding-window layers then one full-attention layer, closing with an SF remainder</td></tr>
+      <tr><td>EMA-200</td><td>Exponential Moving Average, span 200</td><td>Training-loss smoothing (span 200, adjust=False, restarted after conversion)</td></tr>
+      <tr><td>P:D mix</td><td>prefill : decode cost mix</td><td>How inference cost is split between the two phases; the paper's representative point is 75:25</td></tr>
+      <tr><td>inference proxy</td><td>$wp+(1-w)d$</td><td>An analytical cost estimate weighting active body counts; not a measured serving speedup</td></tr>
+      <tr><td>$B_{\text{ref}}$</td><td>reference training FLOPs</td><td>Theoretical cumulative training-compute reference set by the evaluated 47B classic checkpoint, $\approx 5.16836\times10^{21}$</td></tr>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>Sparse expert routing; the source tower and both baselines keep the 512-choose-8 design</td></tr>
+      <tr><td>Muon / Adam</td><td>—</td><td>The two optimizer groups used in continuation (6 Newton–Schulz steps / $\epsilon=10^{-15}$), inheriting the source's groups and phase</td></tr>
+      <tr><td>EP</td><td>Expert Parallelism</td><td>Degree of expert parallelism; 8 in the continuation run on 128 H800 GPUs</td></tr>
+      <tr><td>NLL</td><td>Negative Log-Likelihood</td><td>Held-out token NLL on ARXIV; lower is better</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    An illustrated English deep-read of arXiv:2609.27294, <i>KITE: KV-Invariant Transformer Expansion for Efficient Agentic LLM Scaling</i> (StepFun). All figures and tables are extracted from the original at 300 DPI and displayed scaled-to-fit, never cropped; readings are the editor's, numbers follow the paper, and every recomputation is labelled.<br>
+    Paper: <a href="https://arxiv.org/abs/2609.27294">arXiv:2609.27294</a><br>
+    <span style="opacity:.75">Dark mode · click any image for the original · print-friendly · English edition / 中文精读</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // Dark mode: remember the choice, follow the system by default
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // back to top
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

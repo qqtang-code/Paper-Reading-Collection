@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="KITE 论文中文精读:KV-Invariant Transformer Expansion —— 把新增容量只加在不产生 KV 的一侧,训练/推理成本与模型质量同向改善。StepFun SST 双塔架构全图表 300 DPI 内嵌。">
+<meta name="keywords" content="论文精读, KITE, SST, Step Scale Transformer, KV-Invariant, 模型扩展, upcycling, MoE, prefill, decode, YOCO, 高效推理">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · KITE:KV 不变的 Transformer 扩张(SST 双塔)">
+<meta property="og:description" content="训练期只在「不产生 KV」的一侧扩容:33.8B 源模型扩到 67B,prefill 仍只跑 1.12B 活跃参数,训练损失与推理成本同时低于同算力预算的 47B / 63B 经典 Transformer。">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · KITE:KV 不变的 Transformer 扩张(StepFun SST)</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- 顶栏:章节跳转 + 深色模式 + 语言切换 -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">KITE/SST<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">观察</a>
+      <a class="jump" href="#s4">方法</a>
+      <a class="jump" href="#s5">训练</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">设计空间</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <a class="lang-toggle" href="en.html" title="Read in English"
+         onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">EN</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.27294 · StepFun</div>
+    <h1>KITE:把新容量只加在"不产生 KV"的一侧<br>——KV-Invariant Transformer Expansion 与 SST 双塔</h1>
+    <div class="subtitle">训练期先把小模型练好,再在"不参与 KV 构造"的区域扩容继续训练:推理时 bulk prefill 仍只跑原来的小塔。StepFun 的 SST 把 33.8B 源模型扩成 67B(每 decode token 激活 2.15B),在同等累计训练算力下训练损失低于 47B / 63B 经典 Transformer,解析推理成本低 6.7% / 31.6%。</div>
+    <div class="meta">
+      <span>作者:Zhiheng Hu, Yixun Wei, Jian Zhou, Yizhuang Zhou, Ji Li, Xing Chen, Yang Li, Bojun Wang, Yibo Zhu, Xiangyu Zhang, Daxin Jiang(StepFun)</span>
+      <span>论文:<a href="https://arxiv.org/abs/2609.27294">arXiv:2609.27294</a>(2026-09-23)</span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">KV-Invariant</span><span class="pill">Upcycling 扩展</span><span class="pill">双塔 Prefiller/Decoder</span><span class="pill">MoE 67B·2.15B 激活</span><span class="pill">Prefill/Decode 成本分离</span><span class="pill">Agentic 输入主导负载</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图文按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:一篇讲什么、数字在哪</a></li>
+    <li><a href="#s2">背景:只省一边不算省</a></li>
+    <li><a href="#s3">观察:agentic 负载由输入主导</a></li>
+    <li><a href="#s4">方法:KITE 原则与 SST 架构(含层/参数走查)</a></li>
+    <li><a href="#s5">训练与系统:扩展、续训与算力账</a></li>
+    <li><a href="#s6">实验:损失、下游任务、推理成本</a></li>
+    <li><a href="#s7">设计空间与相关对照</a></li>
+    <li><a href="#s8">点评:来源、局限与要补的账</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<!-- ===== s1 速览 ===== -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览:增长的那部分,不碰 KV</h2>
+  <p class="lead">这篇论文提出 <strong><abbr title="KV-Invariant Transformer Expansion:KV 不变的 Transformer 扩张">KITE</abbr></strong>:一种"训练期扩容"的范式——模型从小练到大时,把<strong>新增容量全部放在不产生 K/V 的那一侧</strong>。于是推理时建 KV cache(prefill)只需跑原来那部分小模型,而新增的"读 KV"容量只在 decode 与 prompt 末位预测时上场。论文给出一个具体实现 <strong><abbr title="Step Scale Transformer:StepFun 的两塔扩容架构">SST</abbr></strong>:两座等深 Transformer 塔<strong>串联</strong>执行——<em>Prefiller</em> 产层级的 <abbr title="Key/Value:注意力中的键与值,缓存后可复用">KV</abbr>,<em>Decoder</em> 读这些 KV 做下一 token 预测。</p>
+  <p>它要解决的是三个成本轴的<strong>联合</strong>问题:训练算力、prefill 算力、decode 算力。已有的办法各有一笔欠账——progressive upcycling 省训练但推理要服务满血模型、质量还打折;YOCO 式的 KV 复用省 prefill 但可能掉质量,补质量又等于多花训练钱。KITE 的账是三项同向:训练省(新容量中途才出现)、prefill 省(不参与 KV 构造)、质量不欠(同算力下损失更低)。</p>
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: KITE 训练路线与三向权衡(63B classic 与 67B SST 对照 47B 参考)">
+    <figcaption>
+      <b>Figure 1:</b> KITE: training route and observed trade-offs. Both panels use the same 47B transformer trained from scratch as the reference; lower is inward. Active counts exclude embedding/head. The inference proxy is 0.75p + 0.25d, where p and d are bulk-prefill and decode active-body counts normalized to the reference.
+      <span class="zh">三张图叠在一起看:顶部是训练路线(1. 先训小模型 → 2. 加 KV 读取容量 → 3. 继续训练);下面两个三角雷达共用同一个"47B 从零训练"的灰色虚线参考,三角的三条轴分别是<strong>训练损失(放大 75× 显示)</strong>、<strong>训练算力</strong>、<strong>推理成本代理</strong>。左:63B classic,推理代理比 47B 高 <strong>36.5%</strong>(2.02B/2.02B 的 prefill/decode 活跃参数都更大),训练损失好 0.0085。右:67B SST,训练损失好 <strong>0.0106</strong>、训练算力 1.00×,推理代理反而低 <strong>6.7%</strong>——因为 prefill 只要 1.12B 活跃参数(比 47B 的 1.48B 还少),代价是 decode 2.15B 略高于 63B 的 2.02B。图注特别声明"面积不是分数",三角只用来同时展示三条轴的方向;推理代理是解析估计,不是实测服务加速。</span>
+          <span class="pgref">报告 p.1</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+  <div class="note"><b>读数约定:</b>本页全部数字以论文原文为准;凡由本页依据论文配置整理、归纳或换算的内容,均以「<b>整理</b>」「<b>推算</b>」显式标注,便于与论文口径区分。记号沿用论文:$L$ 为塔的层数,$p$ 为 bulk-prefill 活跃体参数,$d$ 为 decode 活跃体参数,激活参数均指 body(不含 embedding/head)。</div>
+  <div class="kv">
+    <div class="item"><div class="k">源模型 → 扩展后</div><div class="v">33.819B → 66.959B<small>Prefiller 保留源塔,Decoder 为新增(Table 2)</small></div></div>
+    <div class="item"><div class="k">激活体参数(prefill / decode)</div><div class="v">1.120B / 2.155B<small>对照 47B:1.477/1.477;63B:2.016/2.016</small></div></div>
+    <div class="item"><div class="k">训练 EMA-200 损失</div><div class="v">1.5900<small>47B classic 1.6006;63B classic 1.5921</small></div></div>
+    <div class="item"><div class="k">推理成本代理(75:25)</div><div class="v">0.933<small>vs 47B=1 低 6.7%;vs 63B=1.365 低 31.6%</small></div></div>
+    <div class="item"><div class="k">累计训练 token</div><div class="v">390.54B<small>167.98B 源阶段 + 222.55B 续训;≈100% B<sub>ref</sub></small></div></div>
+    <div class="item"><div class="k">下游 7 任务</div><div class="v">全部第一<small>OpenBookQA 75.00、MMLU 60.54、GSM8K 58.38、MATH 34.36、HumanEval 37.80、MBPP 51.40、BBH 52.74(Table 3)</small></div></div>
+  </div>
+  <div class="takeaway"><b>小结:</b>KITE 不是某一层注意力技巧,而是"<strong>扩哪里</strong>"的架构级选择:凡是需要产生未来 KV 的路径都不加容量。SST 只是这个原则最朴素的实现——两塔串联、层级对齐 KV 复用;论文自己也说它不是最优设计(§7 Discussion),只是足以证明范式有效。全文最值得记住的一条边界:<em>未来 KV 的产生不得依赖 Decoder 的历史状态</em>,这条约束换来的是"prefill 永远只按源模型大小计价"。</div>
+</section>
+
+<!-- ===== s2 背景 ===== -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Motivation</div>
+  <h2 class="sec">背景:只省一边,不算省</h2>
+  <p>大模型服从 scaling 规律——规模换能力(Kaplan et al., 2020;Hoffmann et al., 2022),代价是训练与推理两侧的算力账单一起变厚。于是"如何在更低的计算成本下把模型做大"成了核心问题之一,而且论文强调:<strong>这个目标不只是省钱,而是同一个预算能训出/服务更强的模型</strong>。</p>
+  <p><abbr title="Mixture-of-Experts:稀疏专家混合,每个 token 只激活部分专家">MoE</abbr> 是已经被验证的成功范例(Switch Transformers, Fedus et al., 2022;Shazeer et al., 2017):固定参数总量,稀疏专家路由同时降低训练与推理计算——也就是说,<strong>MoE 之所以成立,是因为它同时省了两侧</strong>。论文由此点出一个容易被忽略的判据:只在单侧省钱,整体 trade-off 未必改善。两条已有的单侧路线恰好构成对照:</p>
+  <ul class="tight">
+    <li><strong>Progressive <abbr title="升格:用小模型 checkpoint 初始化大模型,继续训练">upcycling</abbr>(渐进升格,Net2Net: Chen et al., 2016;SPARKLING: Yu et al., 2026)</strong>:先训小模型、中途长成目标模型,大量 token 跑在便宜图上,省的是<em>训练</em>。但升格模型普遍被认为不如同尺寸从零训练的模型,于是"训练省下的钱在推理时还回去"——服务满血模型,却拿不到满血质量。</li>
+    <li><strong>KV 复用(YOCO 家族:Sun et al., 2024;DeepSeek-V4.1-Flash, 2026;KV-Mirror, WeChat AI, 2026)</strong>:让深层复用浅层算好的 K/V,模型变大时 prefill 仍可负担,省的是<em>推理的 prefill</em>。但删减产 KV 的层可能牺牲质量,补回同等质量往往要更大模型或更长训练——本质上是<em>训练成本</em>的损失。</li>
+  </ul>
+  <p>KITE 的出发点就是把这两个账本合起来算:<strong>把"扩容"这件事限制在不影响 KV 的区域</strong>。新增容量中途才出现(训练便宜),不参与 KV 计算(prefill 便宜),而两塔联合训练把质量补回来(不欠账)。论文同时说明,这条路线与 MoE、混合注意力等已有设计<strong>正交</strong>,可以叠加使用;SST 里的 MoE 层就是"叠加"的证据。</p>
+</section>
+
+<!-- ===== s3 观察 ===== -->
+<section id="s3">
+  <div class="sec-no">03 · Observation</div>
+  <h2 class="sec">观察:agentic 负载是输入主导的,先省 prefill 最划算</h2>
+  <p>为什么优先省 <abbr title="处理输入序列、构建 KV cache 的阶段">prefill</abbr> 而不是 <abbr title="自回归逐 token 生成的阶段">decode</abbr>?论文的论据来自 agentic 的真实负载形态:反复的模型调用会不断处理<strong>累积的上下文与新的工具输出</strong>(SWE-agent: Yang et al., 2024;ReAct: Yao et al., 2023),即使有 prompt 缓存,仍有大量未命中的输入需要重新 prefill。为量化这一点,论文抓取了 OpenRouter 公开的模型活动数据(Aug 22–Sep 20, 2026 UTC),选出六个模型统计:</p>
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: 六个 OpenRouter 模型的输入/输出 token 与未缓存输入占比">
+    <figcaption>
+      <b>Table 1:</b> Input demand in selected OpenRouter traffic. Input includes cached tokens; output includes reasoning tokens. Charge share is uncached-input charges divided by uncached-input plus output charges, excluding cache-read charges. Estimates aggregate available standard and Batch activity within August 22–September 20, 2026 (UTC), using September 21 base prices. Details appear in Appendix A.
+      <span class="zh">三个比值一列比一列"刺眼":<strong>Input/output tokens</strong> 全在 37.79×–106.43× 之间(Gemini 3.7 Flash 最"温和",GPT-6 Astra 最极端);把缓存命中剔掉后的 <strong>Uncached input/output</strong> 仍有 10.15×–16.29×;<strong>Uncached-input charge share</strong> 落在 67.4%–76.7% 区间——也就是说,按未缓存输入费+输出费计,大头(约 2/3 到 3/4)花在"读输入"上。这就是论文选择"优先省 prefill"、并把 75:25 当作代表性 prefill:decode 成本权重的依据。注意口径:这是 token 量与挂牌价的<em>解析估计</em>,不是 GPU 实测成本,也不代表六家流量都是 agentic 场景。</span>
+          <span class="pgref">报告 p.2</span>
+    </figcaption>
+  </figure>
+  <p>记账方式在附录 A 给出:设 $P$ 为总输入 token、$C$ 为缓存命中、$U=P-C$ 为未缓存输入、$D$ 为输出(含推理)token,按各模型挂牌价 $a_v$、$o_v$ 估计未缓存输入费用 $A$ 与输出费用 $O$,得到未缓存输入的账单占比:</p>
+  <div class="math">$$A = 10^{-6}\sum_v U_v a_v,\qquad O = 10^{-6}\sum_v D_v o_v,\qquad s_{\text{uncached}} = \frac{A}{A+O}. \tag{6}$$</div>
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: Table 1 背后的 U/C/D token 量与 A/O 费用明细">
+    <figcaption>
+      <b>Table 4:</b> Components underlying Table 1. Token counts are in billions; estimated charges are in millions of USD. U is uncached input, C cached input, and D output. Ratios use unrounded totals.
+      <span class="zh">把 Table 1 的三个比值拆回原始量:每个模型的未缓存输入 $U$、缓存输入 $C$、输出 $D$(单位 B)与估算费用 $A$、$O$(单位百万美元)。读两处反差:① 缓存命中占比极高——Gemini 3.7 Flash 是 5722B/2100B(缓存约为未缓存的 2.7 倍),说明 prompt caching 已经很有效,但剩下的未缓存输入依然是主要开销;② 输出 token 相对输入是零头(Astra: 24.3B vs 356.2B),而输出单价通常是输入的 5 倍(10/50、2/10、0.75/3.75 每百万 token),论文用这个定价结构解释为什么"输出费并没有因为量小而消失",但未缓存输入费仍然占大头。论文同时声明:不含缓存写溢价、上下文长度与各 provider 的差异定价、历史调价与非 token 费用,也<em>不是</em>真实账单。</span>
+          <span class="pgref">报告 p.10</span>
+    </figcaption>
+  </figure>
+  <p>有了这个权重,论文把"推理成本"写成一个可比较的解析代理:<strong>$\text{proxy} = w\,p + (1-w)\,d$</strong>,$p$、$d$ 分别是 bulk-prefill 与 decode 的活跃体参数,对 47B classic 归一化;$w=0.75$ 即 75:25 的 P:D 成本混合。图 1 用它给出 0.933(SST)与 1.365(63B)的对照;第 6 节图 5 会把这个权重从 0:100 扫到 100:0,看谁在什么区间便宜。</p>
+  <div class="note"><b>口径提醒(整理):</b>论文反复强调这些是 <b>analytical cost estimates, not measured serving speedups</b>——代理只比较"每 token 需要多少参数参与计算",不含 kernel 效率、通信、KV 显存带宽、批处理与调度等真实服务因素。本页后文所有"低 x%"都继承这个口径。</div>
+</section><!-- ===== s4 方法 ===== -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">方法:KITE 的设计原则与 SST 两塔</h2>
+  <h3>4.1 设计原则:结构性不变式,而不是冻结权重</h3>
+  <p>论文把因果模型拆成一个产生可复用注意力记忆的 <strong>Prefiller</strong> $P$ 和一个做预测的 <strong>Decoder</strong> $D$:</p>
+  <div class="math">$$(M_t,\, z_t) = P(x_{1:t};\,\theta_P),\qquad \ell_t = D(x_t,\, z_t,\, M_t;\,\theta_D), \tag{1}$$</div>
+  <p>其中 $M_t$ 是可复用注意力记忆(即各层的 K/V),$z_t$ 是 Prefiller 在位置 $t$ 的可选特征,$\ell_t$ 是下一 token 的 logits。流程是:先完成小模型(源模型)阶段,再<strong>用中间 checkpoint 扩展 $D$</strong>——保留 Prefiller 的计算图与记忆接口——然后两部分联合继续训练。</p>
+  <p>论文特意澄清:<strong>不变式是结构性的,既不冻结权重、也不冻结 KV 值</strong>。真正被限制的是三条:</p>
+  <ul class="tight">
+    <li>Decoder <strong>不得产生</strong>未来位置所需的记忆(K/V 只能由 Prefiller 造);</li>
+    <li>生成时要能整体跳过 Decoder 的历史位置,因此它保留位置的表示必须<strong>在给定 Prefiller 输出后独立于被省略的 Decoder 位置</strong>;</li>
+    <li><abbr title="覆盖整个 prompt 的一次性 KV 构造,区别于逐 token 的 decode">bulk prefill</abbr>(Prefiller 执行的、覆盖整个 prompt 的 KV 构造)<strong>不因扩容而增长</strong>;</li>
+  </ul>
+  <p>在这三条之下,预测容量可以自由增长,而 prefill 的计价对象(tokens × 源塔大小)不变。唯一必须保留的额外计算是两个"边角":第一个输出 token 的<strong>末位读出</strong>(Decoder 只算 prompt 最后一个位置),以及 decode 阶段 Decoder 的逐 token 工作。</p>
+
+  <h3>4.2 SST:两座等深塔,层级对齐的 KV 复用</h3>
+  <p>SST 用两座 Transformer 塔实现这个原则(Prefiller 与 Decoder,正文实验中各 18 层)。Prefiller 先执行、产出<strong>逐层</strong>的 KV;Decoder 每个 block 自己算 query,读对应 Prefiller 层的 KV:</p>
+  <div class="math">$$q^{D}_{l,t} = Q^{D}_{l}\!\left(h^{D}_{l-1,t}\right),\qquad a^{D}_{l,t} = \mathrm{Attn}\!\left(q^{D}_{l,t},\; K^{P}_{l}\!\left[I_l(t)\right],\; V^{P}_{l}\!\left[I_l(t)\right]\right). \tag{2}$$</div>
+  <p>这里 $Q^D_l$ 含 query 投影与归一化;$I_l(t)$ 是原模型因果 full/sliding 注意力掩码允许的位置集合;两塔<strong>都用源模型的位置 id</strong>。Decoder 有独立的 block 参数,其残差与 FFN/MoE 运算都是 <strong>token-local</strong>(逐 token 独立)——这是"可以跳过历史位置"的根本原因。</p>
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: KITE 在 SST 上的实例化 —— Stage 1 训 Prefiller,扩展加入 Decoder,Stage 2 联合训练">
+    <figcaption>
+      <b>Figure 2:</b> KITE instantiated with SST. Stage 1 trains the Prefiller; expansion adds a Decoder initialized from the source weights, and Stage 2 continues training both towers jointly. Within Stage 2, the Prefiller executes in full before the Decoder. Each Decoder block uses aligned Prefiller KV. A token-local entry bridge combines the separately normalized embedding and final Prefiller state. The final Decoder state is normalized and passed to the shared output norm and LM head for prediction.
+      <span class="zh">左边是"扩展前":一座源 Transformer(Stage 1 只训它);中间 <b>Expand</b>:把源权重复制进 Prefiller 与 Decoder 两塔;右边是扩展后的 SST 全图,三类连线用颜色区分——<b>绿色(Shared KV)</b>是层级对齐复用:$K_L,V_L$ 从 Prefiller 第 $L$ 层直接进 Decoder 第 $L$ 层;<b>橙色(Token-local bridge)</b>是只在 token 内部传递的路径:embedding 与"Final Prefiller state"各做一次无仿射 RMSNorm 后相加,从 <b>Entry bridge</b> 进入 Decoder,Decoder 末态再经 RMSNorm(no affine)与共享的 output norm + LM head 出下一个 token;<b>蓝色虚线(New Decoder)</b>标记扩展时新增的组件。注意 KV 输出端只画在 Prefiller 的每个 block 上(绿色向右的箭头),Decoder 自身不产 KV。</span>
+          <span class="pgref">报告 p.4</span>
+    </figcaption>
+  </figure>
+  <p>入口桥与读出各有一个轻量设计。对共享的 embedding/stem $e_t$ 和 Prefiller 末层状态 $h^{P}_{L,t}$,入口桥是<strong>无训练参数</strong>的 RMS 操作之和:</p>
+  <div class="math">$$h^{D}_{0,t} = \mathrm{RMS}_\epsilon(e_t) + \mathrm{RMS}_\epsilon\!\left(h^{P}_{L,t}\right),\qquad \mathrm{RMS}_\epsilon(v) = \frac{v}{\sqrt{\mathrm{mean}(v^2)+\epsilon}}, \tag{3}$$</div>
+  <p>其中 $\epsilon = 10^{-5}$。Decoder 的末态则通过共享的输出归一化与输出头产生 logits:</p>
+  <div class="math">$$\ell_t = W_{\text{out}}\,\mathrm{Norm}_{\text{out}}\!\left(h^{D}_{L,t}\right). \tag{4}$$</div>
+  <p>两塔<strong>共享一份</strong> embedding、输出归一化与输出头;embedding 与输出头权重不绑定(untied)。梯度有两条回流 Prefiller 的路径:入口桥与复用的 KV。给定 Prefiller 输出后,每个 Decoder 位置与更早的 Decoder 状态无关——这条性质让"prefill 只算末位"在数学上成立,而不只是工程近似。</p>
+
+  <h3>4.3 把配置落到层号与参数:一份走查</h3>
+  <p>论文的对照梯子有四个点:33.819B 源模型、66.959B SST,以及同族的 47B / 63B 经典 Transformer(同 tokenizer、同数据配方、同训练协议、同评测集)。先把架构配置摆齐:</p>
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: 模型配置对照(Source / SST / 47B classic / 63B classic)">
+    <figcaption>
+      <b>Table 2:</b> Model configurations.
+      <span class="zh">七个维度里藏着 SST 的"账怎么算":源塔与 SST 的每塔都是 <strong>18 层、hidden 2304、16 个 MoE 层、512 选 8 专家、SSSF 注意力</strong>——SST 的"18 + 18"表示两塔;47B 走的是"更深更宽"(20 层/2560、18 个 MoE 层),63B 是 22 层/2816、20 个 MoE 层。关键的三个数:总参数 <strong>33.819 → 66.959</strong>;decode 活跃体参数 SST <strong>2.155</strong>(比 63B 的 2.016 高)、47B 1.477;而 SST 的 prefill 活跃体参数只有 <strong>1.120</strong>——比 47B classic 的 1.477 还低 24%。表注补充两条口径:每塔以两个 dense FFN 层开头;SSSF 指"三个 sliding 层 + 一个 full-attention 层",18/22 层的余数按 SF 收尾。</span>
+          <span class="pgref">报告 p.5</span>
+    </figcaption>
+  </figure>
+  <p>再往下到几何与参数账。附录 B 给出每塔的详细几何与"有效架构"口径:</p>
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: 详细几何(dense FFN 宽度、专家宽度、头维度、RoPE 维度、Q/KV 头数)">
+    <figcaption>
+      <b>Table 5:</b> Detailed geometry. Source/SST dimensions apply to each tower; both have two initial dense FFN layers. RoPE denotes rotary position embeddings.
+      <span class="zh">六行里最该记住的是最后两行:<strong>全注意力/sliding 的 Q 头数 24/40,KV 头数只有 8</strong>——GQA 式共享,源塔、SST、47B 都是 8,只有 63B 把 Q 头加到 32/48。这解释了为什么 63B"只大了几层"却把 decode 活跃参数抬到 2.016B:它同时加宽了 FFN(dense 5120、专家 640)与 Q 投影。RoPE 维度 64/128(全/sliding)、head dim 128,全线一致。表注还说明:Source/SST 列的两塔几何相同,只有 Prefiller 保留 K/V 投影与 K 归一化(见 Table 6 后的账)。</span>
+          <span class="pgref">报告 p.10</span>
+    </figcaption>
+  </figure>
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: 架构参数量(总参数、embedding/head、body、decode 活跃、Prefiller-only 活跃)">
+    <figcaption>
+      <b>Table 6:</b> Architectural parameter counts in billions, rounded to three decimal places.
+      <span class="zh">这就是"prefill 便宜"的出处:三行并列读——SST 总参数最大(66.959 > 63B 的 62.691),embedding+head 三者相近(0.594/0.660/0.725),但 <strong>Decode active body 2.155 与 Prefiller-only active body 1.120</strong> 是两个不同的量:decode 时两塔都要动,prefill(以及任何只建 cache 的阶段)只动 Prefiller。论文的定义口径:活跃体参数<strong>不含 embedding/head</strong>、按每 MoE 层 Top-8 路由专家 + 共享专家 + router + 其余每 token 需要的体权重的配置张量形状计数,并与导出的权重清单核对;词表导出 128,815 行(训练用填充词表 128,896),输出头不计入活跃体参数,但论文提醒它在 prompt 边界与 decode 仍然要算进真实服务成本。</span>
+          <span class="pgref">报告 p.10</span>
+    </figcaption>
+  </figure>
+  <div class="note"><b>走查(推算):66.959 与 2.155 是怎么凑出来的。</b>把 SST 视为"源塔复制两份 − 只保留一份的共享件 − Decoder 不需要的件":$2 \times 33.819 = 67.638$;减去重复的 embedding/head($0.594$,只留一份)得 $67.044$;再减去 Decoder 塔缺的 <strong>K/V 投影与 K 归一化</strong>——每层约 $2 \times 2304 \times (8 \times 128) \approx 4.72$M 参数,$\times 18$ 层 $\approx 85$M,得 $66.959$,与 Table 6 一致。同一个 85M 也能解释活跃参数:SST decode 活跃 $2.155 = 1.120$(Prefiller)$+ 1.035$(Decoder,即源塔活跃 1.120 减去它没有的 0.085);prefill 活跃则就是 $1.120$。论文只给出结果数字(Table 2/5/6 与附录 B 的口径说明),这条差额拆解是本页依据其口径的归纳,供核对时参考。</div>
+  <p>最后把执行流程按三段钉死(§2.3,这也是全文最该背下来的一段):</p>
+  <ul class="tight">
+    <li><strong>Training</strong>:扩展后两塔联合训练。Prefiller 处理整条序列,Decoder 计算每个被监督位置,梯度经"复用的 KV"回传进 Prefiller;$e$ 与 $h^P_{L}$ 两个入口也把梯度带回;</li>
+    <li><strong>Prefill</strong>:Prefiller 处理完整 prompt $x_{1:n}$ 产出逐层 KV cache;Decoder <strong>只需算末位 $n$</strong>(读 Prefiller 的 KV)就能预测第一个输出 token——更早的 Decoder 位置因 token-local 而可整体省略;</li>
+    <li><strong>Decode</strong>:每个新 token 过两塔——Prefiller 扩展 KV cache,Decoder 读 KV 出下一个 token 的预测。</li>
+  </ul>
+  <div class="takeaway"><b>小结:</b>这套设计把"扩容"和"KV 构造"解耦:新容量以 Decoder 塔的形式存在,只加 decode 与末位读出的计算;Prefiller 塔与源模型逐位对齐,让 KV cache 与源模型完全同构。代价写在明面上——<strong>decode 变重了</strong>(1.12B → 2.155B),所以它押注的是 prefill 主导的工作负载(见第 3 节与图 5)。</div>
+</section>
+
+<!-- ===== s5 训练与系统 ===== -->
+<section id="s5">
+  <div class="sec-no">05 · Training &amp; Systems</div>
+  <h2 class="sec">训练与系统:扩展怎么接、算力账怎么算</h2>
+  <h3>5.1 扩展与继续训练</h3>
+  <p>扩展动作很朴素:<strong>把源模型每一层复制到 Prefiller 与 Decoder 的对应层</strong>,两塔共享一份 embedding、输出归一化与输出头。之后两塔在 <abbr title="Brain Floating Point 16:训练常用的 16 位浮点格式">BF16</abbr> 下联合训练,沿用源模型的 Muon(Liu et al., 2025)与 Adam(Kingma &amp; Ba, 2014)参数组:<strong>保留 Prefiller 与共享参数的优化器状态,Decoder 用全新状态</strong>;所有组接着源模型的 cosine 学习率计划走,把剩余的衰减摊到续训阶段,Decoder 不单独做 warmup(细节在附录 D)。</p>
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: 到被评测 SST checkpoint 的训练路线(源训练 167.98B token + 联合训练 222.55B token)">
+    <figcaption>
+      <b>Figure 3:</b> Training route to the evaluated SST checkpoint: 13,350 source steps followed by 17,687 continuation steps.
+      <span class="zh">一条时间轴把 SST 的"两辈子"画清楚:<strong>源训练 167.98B token(13,350 步)</strong>→ 中间淡蓝色小块是 checkpoint 转换/权重复制 → <strong>联合 Prefiller/Decoder 训练 222.55B token(17,687 步)</strong>,合计 <strong>390.54B token、31,037 步</strong>。图内注记"cumulative training tokens; source and continuation are both included"是全文口径的锚点:SST 报告的任何训练成本都包含源阶段——这正是它敢和从零训练的基线比算力的原因。</span>
+          <span class="pgref">报告 p.5</span>
+    </figcaption>
+  </figure>
+
+  <h3>5.2 累计训练算力:三条模型怎么"同等预算"</h3>
+  <p>论文用理论 FLOPs 对齐预算。对源阶段与续训阶段的 token 数 $D_s$、$D_c$ 与 forward FLOPs/token $f_s$、$f_c$(均按<strong>有效架构</strong>计):</p>
+  <div class="math">$$C_{\text{train}} = 3\,(D_s f_s + D_c f_c), \tag{5}$$</div>
+  <p>系数 3 近似前向+反向。被评测的 47B classic checkpoint 定义基准 $B_{\text{ref}} \approx 5.16836\times 10^{21}$ FLOPs;论文的 forward 系数为 3.887488B(47B)、5.148513B(63B)、3.087252B(源)、5.410678B(SST)FLOPs/token——SST 保留两塔的注意力与 FFN/MoE,但<strong>只有一份</strong> embedding、输出头与 KV 投影。</p>
+  <figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: 最终 checkpoint 的训练预算(token 数与相对训练 FLOPs)">
+    <figcaption>
+      <b>Table 7:</b> Training budgets at the final checkpoints. Theoretical training FLOPs are normalized to the 47B classic reference.
+      <span class="zh">三行数字解释了"同等算力"的字面意思:47B 用 <strong>443.16B token</strong> 训到 1.000 $B_{\text{ref}}$;63B 只需 <strong>334.62B token</strong> 就到 ≈1.000(每 token 更贵);SST <strong>390.54B token</strong>(含源阶段)也是 ≈1.000。所以这不是"token 数对齐",而是"<em>理论累计 FLOPs 对齐</em>"——SST 的 token 数介于两者之间,正是因为它前 43% 的 token 跑在更便宜的源图上。</span>
+          <span class="pgref">报告 p.11</span>
+    </figcaption>
+  </figure>
+  <div class="note"><b>复算核对(推算):</b>按式(5)与论文给出的系数把自己算一遍——SST: $3\times(167.98\text{B}\times 3.087252 + 222.55\text{B}\times 5.410678) \approx 3\times(5.186\times10^{20} + 1.2042\times10^{21}) \approx 5.168\times10^{21}$;47B: $3\times 443.16\text{B}\times 3.887488 \approx 5.168\times10^{21}$;63B: $3\times 334.62\text{B}\times 5.148513 \approx 5.168\times10^{21}$。三者与 $B_{\text{ref}}$ 的偏差都在千分之一以内——"comparable cumulative training compute"是精算出来的,不是粗略说法。</div>
+
+  <h3>5.3 训练配方与续训调度器</h3>
+  <p>附录 D 交代了可复现性的关键参数:续训用 <strong>128 张 NVIDIA H800</strong>、专家并行度 8、序列长 4,096、全局 batch 3,072 条序列;源阶段峰值基础学习率约 $1.03302\times10^{-3}$,续训基础 weight decay 0.15(沿用参数组乘子);源/SST/63B 的 token batch 为 12,582,912(47B 为 14,680,064)。Muon 用 6 步 Newton–Schulz,注意力按 head 切分打包、GLU 按投影类型切分;Adam 的 $\epsilon = 10^{-15}$。入口与末态的 RMS 操作以 FP32 累积、返回输入 dtype。</p>
+  <p>续训的学习率不是重新 warmup,而是<strong>从源模型的 cosine 相位接着走</strong>:设 $u$ 为已消耗的续训 token、$U = 222{,}553{,}964{,}544$ 为配置的续训视野、$q_0$ 为转换点处源的归一化相位,则</p>
+  <div class="math">$$q(u) = q_0 + (1-q_0)\min(u/U,\,1), \tag{7}$$</div>
+  <div class="math">$$\eta(u) = \eta_{\min} + \left(\eta_{\text{anchor}} - \eta_{\min}\right)\frac{1+\cos\!\left(\pi q(u)\right)}{1+\cos(\pi q_0)}, \tag{8}$$</div>
+  <p>其中 $\eta_{\text{anchor}} \approx 5.96548\times10^{-4}$、$\eta_{\min} \approx 1.03302\times10^{-4}$。源计划的 warmup 覆盖 12.582912B token、衰减到 335.9605248B token;<strong>转换发生在 167.9818752B token</strong>——论文特意说明 $q_0$ 是在 warmup 之后的衰减区间内测量的,<em>不是</em>用转换位置除以整个视野。</p>
+  <div class="note"><b>复现视角(整理):</b>论文给出了套件级参数(卡数、并行度、batch、优化器、LR 调度、token 数),但训练数据配方只说"与基线同一套",未披露具体配比;这套 128×H800 的训练规模也不是第三方能低成本复刻的量级。因此这篇的证据形态是"<b>自家 ladder 内的受控对比</b>",而非可独立复现的实验——这一点在第 8 节点评里会再展开。</div>
+</section><!-- ===== s6 实验 ===== -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">实验:损失、下游任务与推理成本</h2>
+  <h3>6.1 训练损失:转换点之后反超</h3>
+  <p>先把最关键的一条曲线讲清楚:SST 的损失在<strong>转换点处先抬升、再在续训中单调下降</strong>,最后停在三者最低。最终 checkpoint 的训练 EMA-200 为 <strong>1.5900</strong>(390.54B token 处)、47B classic 为 1.6006(443.16B token 处)、63B classic 为 1.5921(334.62B token 处)——即在可比累计训练算力下,SST 的训练损失低于两个参照。</p>
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: 训练 LM 损失(EMA-200)对 token 数与理论累计算力的双面板曲线">
+    <figcaption>
+      <b>Figure 4:</b> Training LM loss (EMA-200) against tokens and theoretical cumulative compute. Conversion occurs at 167.98B tokens (0.301B<sub>ref</sub>).
+      <span class="zh">左图横轴是累计 token、右图横轴是相对理论算力 $B_{\text{ref}}$;四条曲线分别是 47B scratch(蓝)、63B scratch(赭金)、Source model(灰)、67B SST(青)。读三件事:① <strong>转换尖峰</strong>——源模型(灰)在 167.98B token 处损失约 1.75,扩展成 SST 后同一横坐标上跳到约 1.89,这就是"改预测图 + 新增 Decoder"的代价,需要续训消化;② <strong>SST 的下降斜率更陡</strong>:青色曲线在约 200B token(右图约 0.55 $B_{\text{ref}}$ 附近)先后穿过 47B 与 63B 两条曲线,一路到终点;③ <strong>终点贴得很近</strong>:右图在 1.0 $B_{\text{ref}}$ 处三条线都在 1.59–1.60 区间,青色最低。图注口径:EMA span 200、`adjust=False`、转换后重启、取图前后先算 EMA 再下采样、保留最后一次观测;曲线值以读图为准,精确终点值以正文/Table 7 为准。</span>
+          <span class="pgref">报告 p.6</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.2 下游任务:七项全胜 + NLL</h3>
+  <p>论文在最终 checkpoint 上评七个任务,并用同一批 1,024 条冻结 packed-4K 样本算 ARXIV 留出集的 token NLL:</p>
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: 七个下游任务得分与 ARXIV 留出 NLL 对照">
+    <figcaption>
+      <b>Table 3:</b> Scores (%) on seven downstream tasks and held-out ARXIV token NLL (lower is better), evaluated at comparable cumulative theoretical training FLOPs, including both training stages for SST. OpenBookQA combines the validation and test splits; MMLU uses the test split, and MATH uses the full test set.
+      <span class="zh">8 行里 SST 全部最优——但要看清幅度分两档:<strong>拉开明显差距的</strong>是 OpenBookQA(75.00,比 63B 高 4.00、比 47B 高 6.50)、HumanEval(37.80,比 63B 高 4.87;注意 63B 在这里反而低于 47B)、GSM8K(58.38,比 63B 高 3.34);<strong>小幅领先的</strong>是 MMLU(60.54,+1.15)、MATH(34.36,+1.22)、BBH(52.74,仅比 63B 高 0.18)、MBPP(51.40,+0.60)与 ARXIV NLL(1.4421,比 63B 低 0.0003)。也就是说"SST 最低训练损失换算成了最好的下游表现"这个结论成立,但其中若干项对 63B 的优势在噪声量级附近,不宜过度解读。</span>
+          <span class="pgref">报告 p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.3 推理成本:换什么权重、在什么区间便宜</h3>
+  <p>图 5 把第 3 节的代理 $\text{proxy} = w\,p + (1-w)\,d$(归一化到 47B classic)在 P:D 成本混合上扫一遍:</p>
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: 不同 prefill:decode 成本混合下的估计推理成本(归一化到 47B classic)">
+    <figcaption>
+      <b>Figure 5:</b> Estimated inference cost across P:D cost mixes, normalized to 47B classic. Shading spans the six-model OpenRouter reference range; open circles mark break-even points and the filled circle marks 75:25.
+      <span class="zh">青色是 SST,两条参考线是 47B(1.0)与 63B(1.365);横轴从左到右 prefill 占比升高。两个空心圆圈是<strong>盈亏平衡点</strong>:与 63B 在 <strong>13.4:86.6</strong> 打平、与 47B 在 <strong>65.5:34.5</strong> 打平;浅绿阴影是六个 OpenRouter 模型实测的未缓存输入账单占比区间(67.4–76.7%),实心圆标出 75:25 这个代表点——在该点 SST 比 47B 低 <strong>6.7%</strong>、比 63B 低 <strong>31.6%</strong>。也就是说:<em>prefill 占比越高 SST 越划算</em>;如果负载是 decode 主导(右侧),它的 2.155B decode 活跃参数会让它比 47B 贵。论文用这六个模型的实际区间给出结论:在整个高亮范围内 SST 比 47B 低 1.3–7.9%、比 63B 低 27.7–32.5%。</span>
+          <span class="pgref">报告 p.7</span>
+    </figcaption>
+  </figure>
+  <div class="note"><b>口径重申:</b>图 5 与图 1 的推理成本都是<strong>解析代理</strong>(0.75p+0.25d 一类权重下的参数计数比较),论文原话是 "analytical cost estimates, not measured serving speedups"。真实部署里 SST 的两塔执行是非对称的——prefill 只跑 Prefiller、decode 跑两塔——其调度、显存与 kernel 效率都会影响实际数字,这部分论文未测。</div>
+</section>
+
+<!-- ===== s7 设计空间 ===== -->
+<section id="s7">
+  <div class="sec-no">07 · Design Space &amp; Related Work</div>
+  <h2 class="sec">设计空间:SST 只是一个点</h2>
+  <p>讨论章(introduction 之后的 §5)把框架的边界与自由度都摊开:SST 提供的是 KITE 的<strong>一种</strong>实现,而非唯一架构处方。它的"层对齐 KV 复用 + 入口桥 + Decoder-only 读出"都是具体选择;真正的中心要求只有一条——<strong>新增容量不得延长产生 KV 的计算、也不得引入需要历史 Decoder 状态的依赖</strong>。</p>
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: KITE 内的连通性选择(a)与三种 KV 分配方式(b)">
+    <figcaption>
+      <b>Figure 6:</b> Connectivity choices within KITE. (a) An SST-style backbone with optional hidden-state connections at the Decoder entry, intermediate layers, and output readout. Dashed paths indicate design choices, not connections that must be enabled together. (b) Three illustrative KV assignments: aligned layer-wise reuse, reversed pairing, and reuse of one Prefiller KV source across multiple Decoder layers. The KV-producing computation remains on the Prefiller side; the illustrated choices are not assumed to have equal cost or quality.
+      <span class="zh">(a) 画出三条<strong>可选</strong>的隐状态通路(橙色虚线):<b>Output fusion</b>——Prefiller 表示直接参与最终读出;<b>Intermediate bridge</b>——在第 $l$ 层把 Prefiller 状态喂进 Decoder;<b>Entry bridge</b>——SST 现在用的入口融合。灰色实线是骨架(Prefiller→Decoder 的 KV 读取),绿箭头是 KV 访问。(b) 三张"三层一例"的 KV 分配示意:<b>Aligned</b>(当前 SST,同层对齐)、<b>Reversed</b>(Decoder 逆序读 Prefiller 的层)、<b>Shared source</b>(多个 Decoder 层共用一个 Prefiller 层的 KV)。图注强调两点:KV 的产生始终留在 Prefiller 侧;这些选择<em>不假设</em>等价——成本与质量都可能不同。论文明确说自己只探索了这个空间的一小部分,报告的是所选 SST 配置的性能,而不是最优连通模式。</span>
+          <span class="pgref">报告 p.8</span>
+    </figcaption>
+  </figure>
+  <p>把 SST 放进文献坐标里(§6 Related work,引用为论文自身的标注口径):</p>
+  <ul class="tight">
+    <li><strong>模型增长</strong>:Net2Net(Chen et al., 2016)研究保函数的模型增长;SPARKLING(Yu et al., 2026)关注宽度渐进学习中的信号保持与对称性破缺。SST 与它们的区别是:<em>不追求保函数</em>——对齐初始化后预测图被改变,靠随后的联合适配补回来。稠密→MoE 升格(Sparse Upcycling: Komatsuzaki et al., 2022;Upcycling LLMs into MoE: He et al., 2024)则是把稠密 checkpoint 变成稀疏专家,SST 是给"已经是稀疏 MoE 的源模型"加一座 Decoder 塔。</li>
+    <li><strong>KV 缩减一族</strong>:<abbr title="Multi-Query Attention,多查询注意力:所有 Q 头共享 1 组 KV">MQA</abbr>(Shazeer, 2019)、<abbr title="Grouped-Query Attention,分组查询注意力:Q 头分组共享 KV 头">GQA</abbr>(Ainslie et al., 2023)通过共享 KV 头减少存储;<abbr title="Cross-Layer Attention:跨相邻层共享 KV,进一步压缩缓存">Cross-Layer Attention</abbr>(Brandon et al., 2024)把共享扩展到相邻层。论文的定位:SST <em>不缩减</em> KV 规模,目标是"扩容的同时不延长 KV 产生路径"。</li>
+    <li><strong>YOCO 家族</strong>:YOCO(Sun et al., 2024)把"产 cache"与"用 cache"的计算分离并据此做 prefill 提前退出;SST 把这个执行模式用于<strong>分阶段模型增长</strong>——YOCO 的 cross-decoder 共享一个全局 KV 表示,而 SST 读对齐后的逐层 KV,且由"源→目标扩展"构造而来。同族的还有 DeepSeek-V4.1-Flash(2026,<a href="../deepseek-v41-flash/">本合集第 ⑦ 篇</a>)与 KV-Mirror(WeChat AI, 2026)。</li>
+    <li><strong>递归/参数绑定</strong>:Mixture-of-Recursions(Bae et al., 2025)的固定 KV 循环,从架构视角可看作 KITE 所依托的家族的一个参数绑定特例;SST 则用独立的 Prefiller/Decoder 参数,扩容时不延长 KV 产生路径。</li>
+  </ul>
+  <div class="takeaway"><b>小结:</b>这一章的价值是把"一个模型"上升为"一个可搜索的设计空间":KV 分配(怎么连)、隐状态通路(连不连)、桥算子与两塔容量分配(多深多宽)都是待探索的维度。对读者的实用含义:如果你在做 YOCO 式或 CLA 式的工作,<strong>"扩容只加在消费侧"这条约束可以直接搬走</strong>。</div>
+</section>
+
+<!-- ===== s8 点评 ===== -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">点评:亮点、账本与要补的测</h2>
+  <h3>8.1 技术来源一览</h3>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>技术来源一览(据论文行内引用整理,非论文原表;引用为论文标注口径,本页未逐条核对参考文献条目)</caption>
+    <thead><tr><th>组件</th><th>论文标注的上游</th><th>本代的改造 / 集成</th></tr></thead>
+    <tbody>
+      <tr><td>两段式执行(cache 生产者 / 消费者分离)</td><td>YOCO(Sun et al., 2024);DeepSeek-V4.1-Flash(2026);KV-Mirror(WeChat AI, 2026)</td><td>把该模式用于分阶段模型扩展:读"层级对齐 KV"(非全局单一 KV),并由源 checkpoint 扩展构造</td></tr>
+      <tr><td>模型增长 / 知识迁移</td><td>Net2Net(Chen et al., 2016);SPARKLING(Yu et al., 2026)</td><td>不保函数:复制成两塔后预测图改变,靠联合继续训练适配</td></tr>
+      <tr><td>稀疏化升格</td><td>Sparse Upcycling(Komatsuzaki et al., 2022);Upcycling LLMs into MoE(He et al., 2024)</td><td>源模型本身已是稀疏 MoE;SST 给已稀疏的源加 Decoder 塔,而非稠密→稀疏</td></tr>
+      <tr><td>KV 头共享</td><td>MQA(Shazeer, 2019);GQA(Ainslie et al., 2023)</td><td>不改 KV 头数(全线 8 组 KV 头);目标不是缩小 KV,而是让 KV 生产者不扩容</td></tr>
+      <tr><td>跨层 KV 共享</td><td>Cross-Layer Attention(Brandon et al., 2024)</td><td>共享方向从"相邻层"改成"跨塔同层"(Aligned),并在 §5 讨论 Reversed / Shared source 变体</td></tr>
+      <tr><td>固定 KV 的循环</td><td>Mixture-of-Recursions(Bae et al., 2025)</td><td>论文将其视为参数绑定特例;SST 用独立两塔参数、参数不绑定</td></tr>
+      <tr><td>输入主导负载的证据</td><td>SWE-agent(Yang et al., 2024);ReAct(Yao et al., 2023)</td><td>自采 OpenRouter 公开活动数据(Table 1/4)量化未缓存输入占比,替代单点引用</td></tr>
+      <tr><td>优化器与位置编码</td><td>Muon(Liu et al., 2025);Adam(Kingma &amp; Ba, 2014);RoPE(Su et al., 2021)</td><td>续训沿用源模型的参数组与 cosine 相位;两塔共享位置 id</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>8.2 值得肯定的三点</h3>
+  <ul class="tight">
+    <li><strong>把"扩哪里"变成一等公民。</strong>多数扩容/升格工作关心"扩多少",这篇关心"扩在哪个区域不破坏什么"——KV 不变式给出的是一个可复用的架构约束,而不只是 SST 这一张图。</li>
+    <li><strong>三个成本轴一起报账,且账目透明。</strong>训练预算含源阶段(390.54B token)、$B_{\text{ref}}$ 与四个 forward 系数都给出,复算能对上(本页 5.2 的核对);推理侧坦白使用解析代理并反复声明不是实测加速——比"含糊地宣称更快"要诚实得多。</li>
+    <li><strong>对照梯子控制得干净。</strong>同 tokenizer、同数据配方、同训练协议、同评测集,47B/63B 是"同族扩深扩宽"而来,SST 又在同族之上——把"scaling 范式"的变量与"模型族"的变量分开了。七项下游 + 留出 NLL 全胜,方向一致。</li>
+  </ul>
+
+  <h3>8.3 未披露、值得补测的点</h3>
+  <ul class="tight">
+    <li><strong>实测服务加速缺位。</strong>全文用 0.75p+0.25d 的解析代理,未见任何端到端吞吐、TTFT / TPOT 或显存实测。SST 的 prefill 只跑 Prefiller、decode 跑两塔,是<em>非对称执行</em>:真实引擎里 cache 布局、调度粒度与 kernel 形态都会变——值得在 vLLM / SGLang 上量一次"prefill 省下的参数"能兑现多少 wall-clock。论文自述结论也止于"without establishing... measured serving speedup"。</li>
+    <li><strong>扩展时点的敏感性未见扫描。</strong>167.98B / 222.55B 的 43:57 切分是给定值;"何时扩展最划算""扩展比例多大"没有扫描,也没有把 SST 的损失–算力曲线与不同转换点的曲线并排——而这恰是 KITE 范式最核心的超参数。</li>
+    <li><strong>容量分配未探。</strong>两塔等深等宽(各 18 层 / 2304)是设计选择,论文明确说未探索最优连通与容量分配。Decoder 更浅/更窄、或采用 §5 的 Reversed / Shared source 分配会怎样,是留给后续的直接问题。</li>
+    <li><strong>单次运行的方差与统计口径。</strong>所有数字来自一次训练运行:损失差(对 63B 仅 0.0021)与下游小分差(如 BBH +0.18)没有种子/重复实验支撑;论文也未披露评测的采样设置细节(如 few-shot 数之外的温度、重复次数)。</li>
+    <li><strong>两塔 KV/显存账未展开。</strong>按架构 Decoder 不产 KV,cache 应与源模型同量级——但论文未给出实际 KV cache 大小、两塔激活显存与 prefill 阶段的批处理效率;对做部署的人来说,这几项决定了"解析省"能否变成"工程省"。另:数据配方只说"与基线同一套",未披露具体配比。</li>
+  </ul>
+
+  <h3>8.4 一句话判断</h3>
+  <p>这是一篇<strong>范式论文</strong>:真正的贡献是把"KV 不变"立成扩容的约束,并用一个足够简单、账目足够透明的实例(SST)证明它在一个算力点上确实三方同向。它的弱点也同样清楚——所有"更省"都是解析代理,所有"更强"都来自单次运行的一段梯子。值得当作方法论读:<em>凡是增长的部分,先问它是否落在需要产生未来状态的关键路径上</em>。</p>
+</section>
+
+<!-- ===== 术语速查 ===== -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>KITE</td><td>KV-Invariant Transformer Expansion</td><td>论文提出的扩容范式:新增容量放在不影响 KV 构造的区域</td></tr>
+      <tr><td>SST</td><td>Step Scale Transformer</td><td>KITE 的具体实现:Prefiller + Decoder 两座等深塔串联执行</td></tr>
+      <tr><td>Prefiller</td><td>—</td><td>第一座塔:处理完整 prompt、产出逐层 KV;唯一包含 K/V 投影与 K 归一化的部分</td></tr>
+      <tr><td>Decoder</td><td>—</td><td>第二座塔:自己算 query、读 Prefiller 的对齐层 KV 做预测;不产 KV,运算 token-local</td></tr>
+      <tr><td>bulk prefill</td><td>—</td><td>覆盖整个 prompt 的 KV 构造过程;KITE 中它只由 Prefiller 执行,故成本不随扩容增长</td></tr>
+      <tr><td>decode</td><td>—</td><td>自回归逐 token 生成阶段;每个新 token 需过两塔</td></tr>
+      <tr><td>活跃体参数</td><td>active body parameters</td><td>每 token 实际参与的体参数(不含 embedding/head),经 Top-8 路由专家等配置张量形状计数</td></tr>
+      <tr><td>Upcycling</td><td>—</td><td>用小模型 checkpoint 初始化大模型的训练方式;KITE 属其"中途扩容"一类</td></tr>
+      <tr><td>YOCO</td><td>You Only Cache Once</td><td>分离 cache 生产/消费、让深层复用浅层 KV 的架构家族;DeepSeek-V4.1-Flash 与 KV-Mirror 同族</td></tr>
+      <tr><td>SSSF</td><td>Sliding-Sliding-Sliding-Full</td><td>注意力模式:三个 sliding-window 层后接一个 full-attention 层,余数按 SF 收尾</td></tr>
+      <tr><td>EMA-200</td><td>Exponential Moving Average, span 200</td><td>训练损失的指数滑动平均(span 200、adjust=False、转换后重启)</td></tr>
+      <tr><td>P:D mix</td><td>prefill : decode cost mix</td><td>推理成本中 prefill 与 decode 的权重划分;论文代表点 75:25</td></tr>
+      <tr><td>推理代理</td><td>inference proxy $wp+(1-w)d$</td><td>用活跃体参数加权的解析成本估计,非实测服务加速</td></tr>
+      <tr><td>$B_{\text{ref}}$</td><td>reference training FLOPs</td><td>由被评测 47B classic checkpoint 定义的理论累计训练算力基准 $\approx 5.16836\times10^{21}$</td></tr>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>稀疏专家混合;SST 源塔与两座基线塔均沿用 512 选 8 的 MoE 设计</td></tr>
+      <tr><td>Muon / Adam</td><td>—</td><td>续训使用的两组优化器(6 步 Newton–Schulz / $\epsilon=10^{-15}$),沿用源模型参数组与相位</td></tr>
+      <tr><td>EP</td><td>Expert Parallelism</td><td>专家并行度;续训配置为 8(128 张 H800)</td></tr>
+      <tr><td>NLL</td><td>Negative Log-Likelihood</td><td>留出集上的 token 负对数似然,ARXIV 留出集越低越好</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2609.27294《KITE: KV-Invariant Transformer Expansion for Efficient Agentic LLM Scaling》(StepFun)的人工精读笔记。全部 Figure / Table 以 300 DPI 摘自论文原文、按比例缩放展示(未裁剪);解读为编者观点,数字以论文为准,推算/整理处均已标注。<br>
+    原文:<a href="https://arxiv.org/abs/2609.27294">arXiv:2609.27294</a><br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好 · 中文精读 / English edition</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

@@ -151,8 +151,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(四篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the four flagship papers, quick-read editions for the other six).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(五篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the five flagship papers, quick-read editions for the other six).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -163,8 +163,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>10</b> 篇</span><span class="i18n-en"><b>10</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>75</b> 图 + <b>95</b> 表</span><span class="i18n-en"><b>75</b> figures + <b>95</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>11</b> 篇</span><span class="i18n-en"><b>11</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>81</b> 图 + <b>102</b> 表</span><span class="i18n-en"><b>81</b> figures + <b>102</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -176,12 +176,12 @@
 <section id="matrix">
   <div class="sec-no">How to read the collection</div>
   <h2 class="sec">
-    <span class="i18n-zh">机制对照:10 篇论文的分工图</span>
-    <span class="i18n-en">Mechanism matrix: how the ten papers divide the work</span>
+    <span class="i18n-zh">机制对照:11 篇论文的分工图</span>
+    <span class="i18n-en">Mechanism matrix: how the eleven papers divide the work</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑥)、模型权重与系统栈(⑦–⑨)、度量而非优化(⑩)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
-    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑥), the model weights and the system stack (⑦–⑨), or measurement rather than optimization (⑩). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
+    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑥)、模型权重与系统栈(⑦–⑩)、度量而非优化(⑪)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
+    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑥), the model weights and the system stack (⑦–⑩), or measurement rather than optimization (⑪). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
   </p>
   <div class="matrix-wrap">
   <table class="matrix">
@@ -270,6 +270,14 @@
       </tr>
       <tr>
         <td class="num">10</td>
+        <td class="pap"><a href="efficient-inference/kite/">KITE / SST</a></td>
+        <td><span class="i18n-zh">训练算力与 prefill 计算(扩容不延长 KV 生产路径)</span><span class="i18n-en">Training compute and prefill computation (expansion never extends the KV-producing path)</span></td>
+        <td><span class="i18n-zh"><b>扩容只加在不产生 KV 的一侧</b>:Prefiller 产 KV、Decoder 读 KV(结构约束,不冻结权重)</span><span class="i18n-en"><b>Grow only the side that produces no KV</b>: a Prefiller that writes KV and a Decoder that reads it (a structural constraint, not frozen weights)</span></td>
+        <td><span class="i18n-zh">需要(源 167.98B + 续训 222.55B token,累计算力对齐基线)</span><span class="i18n-en">Yes (167.98B source + 222.55B continuation tokens, FLOP-matched to the baselines)</span></td>
+        <td><span class="i18n-zh">67B SST prefill 活跃参数 1.12B(47B 基线 1.48B);训练损失 1.5900 最低;75:25 成本代理 −6.7% / −31.6%</span><span class="i18n-en">1.12B prefill active params for the 67B SST (vs 47B's 1.48B); lowest loss 1.5900; 75:25 cost proxy −6.7% / −31.6%</span></td>
+      </tr>
+      <tr>
+        <td class="num">11</td>
         <td class="pap"><a href="benchmarks/mmlongembed/">MMLongEmbed</a></td>
         <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
         <td><span class="i18n-zh">基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型</span><span class="i18n-en">Benchmark construction: 4 tasks / 8 datasets / 8,460 queries / 11 models</span></td>
@@ -423,8 +431,8 @@
     <span class="i18n-en">⚡ Efficient Inference &amp; Deployment</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">在模型权重与系统栈上省算力与显存,按「模型 → 权重 → 系统」排列:<b>整篇模型报告的架构与缓存压缩 → 量化精度与定制内核 → 服务系统与部署形态</b>。</span>
-    <span class="i18n-en">Saving compute and memory in the weights and the system stack, ordered "model → weights → system": <b>a full model report on architecture and cache compression → quantization accuracy and custom kernels → the serving system and deployment shape</b>.</span>
+    <span class="i18n-zh">在模型权重与系统栈上省算力与显存,按「模型 → 权重 → 系统」排列:<b>整篇模型报告的架构与缓存压缩 → 量化精度与定制内核 → 服务系统与部署形态</b>,再加一篇把<b>扩容本身</b>做成省算力手段的架构工作。</span>
+    <span class="i18n-en">Saving compute and memory in the weights and the system stack, ordered "model → weights → system": <b>a full model report on architecture and cache compression → quantization accuracy and custom kernels → the serving system and deployment shape</b>, plus one architecture paper that turns <b>expansion itself</b> into a way to save compute.</span>
   </p>
   <div class="cards">
 
@@ -488,6 +496,26 @@
       </div>
     </div>
 
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">架构扩展 · KV 复用 · Prefill/Decode 成本分离 · MoE</span><span class="i18n-en">Architecture Scaling · KV Reuse · Prefill/Decode Split · MoE</span></span>
+      <h3>
+        <a class="i18n-zh" href="efficient-inference/kite/">⑩ KITE / SST<br><span style="font-size:14px; font-weight:600; color:var(--muted)">把新容量只加在"不产生 KV"的一侧</span></a>
+        <a class="i18n-en" href="efficient-inference/kite/en.html">⑩ KITE / SST<br><span style="font-size:14px; font-weight:600; color:var(--muted)">KV-Invariant Transformer Expansion</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">StepFun 的扩容范式:训练期把新容量<b>只加在只读 KV 的 Decoder 塔</b>上——33.8B 源模型扩成 <b>67B MoE</b>(decode 激活 2.15B,prefill 只要 <b>1.12B</b>,比 47B 基线的 1.48B 还少)。累计训练算力对齐 47B/63B 经典 Transformer 的条件下训练损失最低(<b>1.5900</b> vs 1.6006/1.5921)、七项下游全部第一;75:25 成本代理比 47B 低 <b>6.7%</b>、比 63B 低 <b>31.6%</b>,且 prefill 占比越高越划算。全文只押一条约束:未来 KV 的产生不得依赖 Decoder 的历史状态。</span>
+        <span class="i18n-en">StepFun's scaling paradigm: add new capacity <b>only in a KV-reading Decoder tower</b> — a 33.8B source expands into a <b>67B MoE</b> (2.15B active at decode, only <b>1.12B</b> at prefill, below the 47B baseline's 1.48B). At FLOP-matched cumulative training compute it has the lowest training loss (<b>1.5900</b> vs 1.6006/1.5921) and best scores on all seven downstream tasks; the 75:25 cost proxy runs <b>6.7%</b> under 47B and <b>31.6%</b> under 63B, improving as the prefill share grows. The rule behind it: future KV production must never depend on historical Decoder states.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">6 图 7 表</span><span class="i18n-en">6 figures · 7 tables</span></span><span>arXiv:<a href="https://arxiv.org/abs/2609.27294">2609.27294</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="efficient-inference/kite/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/kite/en.html">Read in English →</a>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -506,8 +534,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">多模态 · 嵌入模型 · 长上下文</span><span class="i18n-en">Multimodal · Embeddings · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑩ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
-        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑩ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
+        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑪ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
+        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑪ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">首个专门评测多模态嵌入模型长上下文能力的基准:<b>4 个检索任务、8 个数据集、8,460 个查询、11 个模型</b>。核心发现:现役模型靠表面特征匹配"作弊",细粒度信息保持随长度衰退——"窗口大"≠"读得懂"。</span>

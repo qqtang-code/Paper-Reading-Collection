@@ -14,6 +14,8 @@ PAGES = [
     "/attention-kv-cache/elastic-attention/en.html",
     "/attention-kv-cache/hysparse2/",
     "/attention-kv-cache/hysparse2/en.html",
+    "/attention-kv-cache/cowindow-attention/",
+    "/attention-kv-cache/cowindow-attention/en.html",
     "/attention-kv-cache/pisa/",
     "/attention-kv-cache/pisa/en.html",
     "/efficient-inference/freetoken/",
@@ -23,6 +25,8 @@ PAGES = [
     "/efficient-inference/deepseek-v41-flash/",
     "/efficient-inference/deepseek-v41-flash/DeepSeek-V4.1-Flash论文精读_HTML.html",
     "/efficient-inference/deepseek-v41-flash/en.html",
+    "/efficient-inference/kite/",
+    "/efficient-inference/kite/en.html",
     "/benchmarks/mmlongembed/",
     "/benchmarks/mmlongembed/en.html",
 ]
