@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){
+  var lang = null;
+  try{ lang = localStorage.getItem('pr-lang'); }catch(e){}
+  if (lang !== 'zh' && lang !== 'en') {
+    lang = String(navigator.language || navigator.userLanguage || 'en').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+  }
+  document.documentElement.lang = (lang === 'en') ? 'en' : 'zh-CN';
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="DoSA (Dots Sparse Attention, arXiv:2610.13990) in-depth English reading notes: turning the DSA indexer's all-head scoring into conditional computation with a Top-K score upper-bound certificate. All figures embedded at 300 DPI, figures paired with the text.">
+<meta name="keywords" content="DoSA, Dots Sparse Attention, DSA, sparse attention, Top-K, indexer, upper-bound certificate, long context, paper reading, Xiaohongshu">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DoSA: Dots Sparse Attention · Paper Reading Notes">
+<meta property="og:description" content="arXiv:2610.13990 in-depth reading notes: a score upper-bound certificate for a signed multihead indexer, lossless exact Top-K selection, and up to 2.74× complete-Indexer speedup. All figures embedded at 300 DPI.">
+<meta property="og:url" content="https://qqtang-code.github.io/DoSA-Project-Page/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>DoSA: Dots Sparse Attention — Paper Reading Notes · arXiv:2610.13990</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media print{.lang-toggle{display:none!important}}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">DoSA<span>·Notes</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Observation</a>
+      <a class="jump" href="#s4">Certificate</a>
+      <a class="jump" href="#s5">System</a>
+      <a class="jump" href="#s6">Experiments</a>
+      <a class="jump" href="#s7">Analysis</a>
+      <a class="jump" href="#s8">Commentary</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="DoSA论文精读_HTML.html" title="阅读中文版"
+         onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark / light" title="Toggle dark / light">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2610.13990</div>
+    <h1>DoSA: Dots Sparse Attention<br><span style="font-size:20px; font-weight:600; opacity:.9">Making "find the Top-K" a computation that can itself be skipped</span></h1>
+    <div class="subtitle">Sparse attention visits only a few keys, but <i>finding</i> those keys still scores every key with every indexer head. DoSA's central observation is that <b>Top-K selection needs sufficient evidence to reject a candidate, not that candidate's full score</b>. The paper builds a score upper-bound certificate tailored to a signed ReLU multihead score, and turns all-head scoring into conditional computation <b>without changing the final selected set</b>.</div>
+    <div class="meta">
+      <span>Authors: Fanxu Meng<sup>*</sup>, Taosong Fang<sup>*†</sup> (Dots Studio, Xiaohongshu Inc.)</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2610.13990">arXiv:2610.13990</a> (cs.LG, v1 26 Sep 2026)</span>
+      <span>Code: <a href="https://github.com/llm-sys/flash-indexer">github.com/llm-sys/flash-indexer</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Sparse Attention</span>
+      <span class="pill">DeepSeek Sparse Attention</span>
+      <span class="pill">Top-K Selection</span>
+      <span class="pill">Upper-Bound Certificate / Safe Pruning</span>
+      <span class="pill">Lossless Exact Selection</span>
+      <span class="pill">GPU Kernel</span>
+      <span class="pill">Long-Context Prefill / TTFT</span>
+    </div>
+    <div style="margin-top:14px; font-size:13px; opacity:.85">
+      <sup>*</sup>Equal contribution; author order was determined by a coin toss. <sup>†</sup>Corresponding author.
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Reading guide (figures interleaved in narrative order)</h2>
+  <ol>
+    <li><a href="#s1">Overview: one sentence and the key numbers</a></li>
+    <li><a href="#s2">Background: the "dense scoring" bottleneck inside sparse attention</a></li>
+    <li><a href="#s3">Observation: rejecting a candidate does not need its full score</a></li>
+    <li><a href="#s4">Method: building an upper-bound certificate for a signed multihead score</a></li>
+    <li><a href="#s5">System: turning the certificate into a four-stage GPU pipeline</a></li>
+    <li><a href="#s6">Experiments: from microbenchmarks to end-to-end TTFT</a></li>
+    <li><a href="#s7">Additional analysis: putting the configuration onto layers and tensors</a></li>
+    <li><a href="#s8">Commentary: positioning, boundaries, and what deserves follow-up</a></li>
+    <li><a href="#s9">Glossary (come back to it any time)</a></li>
+  </ol>
+</nav>
+
+<!-- ================= 01 OVERVIEW ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview</h2>
+
+  <p class="lead">The question this paper answers is very specific: <b>inside a DeepSeek Sparse Attention (DSA)-style "multihead indexer + Top-K" sparse attention, can we be certain we have not missed a token that should have been selected, without computing all the scores?</b> The authors' answer is yes — as long as we build, for each candidate key, an <b>upper bound $U_i$ that is strictly no lower than its true score</b>, and a <b>lower bound $\tau$ that is strictly no higher than the true Top-K threshold</b> (supplied by a seed set). Once the two separate ($U_i < \tau$), that key is <i>proven</i> unable to enter the Top-K and can be safely discarded. Throughout, the tokens finally selected are identical to full scoring, which is why the paper calls the method <b>lossless</b>.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">Core mechanism</div><div class="v">Score upper-bound certificate + fixed seed threshold<small>The certificate rejects candidates; the seed supplies the lower bound; ties are always retained</small></div></div>
+    <div class="item"><div class="k">Selection correctness</div><div class="v">Exact Top-K (Theorem 1)<small>Returns the same Top-K as full scoring (identical under a common total order)</small></div></div>
+    <div class="item"><div class="k">Indexer microbenchmark speedup</div><div class="v">up to 2.74× / 1.69×<small>Over SGLang and LiteTopK; fastest in 60/60 configurations</small></div></div>
+    <div class="item"><div class="k">End-to-end TTFT</div><div class="v">1.86× / 1.94×<small>GLM-5.2 and DeepSeek-V3.2, ~1M-token inputs, over SGLang</small></div></div>
+    <div class="item"><div class="k">Pruning rate</div><div class="v">97.2%–97.5%<small>Domain average; 20 of 21 layers above 95%</small></div></div>
+    <div class="item"><div class="k">Model configuration</div><div class="v">32 / 64 heads, Top-K = 2048<small>GLM-5.2 / DeepSeek-V3.2; both have 21 indexer-producing layers</small></div></div>
+  </div>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page follows the paper; anything this page organizes, summarizes, or converts from the paper's configuration is explicitly marked <b>[organized]</b> or <b>[estimated]</b>, so it can be told apart from the paper's own figures. Notation follows the paper: $H$ is the number of indexer heads, $r$ the number of retained heads evaluated directly, $K$ the Top-K budget (2,048 in the experiments), $\Omega$ the set of visible keys, and $[x]_+ = \max(x,0)$. The "Report p.X" at the end of each caption gives that figure's page in the original PDF.</div>
+
+  <p>Let us lay out the paper's four contributions, which map onto the four chapters that follow: <b>(1) the certificate</b> (chapters ③④) — a per-key upper bound designed specifically for the <i>signed</i> DSA score, rather than a lifted block-max bound from document retrieval; <b>(2) the analysis</b> (chapters ④⑦) — connecting the certificate's slack $\delta_i$ to the selection margin $\Delta_i$ and the head budget $r$, answering "when is this certificate useful, and is one more head worth it"; <b>(3) the system</b> (chapter ⑤) — translating "certified rejection" into genuinely saved compute and memory traffic, not just fewer multiply-accumulates; <b>(4) the measurements</b> (chapter ⑥) — three domains (English/Chinese/code), 60 microbenchmark configurations, and TTFT on two real models.</p>
+
+  <div class="takeaway"><b>One-sentence summary:</b> DoSA moves WAND/MaxScore-style upper-bound pruning from document retrieval onto the indexer of an LLM sparse attention — but does something retrieval never had to do: <b>make the upper bound fit a multihead reduction with ReLU inside and weights of both signs</b>. Positive heads are covered by "project onto an already-computed head + a residual norm", negative heads by "a single aggregate direction chosen by activation pattern", plus a GPU implementation that turns pruning into real bandwidth savings.</div>
+</section>
+<!-- ================= 02 BACKGROUND ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">Background: the "dense scoring" bottleneck inside sparse attention</h2>
+
+  <p>Sparse attention lets each query look at only a few keys, so the complexity looks like it has come down. But the step that decides <i>which</i> keys to look at is, in DSA, performed by an <b>indexer</b> with $H$ heads: each head computes a dot product between the query and the key, passes it through a ReLU, and the results are combined with a signed weighted sum, after which the $K$ highest scores are taken. The paper writes this as:</p>
+
+  <div class="math">$$s_i = \sum_{h=1}^{H} w_h \,[\,q_h^\top k_i\,]_+ , \qquad i \in \Omega \tag{1}$$</div>
+
+  <p>Here $q_h \in \mathbb{R}^D$ is the query vector of head $h$, $w_h \in \mathbb{R}$ its weight, and $k_i$ the key of token $i$. Two details matter and will recur constantly: <b>the ReLU sits inside the weighted sum</b> (so it is "rectify first, then sum with signs"), and <b>the weights $w_h$ have both signs</b>. Exactly these two facts make "just compute fewer heads" unsafe — dropping a positive head underestimates the score, dropping a negative head overestimates it.</p>
+
+  <p>A structural contradiction follows: $s_i$ is used sparsely (only $K$ keys are eventually attended), but <b>the process that produces $s_i$ is dense</b> — every visible key must be scored by all $H$ heads. The paper quantifies this on real models:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: The indexer's share of prefill GPU time and of theoretical matrix FLOPs grows with prompt length">
+    <figcaption>
+      <b>Figure 1:</b> The indexer becomes a dominant cost of long-context prefill. Left: its fraction of prefill GPU time, including query/key preparation, scoring, and Top-K. Right: its fraction of theoretical matrix FLOPs. Each point averages two requests under SGLang; profiling and FLOP conventions are given in Appendix D.1.
+      <span class="ex"><b>Reading note:</b> the left panel is the indexer's share of prefill GPU time; the right panel its share of theoretical matrix FLOPs. The two bar series are GLM-5.2 (blue) and DeepSeek-V3.2 (tan). Point by point: at about 1M tokens the indexer accounts for <b>73.0%</b> of GLM-5.2's prefill GPU time and <b>90.8%</b> of DeepSeek-V3.2's, while the corresponding FLOPs shares are only <b>47.4%</b> and <b>83.2%</b>. Reading the two panels side by side is the point: <b>the time share is clearly higher than the arithmetic share</b> (73.0% vs 47.4% on GLM-5.2), which says the indexer's cost is not only "more arithmetic" but also the memory traffic of Top-K selection and of reading/writing intermediate results — precisely why DoSA, beyond computing fewer dot products, also cuts writeback and selection work. Both curves rise monotonically with length, foreshadowing the Amdahl-style conclusion: the longer the context, the more accelerating the indexer is worth.</span>
+      <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to view the full-resolution original; click again or press Esc to close.</p>
+
+  <h3>The three existing acceleration routes, and the gap they all leave open</h3>
+  <p>The paper sorts related work into three families and points out where each one leaves a gap:</p>
+  <ul class="tight">
+    <li><b>Predictive / reusable sparse selection:</b> NSA combines token compression with fine-grained selection (Yuan et al., 2025), MoBA uses expert routing for block attention (Lu et al., 2025), and DSA selects tokens with a learned multihead indexer (DeepSeek-AI, 2025); IndexCache reuses indices across layers (Bai et al., 2026), SparDA predicts next-layer selections (Fu et al., 2026), HISA uses hierarchical block indexing with token refinement (Xu et al., 2026), PIVOT shares proxy scans across query groups (Liu et al., 2026), and MISA screens with fewer heads and reranks with the full indexer (Zhou et al., 2026). The paper's verdict: these methods <b>need not preserve the original scorer's Top-K</b>, and <b>reranking cannot recover an already-excluded winner</b>.</li>
+    <li><b>Exact GPU selection and fused scoring:</b> radix selection narrows candidates with successive digit histograms (Zhang et al., 2023), GVR predicts a decoding threshold from temporal correlation (Cheng et al., 2026), DeepSelect streams materialized scores through a bounded buffer (Qian et al., 2026), and LiteTopK fuses full-head scoring with online candidate filtering (Yin et al., 2026). These accelerate Top-K selection itself, but <b>still rely on full-head scores for every key</b>.</li>
+    <li><b>Score upper bounds from classical document retrieval:</b> MaxScore (Turtle &amp; Flood, 1995) and WAND (Broder et al., 2003) use term-contribution upper bounds plus a running Top-K threshold to skip unnecessary document scoring, and Block-Max WAND tightens these bounds for individual posting-list blocks (Ding &amp; Suel, 2011). The paper stakes out its own position here: <b>a block-level upper bound must cover every key in the block and can therefore be loose for individual candidates</b>, which motivates tighter, per-key bounds that exploit query-head geometry and activation structure.</li>
+  </ul>
+
+  <div class="note"><b>Stating the gap precisely:</b> the first family trades away "consistency with the original scorer" for speed; the second keeps correctness but does not reduce the scoring work itself; the third has the right principle, but its bound form (block-level) is not tight enough in the LLM-indexer setting. <b>DoSA wants both the original scorer's exact Top-K and fewer computed scores</b>, so it has to invent a new kind of bound. That is where the paper's self-posed question comes from: <i>Can we avoid full-score computation while certifying that screening discards no winner?</i></div>
+</section>
+
+<!-- ================= 03 OBSERVATION ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Key Observation</div>
+  <h2 class="sec">Observation: rejecting a candidate does not need its full score</h2>
+
+  <p>The starting point is a plain but often overlooked sentence: <b>"entering the Top-K" is an event that can be refuted by contradiction.</b> To prove that some key cannot be selected, we do not need to know its score — only an <b>upper limit</b> on how high it could be, together with the fact that this upper bound already falls below the qualification line. Formally, choose a seed set $S \subseteq \Omega$ of at least $K$ visible keys and use the original scorer to compute their $K$th largest score $\tau = \tau_K(S)$. Because $S$ is only a subset of $\Omega$, its $K$th largest score cannot be <b>higher</b> than the full set's:</p>
+
+  <div class="math">$$\tau_K(S) \le \tau_K(\Omega), \qquad s_i \le U_i &lt; \tau_K(S) \;\Longrightarrow\; i \notin \mathrm{TopK}(\Omega) \tag{2}$$</div>
+
+  <p>This gives two quantities pointing in opposite directions: $\tau_K(S)$ is a <b>lower bound</b> on the true threshold (the better the seed, the tighter), and $U_i$ is an <b>upper bound</b> on the token score (the tighter the certificate, the better). Their strict separation completes one <b>certified rejection</b>. The paper flags two engineering facts at the same time: <b>a poor seed weakens filtering</b>; and <b>additional exact scores can only raise the threshold lower bound</b> — that is, knowing more is always safer, and never causes a winner to be missed.</p>
+
+  <h3>Why retaining only some heads is not enough</h3>
+  <p>The most natural way to "save money" is to compute only a subset of heads. The paper closes that door in one paragraph, and it is worth following verbatim: <b>dropping positive-weight heads is unsafe</b> (it underestimates the score and kills a key that should have been selected), while <b>dropping negative-weight heads is safe but leaves loose bounds</b> (negative heads subtract, so ignoring them only raises the upper bound). So DoSA's strategy is not "drop some heads" but "<b>evaluate some heads exactly, and build bounds for the rest</b>".</p>
+
+  <p>Concretely, let $R$ be a set of $1 \le r < H$ <b>retained heads</b>. Their contribution is computed exactly:</p>
+
+  <div class="math">$$S_R(k_i) = \sum_{j \in R} w_j \,[\,q_j^\top k_i\,]_+ \tag{3}$$</div>
+
+  <p>The remaining heads split into two groups: $P = H_+ \setminus R$ (omitted <b>positive</b> heads, needing an upper bound) and $N = H_- \setminus R$ (omitted <b>negative</b> heads, whose subtracted magnitude needs a lower bound). How $R$ is chosen follows a rule that depends on activation frequency (see the next chapter), but the authors stress one crucial point: <b>the theorem holds for any $R$; the choice of $R$ affects only efficiency and tightness, never correctness.</b> This decoupling of correctness from heuristics is the foundation of the paper's credibility.</p>
+
+  <h3>A practical problem for "tighten as you scan": the threshold must be fixed</h3>
+  <p>In classical retrieval the threshold can be raised as documents are seen, tightening as the scan proceeds. DSA is different: candidates are scanned block by block, and if the threshold changed mid-scan, <b>keys already rejected under the old threshold could not be recovered</b>. The paper therefore chooses a <b>fixed threshold</b>: once the seed set fixes $\tau$, it never changes through the screening and refinement stages (Algorithm 1). This trade sacrifices some potential tightness in exchange for provable correctness that is independent of scan order. Appendix B.3 writes the size of that trade as an equality: rejection needs $\Delta_i > \delta_i + b$, where $b = \tau^* - \tau \ge 0$ is exactly the "debt" of a fixed threshold (the gap between the threshold lower bound and the true threshold) and $\delta_i = U_i - s_i$ is the certificate slack. This formula puts "seed quality" and "certificate tightness" — two independent directions for improvement — cleanly on the two sides of one inequality.</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: DoSA execution overview, read in order ❶–❹">
+    <figcaption>
+      <b>Figure 2:</b> DoSA execution overview, read in order ❶–❹: ❶ screening dot products; ❷ bound evaluation, pruning, and candidate compaction; ❸ full-head dot products for survivors; ❹ original-score reduction and sparse writeback. Tensor Cores execute stages ❶ and ❸; SIMT threads execute stages ❷ and ❹ using accumulators from Tensor Memory (TMEM), with gray and purple data tiles indicating avoided computation and writeback, respectively. The center sketches GPU resources; seed initialization and final Top-K selection are omitted.
+      <span class="ex"><b>Reading note:</b> this figure is meant to be read by its ❶–❹ labels, and it doubles as the roadmap for chapter ⑤'s GPU design. <b>❶ screening dot products:</b> tensor-core matrix multiplies between the $(r+d_a)$-row $\tilde{Q}$ and key tiles — note it is $r+d_a$ rows, not $H$ rows, and that is where the saving comes from. <b>❷ bound evaluation, pruning, candidate compaction:</b> the accumulators in TMEM produce $U = p + R$, keys with $U < \tau$ are dropped, and survivor IDs are compacted. <b>❸ full-head dot products for survivors:</b> only surviving keys are multiplied against the full $Q$ and $K[\mathrm{IDs}]^\top$; the gray blocks are exactly "computation certified away". <b>❹ original-score reduction and sparse writeback:</b> ReLU plus the signed weighted sum of Eq. (1), writing out only records with $s \ge \tau$; the purple blocks are "writeback avoided". The two savings colors (gray = compute, purple = bandwidth) are the page's visual thread: what DoSA saves was never only FLOPs.</span>
+      <span class="pgref">Report p.3</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Takeaway from this chapter:</b> the certificate's correctness needs only one inequality — the upper bound is not too low and the lower bound is not too high — and is independent of how retained heads are chosen and how the threshold is set. What is genuinely hard in engineering is making that inequality <b>both tight and cheap</b>, and turning "compute less" into "actually save". The former is the next chapter (the certificate); the latter is chapter ⑤ (the system).</div>
+</section>
+<!-- ================= 04 METHOD: CERTIFICATE ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">Method: an upper-bound certificate for a signed multihead score</h2>
+
+  <p>Now comes the paper's central technical problem: given a score of the form in Eq. (1) — <b>ReLU inside, weights of both signs</b> — how do we build a cheap yet tight upper bound $U_i \ge s_i$ for every key? The paper handles positive and negative heads separately, producing two tools with different characters.</p>
+
+  <h3>4.1 Omitted positive heads: project onto an already-computed head, cover the rest with a residual norm</h3>
+  <p>For each omitted positive head $h \in P$, the paper picks an <b>anchor</b> $j_h^\star$ from the retained set $R$ and splits $q_h$ into "a component along the anchor plus a residual":</p>
+
+  <div class="math">$$j_h^\star = \arg\max_{j \in R} \frac{[\,q_h^\top q_j\,]_+}{\lVert q_j \rVert_2}, \qquad \beta_h = \frac{[\,q_h^\top q_{j_h^\star}\,]_+}{\lVert q_{j_h^\star} \rVert_2^2}, \qquad d_h = q_h - \beta_h\, q_{j_h^\star} \tag{4}$$</div>
+
+  <p>Then ReLU subadditivity, positive homogeneity, and Cauchy–Schwarz give:</p>
+
+  <div class="math">$$[\,q_h^\top k_i\,]_+ \le \beta_h\,[\,q_{j_h^\star}^\top k_i\,]_+ + \lVert d_h \rVert_2 \lVert k_i \rVert_2 \tag{5}$$</div>
+
+  <p>This inequality deserves a pause, because it explains both "why cheap" and "why tight": <b>the first term on the right reuses a retained dot product that has already been computed</b> (so the projected part is free), and <b>the second term depends only on the query-side $d_h$ and the key-side $\lVert k_i \rVert_2$</b> — and $\lVert k_i \rVert_2$ is computed once per key and shared across all positive heads. In other words, the omitted positive heads do not vanish; they are folded into a single residual allowance.</p>
+
+  <p>Summing the contributions of all omitted positive heads defines folded weights and a total residual allowance:</p>
+
+  <div class="math">$$\tilde{w}_j = w_j + \sum_{\substack{h \in P \\ j_h^\star = j}} w_h \beta_h , \qquad E_P = \sum_{h \in P} w_h \lVert d_h \rVert_2 \tag{6}$$</div>
+
+  <p>So "retained heads + omitted positive heads" as a whole are covered by $ \sum_{j \in R} \tilde{w}_j [q_j^\top k_i]_+ + E_P \lVert k_i \rVert_2 $. One engineering detail is easy to misread: $\tilde{w}_j$ are <b>folded weights</b> that live only inside the screening plan and <b>do not modify model parameters</b>. If $P$ is empty (all positive heads retained), then $E_P = 0$ and $\tilde{w}_j = w_j$, degenerating to exact computation.</p>
+
+  <h3>4.2 Why the nonnegative projection is the optimal single anchor</h3>
+  <p>Appendix B.1 (Proposition 5) answers a natural question: is this choice of anchor and $\beta$ optimal? The answer is yes — among all single-anchor bounds of the form $[q^\top k]_+ \le \beta [p^\top k]_+ + c\lVert k \rVert_2$, <b>the smallest achievable uniform allowance is $c^\star = \min_{\beta \ge 0} \lVert q - \beta p \rVert_2$</b>, i.e. the distance from $q$ to the <b>nonnegative ray</b> generated by $p$, and the values in Eq. (4) attain it.</p>
+  <p>The proof itself is elegant and worth one line: if $q^\top p \le 0$, substituting $k = q/\lVert q \rVert_2$ makes the anchor term vanish for every $\beta \ge 0$, so $c \ge \lVert q \rVert_2 = c^\star$; otherwise let $d = q - \beta^\star p$, whose projection satisfies $d^\top p = 0$, and substituting $k = d / \lVert d \rVert_2$ again kills the anchor term while the left side equals $\lVert d \rVert_2$, so $c \ge c^\star$. The paper is also honest about the boundary: what is optimized is the <b>uniform norm allowance</b>, not the pointwise-optimal complete bound, and not the optimal choice of the retained-head set.</p>
+
+  <div class="note"><b>Two tighter upgrade routes exist (Appendix A.1); the paper gives them but keeps the simpler one on the main path:</b><br>
+  <b>(a) Grouped residuals</b> — split coordinates into $G$ groups, give each its own residual norm $E_{P,g}$, then combine with Minkowski into $\big(\sum_g E_{P,g}^2\big)^{1/2}\lVert k_i \rVert_2$. By Minkowski it is $\le E_P$, i.e. <b>strictly tighter at unchanged cost</b> (still one RMS value per key).<br>
+  <b>(b) Joint residual</b> — exploiting correlations among residual directions, Eq. (7) gives $E_P^{\text{joint}} = \frac{1}{2}\big(\lVert \sum_h u_h \rVert_2 + \sqrt{\sum_{h,\ell} |u_h^\top u_\ell|}\big) \le E_P$, with $u_h = w_h d_h$. Its gain comes from residual geometry and it <b>needs no extra key reads</b>, but its query-side cost is quadratic in the number of omitted positive heads — so the paper treats it as an optional tightening rather than the default path.</div>
+
+  <h3>4.3 Omitted negative heads: aggregate along a direction decided by the activation pattern</h3>
+  <p>The negative side is the most interesting design in the paper, and ablation shows it is the single most critical piece. Negative heads <b>subtract</b>, so to build a score upper bound we must find a <b>lower bound</b> on the subtracted magnitude. The paper picks a subset $A \subseteq N$ to define an aggregate direction:</p>
+
+  <div class="math">$$a_A = \sum_{h \in A} |w_h|\, q_h , \qquad L_N(k_i) = [\,a_A^\top k_i\,]_+ \le \sum_{h \in N} |w_h|\,[\,q_h^\top k_i\,]_+ \tag{8}$$</div>
+
+  <p>By ReLU subadditivity, $L_N$ never exceeds what the omitted negative heads actually subtract, so it is safe. The paper then asks a sharp question: <b>why not simply put every negative head into $A$?</b> The answer is a counterintuitive but important insight — <b>a head that is itself inactive (negative dot product, zero after ReLU) can, through its negative dot product, cancel other active heads' positive dot products before the aggregate ReLU</b>, which underestimates the subtracted magnitude and loosens the upper bound. So "adding one more head" is not monotonically better.</p>
+
+  <p>DoSA solves this using the activation pattern of seed keys: for sampled seed keys record $M_i = \{h \in N : q_h^\top k_i > 0\}$, let $p_h$ be head $h$'s activation frequency, and take <b>componentwise majority support</b>:</p>
+
+  <div class="math">$$A = \{\, h \in N : p_h \ge 1/2 \,\}$$</div>
+
+  <p>The paper proves this is principled rather than ad hoc: define the separable surrogate $J(A) = \sum_{h \in A} a_h (1 - p_h) + \sum_{h \in N \setminus A} a_h p_h$ (with $a_h = |w_h|\lVert q_h \rVert_2$). If the sampling mask uses the signs of the same real dot products, then $J(A)$ upper-bounds the sample mean of $\delta_N(k)/\lVert k \rVert_2$; since each head independently picks between $a_h(1-p_h)$ and $a_h p_h$, <b>componentwise majority exactly minimizes $J$</b>, with minimum $\sum_h a_h \min(p_h, 1-p_h)$. Meanwhile the retained-head rule from before uses the very same $\min(p_h, 1-p_h)$ as its priority, which removes the largest of the remaining terms — so "which negative heads to retain" and "which to aggregate" are two decisions under one surrogate objective.</p>
+
+  <p>There is also a neat boundary case: if a new key's active set is exactly $A$, the aggregate is <b>exact</b> (both slack terms vanish); other activation patterns stay safe, just with a looser bound. <b>Frequency affects efficiency, not correctness</b> — worth remembering, because it means noisy activation statistics cannot break losslessness.</p>
+
+  <h3>4.4 Putting it together: the final form of $U$, and where each term's slack comes from</h3>
+  <p>Combining Eqs. (5)–(8) yields the paper's <b>score certificate</b>:</p>
+
+  <div class="math">$$U_i = \underbrace{\sum_{j \in R} \tilde{w}_j\,[\,q_j^\top k_i\,]_+}_{\text{retained heads (folded weights)}} + \underbrace{E_P \lVert k_i \rVert_2}_{\text{positive residual allowance}} - \underbrace{[\,a_A^\top k_i\,]_+}_{\text{negative aggregate}} , \qquad s_i \le U_i \tag{9}$$</div>
+
+  <p>The paper then decomposes "where exactly is this certificate loose" into three nonnegative terms (Appendix B.2, Proposition 6):</p>
+
+  <div class="math">$$U(k) - s(k) = \underbrace{\delta_P(k)}_{\text{positive projection}} \;+\; \underbrace{\sum_{h \in N \setminus A} c_h [x_h]_+}_{\text{missed active negatives}} \;+\; \underbrace{\min\{Z_A^+(k),\, Z_A^-(k)\}}_{\text{aggregate cancellation}} \tag{14}$$</div>
+
+  <p>where $c_h = |w_h|$, $x_h = q_h^\top k$, and $Z_A^\pm$ are the positive and negative contributions inside the aggregate heads. The physical meanings of the three blocks are: <b>(i)</b> the price paid for approximating positive heads by projection; <b>(ii)</b> negative heads that really are active but were not taken into $A$ (subtracted less than they should be); <b>(iii)</b> the loss from positive and negative terms cancelling inside the aggregate. This decomposition explains why negative aggregation is irreplaceable: in the ablation, removing it sends candidate survival from 2.65% to 95.06% (details in the next chapter) — because without it, term (ii) pushes the upper bound up until it is nearly useless.</p>
+
+  <h3>4.5 Walkthrough: putting the paper's configuration onto layers, heads, and tensors</h3>
+  <p>After the abstract mechanism, it is worth a "configuration walkthrough" to see what the formula looks like in a real model. All numbers below come from the paper's main text and appendices; rows marked <b>[organized]</b> are this page's sums or conversions from the paper's configuration:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>DoSA configuration walkthrough (data from the paper's §2.5, §4.1 and Appendices C.1, D.2; [organized] marks converted results)</caption>
+    <thead><tr><th>Item</th><th>Value given by the paper</th><th>What the walkthrough concludes</th></tr></thead>
+    <tbody>
+      <tr><td>GLM-5.2's indexer</td><td>$H = 32$ heads, Top-K $= 2048$, 21 indexer-producing layers</td><td>The 32 heads split into "retained $r$ + omitted positive + omitted negative"; the retained count $r$ is a tunable budget</td></tr>
+      <tr><td>Implementation paths for $r$</td><td>Paper §2.5 and Appendix C.1: three paths, $r = 14, 16, 20$</td><td>$r = 14,16$ use the <b>absolute-value form</b> (all positive heads retained, $P = \varnothing$); $r = 20$ uses the <b>base form</b> and keeps positive-head projection</td></tr>
+      <tr><td>Auxiliary rows $d_a$</td><td>Two FP8 auxiliary rows $v_0, v_1$ approximate the negative aggregate ($a_A \approx v_0 + v_1 + e_A$)</td><td><b>[organized]:</b> the logical dot-product rows per screening request are $r + 2$, not $H = 32$; at $r = 14$ that is 16 rows, about 50% of all heads</td></tr>
+      <tr><td>Per-key screening cost</td><td>The normalized work model of Eq. (20)</td><td><b>[organized]:</b> screening saves logical dot products only when $m < 1 - (r + d_a)/H$ ($m = M/N_s$ is the survival rate); with $r = 14$, $d_a = 2$, $H = 32$ the threshold is about $m < 0.5$ — while measured survival is only 2.65%, a very large margin</td></tr>
+      <tr><td>Measured pruning rate</td><td>20 of 21 layers above 95%, domain average 97.2%–97.5%; layer 1 lowest at 89%–93%</td><td><b>[organized]:</b> that corresponds to a survival rate of roughly 2.5%–2.8%, consistent with the 2.65% in Appendix D.2</td></tr>
+      <tr><td>Numerical safety</td><td>Eq. (26): $U_i^{\mathrm{num}} = \mathrm{Eval}^{\uparrow}\!\big[\alpha_i(\hat{U}_i + \rho_i C) + \varepsilon_{\text{raw}} + \varepsilon_{\text{out}}\big]$</td><td>The certificate must still hold in FP8/FP32, which needs an <b>upward-enclosing</b> evaluation, a conservative key RMS summary $\rho_i$, and rounding errors made explicit as tolerance terms</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="takeaway"><b>Takeaway from this chapter:</b> positive-head projection handles "omitting positive heads underestimates"; negative-head aggregation handles "omitting negative heads overestimates". Both have the same structure — <b>per-key, precomputed on the query side, shared across keys</b> — which is exactly why the bound is tighter than block-level bounds yet cheaper than scoring everything. And Proposition 6's three-term slack decomposition previews the ablation result: negative aggregation is this certificate's lifeline.</div>
+</section>
+<!-- ================= 05 SYSTEM ================= -->
+<section id="s5">
+  <div class="sec-no">05 · GPU Kernel Design</div>
+  <h2 class="sec">System: turning the certificate into a four-stage GPU pipeline</h2>
+
+  <p>The certificate only guarantees "less arithmetic", but on a GPU "less arithmetic" does not automatically mean "faster". The paper names this trap right at the start: <b>certified pruning reduces arithmetic, but irregular survivor sets can limit GPU utilization and introduce scattered key accesses.</b> Chapter ③ therefore uses three concrete design decisions to translate the certificate into real benefit.</p>
+
+  <h3>5.1 Design one: group queries so screening can use dense tensor cores</h3>
+  <p>The first decision is "grouping + pipelining".</p>
+  <ul class="tight">
+    <li><b>Group by retained-head budget:</b> queries with similar retained-head budgets are packed into fixed-width tiles, so a small set of screening kernels can use <b>dense tensor-core MMA</b>, avoiding the fragmentation of a custom width per query.</li>
+    <li><b>Prepare query-side data once:</b> retained query rows, folded weights $\tilde{w}_j$, and the two FP8 auxiliary rows are <b>prepared once and reused across all key tiles</b> — the concrete realization of chapter ③'s repeated "query-side quantities are reused across keys".</li>
+    <li><b>Threshold fixed during the scan:</b> each query's threshold is initialized from the exact scores of seed keys and never changes during the scan (consistent with chapter ③'s fixed-threshold trade).</li>
+    <li><b>Producer/consumer split:</b> dedicated warps issue asynchronous key loads and MMA operations, while consumer warps evaluate bounds from TMEM accumulators; buffered key tiles overlap loading with computation. A key is rejected only when $U_i^{\mathrm{num}} < \tau$, and <b>warp ballots pack survivor decisions into a compact mask</b> for refinement.</li>
+  </ul>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: Data flow through screening, refinement, and sparse writeback">
+    <figcaption>
+      <b>Figure 3:</b> Data flow through screening, refinement, and sparse writeback. Blue and orange illustrate successive tiles within each stage, where key loading overlaps computation. SIMT threads evaluate bounds U from TMEM accumulators; gray full-head MMA blocks indicate work avoided through certified pruning. Compacted candidate IDs feed refinement, whose outputs are filtered before writeback. G2S and T2R denote global-to-shared and TMEM-to-register transfers.
+      <span class="ex"><b>Reading note:</b> this swim-lane diagram spreads Figure 2's four stages out into "where the data flows". Vertically it follows the hardware hierarchy: <b>SIMT (bound evaluation / reduction) → Registers (fragments) → TMEM (MMA accumulators) → Tensor Cores (scoring MMA) → Shared Memory (tile reuse) → Global Memory (inputs and buffers)</b>. Horizontally it splits into three segments: <b>Pipeline initialization</b> (exchanging Q/K tiles), <b>Fused screening</b> (the blue and orange colors are two successive key tiles within the same stage, showing load/compute overlap), and <b>Fused refine + emit</b>. The key reading is on the Tensor Cores row: after <code>U &lt; τ pruned</code> appears during screening, the following <code>MMA full heads</code> blocks are shaded gray — that is the full-head computation certified away; the <b>Sparse writeback</b> at bottom right lets only candidates passing the threshold into the candidate-ID buffer. G2S/T2R mark global→shared and TMEM→register moves, a reminder that <b>half of this design's optimization target is data movement, not arithmetic</b>.</span>
+      <span class="pgref">Report p.5</span>
+    </figcaption>
+  </figure>
+
+  <h3>5.2 Design two: sharing key loads during refinement</h3>
+  <p>The second decision targets "irregular accesses". If every query gathers its own selected keys, then <b>a key selected by several queries is loaded repeatedly</b>. The paper's approach compacts the survivor masks into a <b>shared stream plus per-query streams</b>: within a group of four queries, a key that survives at least two bounds and lies in the group's common visible range enters the shared stream (one load serves full-head scoring for the whole group); other candidates use per-query streams. The paper openly admits this is a <b>trade</b> — it "trades some extra query–key evaluations for fewer key transfers". The trade works because at long context, moving keys (bandwidth) is often more expensive than a few extra dot products, echoing Figure 1's observation that the time share exceeds the arithmetic share. Each score is still filtered against its own query's threshold, so the extracted result is unchanged.</p>
+
+  <h3>5.3 Design three: compact writeback and exact selection</h3>
+  <p>The third decision targets "writeback and selection". Refinement <b>fuses</b> full-score computation with threshold filtering: only records with $s_i^{\mathrm{ref}} \ge \tau$ produce output. These records store <b>compact monotone score codes with exact key IDs</b>, reducing both HBM traffic and the selection stage's input size. Selection then keeps records strictly above the boundary code, and <b>candidates falling exactly on the boundary are resolved one by one using their original scores</b>. This "handle the boundary separately" detail is a necessary condition for losslessness — it guarantees that Theorem 1's requirement that both filters retain equality really is honored at the implementation level.</p>
+
+  <h3>5.4 Decoding: a different approach</h3>
+  <p>Prefill has many queries, so the certificate's preparation cost can be amortized across query groups. Decoding has very few queries per step and <b>very limited key reuse across query groups</b>, so the same benefit structure no longer holds. The paper changes tack here: it keeps full FP8 scoring and instead exploits <b>temporal coherence</b>. Distinct keys selected in recent steps provide <b>witnesses</b> whose scores on the current query yield a conservative lower bound on the Top-K threshold; scores at or above this bound are compacted for exact selection, and the witness set and selected indices are updated. So the decoding-stage gain comes from <b>reducing selection work</b>, not from reducing scoring — which explains why Figure 5's decoding speedups (1.06×–1.26×) are far smaller than the prefill speedups.</p>
+
+  <div class="note"><b>The accompanying numerical engineering (Appendix C):</b> for the certificate to hold on real hardware, FP8/FP32 rounding error must be made explicit as tolerance. The paper gives Eq. (26), $U_i^{\mathrm{num}} = \mathrm{Eval}^{\uparrow}[\alpha_i(\hat{U}_i + \rho_i C) + \varepsilon_{\text{raw}} + \varepsilon_{\text{out}}]$, and stresses three points: <b>(1)</b> an <b>upward-enclosing</b> evaluation is required (directed rounding or explicit error bounds); "round-to-nearest alone is insufficient". <b>(2)</b> the conservative key RMS summary must satisfy $\rho_i \sqrt{D} \ge \lVert \bar{k}_i \rVert_2$; a nearest-rounded RMS is not enough. <b>(3)</b> once a non-finite value appears or coverage cannot be established, the certificate is invalid and the query stays flagged until <b>full-domain recovery</b> — re-evaluating the original scorer and selector over <b>all visible keys, including those discarded before the error was detected</b>. The paper warns explicitly: <b>"re-selecting from an incomplete buffer is insufficient."</b> This section reads like an engineering contract; it marks the distance between "lossless in mathematics" and "lossless on floating-point hardware".</div>
+</section>
+<!-- ================= 06 EXPERIMENTS ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">Experiments: from microbenchmarks to end-to-end TTFT</h2>
+
+  <p>Let us set up the experimental bench first, so the numbers are easier to read. The paper evaluates <b>GLM-5.2</b> (32 indexer heads) and <b>DeepSeek-V3.2</b> (64 heads) on NVIDIA GPUs, both with Top-K = 2048; <b>microbenchmarks run GLM-5.2 on a single GPU</b>, and <b>end-to-end inference uses eight-way tensor parallelism (TP8)</b> with prefill chunks of 32K (GLM-5.2) and 16K (DeepSeek-V3.2). Workloads come from InfiniteBench's English/Chinese books and code, supplemented with Project Gutenberg and SQLite source code to reach long contexts; per domain, samples are selected by tokenized length and contiguous contexts between 128K and about 1M tokens are extracted. Baselines are <b>SGLang v0.5.18</b> (full multihead scoring + Top-K) and <b>LiteTopK</b> (fusing scoring, candidate filtering, and selection). Timing uses CUDA events after warmup; end-to-end is measured by TTFT, <b>clearing the prefix cache between requests</b>.</p>
+
+  <h3>6.1 Prefill microbenchmarks: fastest in all 60 configurations, and the gap widens with length</h3>
+  <p>The microbenchmark sweeps five context lengths (128K/256K/512K/768K/1M) × four chunk sizes (4K/8K/16K/32K), 60 configurations in total. Each configuration replays the final query chunk across all 21 indexer layers, <b>including query/key preparation in the measured latency</b> — an important detail, since the certificate's preparation cost is a real cost and must not be hidden outside the timer.</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: Complete-Indexer speedup across context lengths, input domains, and prefill chunk sizes">
+    <figcaption>
+      <b>Figure 4:</b> Complete-Indexer speedup over SGLang across context lengths, input domains, and prefill chunk sizes.
+      <span class="ex"><b>Reading note:</b> the vertical axis is speedup over SGLang (so SGLang and LiteTopK themselves sit at the 1× baseline), the horizontal axis is context length (128K–1M), the three rows are the English/Chinese/code domains, and the four columns are the 4K/8K/16K/32K chunks. Two things matter most when reading it. <b>(1) The green bars (DoSA) are tallest in all 60 configurations</b>: speedups over SGLang range from <b>1.12×–2.74×</b>, and at 512K and above <b>every configuration is above 2×</b>; over LiteTopK the range is <b>1.17×–1.69×</b>. At 1M the gains reach 2.47×–2.74× (vs SGLang) and 1.47×–1.69× (vs LiteTopK). <b>(2) The shape is "rising with length, flat with chunk"</b>: the paper's explanation is that longer contexts enlarge the key set each query must evaluate while <b>the certificate's preparation is reused</b>; enlarging the chunk merely enlarges the query batch, which moves all methods in the same direction. The paper summarizes this neatly: <b>DoSA's main gain comes from cutting work along the "long key dimension".</b> The comparison with LiteTopK also separates two kinds of benefit: LiteTopK already removes score writeback and selection input, but leaves full multihead computation untouched, and that is exactly the block DoSA dismantles.</span>
+      <span class="pgref">Report p.6</span>
+    </figcaption>
+  </figure>
+
+  <p>The paper also runs a very concrete sensitivity comparison worth noting separately: <b>for English inputs with 16K queries, speedup rises from 1.19× at 128K to 2.58× at 1M; whereas at 1M, enlarging the query chunk from 4K to 32K (an eightfold increase) moves speedup only from 2.47× to 2.69×.</b> One variable buys a 2.2× increase, the other moves eightfold and buys about 0.2× — a clean demonstration that the benefit comes from diluting work along the key dimension.</p>
+
+  <h3>6.2 Pruning rate: how much does the certificate actually reject</h3>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: Certificate pruning rates across GLM-5.2 layers">
+    <figcaption>
+      <b>Figure 6:</b> Certificate pruning rates across GLM-5.2 layers, averaged within each input domain.
+      <span class="ex"><b>Reading note:</b> pruning rate here is defined as $p = 1 - N_{\text{keep}}/N_{\text{screen}}$, the ratio of query–key pairs before and after certificate screening. Across the 21 layers, 20 of them exceed 95% on all three curves (English/Chinese/code), with domain averages of <b>97.2%–97.5%</b>. Most striking is that <b>the three domains' curves almost coincide</b>: all show a clear dip at layer 1 (89%–93%, i.e. nearly nine tenths of pairs still rejected) and exceed 95% everywhere else. The paper's conclusion is that <b>what governs pruning is the layer's score geometry, not the language or modality of the input</b> — a stronger and more informative claim than "we are fast in three domains". In the language of Appendix B.3, for most keys the selection margin $\Delta_i$ to the Top-K boundary is large enough that even with certificate slack $\delta_i$ and threshold deficit $b$, $\Delta_i > \delta_i + b$ still holds.</span>
+      <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.3 Decoding: the gain comes from selection, not scoring</h3>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: Decoding Indexer speedup over SGLang">
+    <figcaption>
+      <b>Figure 5:</b> Decoding Indexer speedup over SGLang.
+      <span class="ex"><b>Reading note:</b> the workloads are document-analysis requests built from HELMET, InfiniteBench, and LongBench v2, plus code-review requests from SQLite; each workload fills a KV cache of about 1M tokens with equal-length requests. At request lengths of 256K / 512K / about 1M, DoSA's decoding-Indexer speedups are <b>1.06× / 1.11× / 1.26×</b>. These numbers are far more modest than prefill's, for the reason already given in chapter ⑤: decoding has too few queries per step for much key reuse across query groups, so in decoding DoSA <b>does not save scoring, only selection work</b> (using keys selected in recent steps as witnesses to derive a conservative threshold and compact records). Setting this beside prefill's 2.74× pinpoints the precondition of the paper's benefit structure: batching and reuse on the query side.</span>
+      <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.4 Ablation: how much do screening and sparse writeback each contribute</h3>
+
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7: Screening and sparse writeback ablation">
+    <figcaption>
+      <b>Figure 7:</b> Screening and sparse writeback ablation.
+      <span class="ex"><b>Reading note:</b> the four configurations are <b>Base</b> (neither enabled), <b>Full</b> (sparse writeback only), <b>Dense</b> (screening only), and <b>DoSA</b> (both). The workload is a SciFact retrieval example from LOFT, with 16K queries × 896K keys, averaging retrieval latency across all 21 indexer-producing layers. Bar by bar: 76.2 ms (Base) → 58.4 ms (Full, −23.4%) → 47.7 ms (Dense, −37.4%) → 40.2 ms (DoSA, −47.3%), i.e. <b>1.90×</b> over Base. The cross comparisons are more telling: adding screening on top of Full saves a further <b>31.1%</b>, and adding sparse writeback on top of Dense saves a further <b>15.7%</b>. The paper's reading: Full avoids dense writeback but still pays for every head, and its remaining gap to DoSA exposes <b>the computation fusion alone cannot remove</b>; Dense is the mirror image — fewer scores computed, but dense intermediate results still consume HBM bandwidth. <b>The conclusion: pruning must be paired with a matching execution strategy to realize its benefit.</b></span>
+      <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.5 Certificate-component ablation: which piece is the lifeline</h3>
+
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9: Effects of certificate components on screening and Indexer latency">
+    <figcaption>
+      <b>Figure 9:</b> Effects of certificate components on screening and Indexer latency. Bars show the mean candidate survival rate and geometric mean latency relative to DoSA. Breaks mark bars beyond the displayed range; annotations give their measured values.
+      <span class="ex"><b>Reading note:</b> the five variants are DoSA itself, <b>All-neg. support</b> (putting every omitted negative head into the aggregate), <b>No neg. aggregate</b> (removing negative aggregation), <b>Strength-only</b> (selecting retained negative heads by strength alone), and <b>No pos. projection</b> (removing positive-head projection). The left panel is candidate survival (lower is better) and the right panel is Indexer latency relative to DoSA (lower is better, and <b>these timings include recovery when the candidate pool fills</b>). The most glaring row is <b>No neg. aggregate: survival jumps from 2.65% to 95.06% and latency becomes 9.507×</b> — nearly tenfold. The paper's conclusion is direct: <b>the negative contribution is essential to obtaining a tight certificate for the signed Indexer score</b>; without it, screening all but fails (exactly matching the analysis of term (ii) in Proposition 6). The second variant, <b>All-neg. support</b>, also confirms chapter ④'s counterintuitive insight: stuffing every negative head into the aggregate is actually worse (survival rises to 4.06%, latency +12.0%), showing that "activation pattern decides the support set" genuinely helps. The other two variants (<b>Strength-only</b> 2.84%, <b>No pos. projection</b> 2.66%) barely matter on this workload; the paper adds that positive-head projection is <b>required by only 0.42% of the evaluated query-layer rows</b> — an honest and highly informative number: on this workload the mechanism is almost always a degenerate path rather than a main contributor.</span>
+      <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10: Layer-wise effects of certificate components">
+    <figcaption>
+      <b>Figure 10:</b> Layer-wise effects of certificate components on candidate survival and Indexer latency. Each layer aggregates the same sample sets. Both vertical axes use logarithmic scales.
+      <span class="ex"><b>Reading note:</b> this is Figure 9 broken out by layer, and both vertical axes are logarithmic — something to keep firmly in mind, or the visual gaps will be badly misread. In the left panel (survival), the "No neg. aggregate" curve hugs the near-100% top edge in most layers, <b>one to two orders of magnitude</b> away from DoSA's 2–3%. The right panel (relative latency) shows a structured phenomenon: <b>the cost of aggregating all negative heads is most pronounced in early layers, reaching 3.41× at layer 2</b>. This dovetails with Figure 6's observation that layer 1 has the lowest pruning rate — early-layer score geometry is simply the hardest to reject against, certificate tightness is most strained there, and any slack gets amplified.</span>
+      <span class="pgref">Report p.20</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.6 End-to-end TTFT: the gain strengthens with context</h3>
+
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8: Time to first token across input lengths on GLM-5.2 and DeepSeek-V3.2">
+    <figcaption>
+      <b>Figure 8:</b> Time to first token across input lengths on (a) GLM-5.2 and (b) DeepSeek-V3.2.
+      <span class="ex"><b>Reading note:</b> note that the two panels use <b>different vertical scales</b> — (a) GLM-5.2 runs 0–100 s and (b) DeepSeek-V3.2 runs 0–400 s — so bar heights cannot be compared across panels. At about 1M tokens, DoSA <b>nearly halves</b> TTFT on both models: <b>1.86×</b> (GLM-5.2) and <b>1.94×</b> (DeepSeek-V3.2) over SGLang, and <b>1.26×</b> and <b>1.50×</b> over LiteTopK. The annotated 131.60 s and 475.31 s are the baselines' TTFT at 1M. One more detail in panel (a): at 128K/256K the three bars are nearly equal (DoSA's lead is small), and only at 768K–1M does the gap open up clearly — a direct manifestation of the Amdahl effect.</span>
+      <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+
+  <p>The paper uses Amdahl's law to explain why the gain strengthens with length: with indexer time fraction $f$ and indexer speedup $s$, the overall speedup is $S = (1 - f + f/s)^{-1}$. GLM-5.2's $f$ rises from 23.6% at 128K to 73.0% at 1M, and DeepSeek-V3.2 reaches 90.8% at 1M. The larger $f$ is, the bigger the share of request latency that accelerating the indexer can take. The paper also explains why <b>TTFT speedup (1.86×/1.94×) is smaller than Indexer speedup (up to 2.74×)</b>: attention layers and feed-forward layers still contribute request latency; the indexer is not everything.</p>
+
+  <div class="takeaway"><b>Three conclusions from the experiments chapter:</b> <b>(1)</b> DoSA is the fastest in all 60 microbenchmark configurations, with the advantage growing monotonically with context length, showing the gain comes from cutting work along the "long key dimension"; <b>(2)</b> pruning rates of 97%+ are nearly invariant across languages and modalities, showing this is a property of score geometry rather than of data; <b>(3)</b> the ablations separate three kinds of benefit — arithmetic (screening), bandwidth (sparse writeback), and selection (compact records) — with negative-head aggregation the lifeline the certificate stands or falls on.</div>
+</section>
+<!-- ================= 07 ADDITIONAL ANALYSIS ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Additional Analysis</div>
+  <h2 class="sec">Additional analysis: per-layer retrieval speed and one engineering disclosure worth reading closely</h2>
+
+  <p>Appendix D.4 gives a per-layer retrieval-speedup heatmap covering 21 layers × 12 input samples = 252 cells. Its timing scope is "scoring and selection on prepared queries and keys", <b>excluding query/key preparation</b> — a different convention from the microbenchmarks, so watch out when reading.</p>
+
+  <figure class="fig">
+    <img src="figs/fig11.png" alt="Figure 11: Per-layer retrieval speedup over SGLang for the final 32K queries">
+    <figcaption>
+      <b>Figure 11:</b> Per-layer retrieval speedup over SGLang for the final 32K queries. Columns identify inputs and context lengths; rows identify indexer layers. Crosses mark cells slower than the baseline. The logarithmic color scale is centered at 1×. Five cells use the capacity-repair remeasurements specified in Appendix D.4.
+      <span class="ex"><b>Reading note:</b> columns are the 12 input samples (English EN01–EN04, Chinese ZH01–ZH04, code CD01–CD04) with their context lengths (132K to 1M), rows are indexer layer numbers, and color is speedup over SGLang, with <b>the logarithmic color scale centered at 1×</b> (so a light cell does not necessarily mean "fast" — read the direction relative to the midpoint). Crosses mark cells <b>slower</b> than the baseline (i.e. &lt;1×). The conclusion: across the measured cells DoSA beats SGLang in <b>251 of 252 comparisons (99.6%)</b> and LiteTopK in <b>250/252 (99.2%)</b>; every one of the 21 layers reaches 2× or more against SGLang on at least one input, with a maximum of <b>3.74×</b>, and up to 2.08× over LiteTopK. Those three losing comparisons cost 0.7%–9.0% more latency, and the paper <b>chose to keep them in the figure</b> rather than erase them — a point worth crediting. Overall, every layer's <b>median</b> speedup is above 1× against both baselines.</span>
+      <span class="pgref">Report p.21</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig12.png" alt="Figure 12: Per-layer retrieval speedup over LiteTopK for the final 32K queries">
+    <figcaption>
+      <b>Figure 12:</b> Per-layer retrieval speedup over LiteTopK. Input and layer ordering, timing scope, remeasured cells, and color scale match Figure 11; crosses retain the two comparisons slower than the baseline.
+      <span class="ex"><b>Reading note:</b> same structure, same color scale, and same timing scope as Figure 11, only with the baseline switched to LiteTopK. Its role here is to separate "the benefit of fusion" from "the benefit of certified rejection": a baseline that already fuses scoring and eliminates score writeback and selection input is still beaten by DoSA at a higher rate — from which the paper argues that <b>"avoiding score computation" improves serving latency even after scoring and selection have been fused</b>. Reading the two figures side by side, the overall light/dark pattern changes little, which indicates the advantage is not skewed by one or two input samples.</span>
+      <span class="pgref">Report p.21</span>
+    </figcaption>
+  </figure>
+
+  <h3>One engineering disclosure worth reading on its own: candidate-storage capacity repair</h3>
+  <p>Appendix D.4 contains a candid "measurement scope" paragraph that carries a lot of information and deserves to be read point by point:</p>
+  <ul class="tight">
+    <li>The matrix retains <b>247 cells</b> from the original run, and after discovering and repairing a <b>candidate-storage capacity problem</b>, <b>five cells were replaced</b> with matched measurements of all three methods: EN01 at layer 26, and EN02, EN04, ZH04, and CD04 at layer 1.</li>
+    <li>The repair kept the scoring and selection rules, four-anchor initialization, and the 16K internal query scratch unchanged; at about 1M keys of capacity, it reserves 1,024 candidate-ID pages and 114,688 output records per query, <b>adding 9.94 GiB of workspace</b> relative to the original allocation.</li>
+    <li>The paper states plainly: <b>the full matrix was not rerun after the repair</b>.</li>
+  </ul>
+  <p>This disclosure is the same problem as Appendix C.3's theoretical warning showing up in the measurements: C.3 already pointed out that "a buffer capacity $C_{\text{buf}}$ does not limit how many keys satisfy $U_i \ge \tau$ — if all scores equal $\tau$, every key passes even with exact bounds", and stressed that "dropping overflow candidates can lose required Top-K IDs". In other words, <b>this capacity repair is not tuning; it fixes a correctness problem</b>. It also exposes the method's real space cost: an extra 9.94 GiB of workspace at about 1M keys (the appendix does not give this as a fraction of a GPU's memory, so this page makes no estimate). Together, these are the two threads most worth pulling when judging whether DoSA can go to production.</p>
+
+  <div class="note"><b>Two more scope details that are easy to skip but matter:</b> <b>(1)</b> Figure 1's profiling was done with <b>both DoSA and LiteTopK disabled</b> (using real model weights and text), so it characterizes the cost of the <i>original</i> indexer, not DoSA's; <b>(2)</b> Appendix D.1 states explicitly that the indexer interval includes query/key preparation, key-cache access, scoring, and selection, while the denominator is the complete model prefill GPU interval, <b>excluding CPU tokenization and request transport and distinct from TTFT</b> — the paper draws this distinction deliberately, avoiding the common confusion of using a GPU share to explain end-to-end latency. D.1 also notes that 1K = 1,024 tokens, 375K = 384,000 tokens, and about 1M = 1,048,569 tokens, and declares that DeepSeek measurements beyond its declared context support a computational scaling observation, not a claim about task accuracy.</div>
+
+  <div class="takeaway"><b>Takeaway from this chapter:</b> the per-layer heatmaps break "fast on average" down into "reliable cell by cell", and honestly leave three losing cells in place; meanwhile the five remeasured candidate-storage cells are the most notable engineering signal in the whole paper — it shows that <b>the certificate's correctness reappears in real systems as "memory capacity"</b>, and that this part of the cost is not fully quantified.</div>
+</section>
+<!-- ================= 08 COMMENTARY ================= -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">Commentary: positioning, boundaries, and what deserves follow-up</h2>
+
+  <h3>8.1 What this paper genuinely gets right</h3>
+  <p><b>First, the problem is well chosen.</b> Between "saving" and "selecting" in sparse attention there has long been a tax that everyone tacitly accepts: to save 99% of the attention computation, you must first spend one full round of dense scoring. The paper quantifies that tax with Figure 1 as a 73.0%/90.8% share of time, and points at the gap between that and the 47.4%/83.2% share of arithmetic — <b>the observation that "time is more expensive than arithmetic" directly determines the design of the next two chapters</b> (not only compute less, but write less and select less). This is not a narrative where the method comes first and the motivation is patched in afterwards.</p>
+
+  <p><b>Second, "lossless" is made a verifiable strong property rather than a vague "approximation".</b> Theorem 1's phrasing is worth learning from: it explicitly distinguishes "returning exactly the same Top-K given a common total order" from "returning a valid Top-K set when no total order is specified", and explicitly notes that "valid tied Top-K sets need not yield identical generated text". Meanwhile both filters in Algorithm 1 <b>retain equality</b> ($U_i \ge \tau$ survives, $s_i \ge \tau$ survives) — a detail that is easy to get wrong in an implementation, and the paper writes it into the algorithm rather than leaving it for the reader to guess. Appendix C goes further, handling "lossless in real arithmetic" and "lossless in FP8" separately and giving a checklist of must-enclose-upward, must-be-conservative-RMS, and must-do-full-domain-recovery — <b>a responsible way of extending a correctness claim from the mathematics to the hardware.</b></p>
+
+  <p><b>Third, correctness and heuristics are cleanly decoupled.</b> The paper repeatedly stresses that the choice of $R$, the choice of $A$, and the estimate of $p_h$ <b>affect only efficiency, not correctness</b> ("The proof holds for any R"; "The frequencies guide efficiency, not correctness"). The significance is that any tuning for a particular hardware or model cannot break losslessness. By contrast, MISA-style schemes that "screen with fewer heads and rerank with the full indexer" can never <b>recover an already-excluded winner</b>, no matter how good the reranking is — the paper names this irreversibility in one sentence, its sharpest distinction from related work.</p>
+
+  <p><b>Fourth, the ablation answers "why it works", not merely "it works".</b> Figure 9's No-neg.-aggregate variant (survival 2.65% → 95.06%, latency 9.507×) is a highly informative negative result: it nails down, from theory (Proposition 6) to numbers, which of the certificate's three slack terms dominates. And the All-neg.-support variant (survival up to 4.06%, latency +12.0%) verifies the counterintuitive insight that you cannot simply stuff every negative head into the aggregate — <b>and that conclusion is actionable in engineering: activation-frequency statistics are necessary, and they cost one sampling pass.</b></p>
+
+  <h3>8.2 Where the techniques come from</h3>
+  <p>DoSA's two technical bloodlines are "upper-bound pruning from document retrieval" and "DSA's signed multihead scoring". Joining them required a fair amount of new machinery. The table below follows the paper's own inline citations:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Where DoSA's components come from (organized from the paper's inline citations; not a table from the paper)</caption>
+    <thead><tr><th>Component</th><th>Upstream as cited by the paper</th><th>What this generation changes / integrates</th></tr></thead>
+    <tbody>
+      <tr><td>Upper-bound pruning + running threshold</td><td>MaxScore (Turtle &amp; Flood, 1995), WAND (Broder et al., 2003), Block-Max WAND (Ding &amp; Suel, 2011)</td><td>Retrieval-side bounds are <b>block-level</b> (they must cover every key in the block, so they are loose for an individual candidate); DoSA switches to a <b>per-key</b> bound and tightens it using query-head geometry and activation structure</td></tr>
+      <tr><td>The pruned scoring function</td><td>DeepSeek Sparse Attention (DeepSeek-AI, 2025): multihead indexer + Top-K</td><td>Its definition and parameters are untouched; the certificate must fit the <b>ReLU-inside + signed weights</b> form and provide a strictly non-lower $U_i$</td></tr>
+      <tr><td>Exact Top-K engineering baseline</td><td>Radix selection (Zhang et al., 2023), GVR (Cheng et al., 2026), DeepSelect (Qian et al., 2026), LiteTopK (Yin et al., 2026)</td><td>Keeps the "streaming threshold + compact selection" idea, but inserts a layer of certified rejection <b>before</b> it, saving full-head scoring rather than only writeback</td></tr>
+      <tr><td>Fewer-head screening as an alternative</td><td>MISA (Zhou et al., 2026)</td><td>MISA screens with fewer heads and optionally reranks with full scores; <b>reranking cannot rescue an excluded winner</b>. DoSA instead proves "whatever was excluded is not a winner"</td></tr>
+      <tr><td>Mathematical tools for the ReLU reduction</td><td>Used by the paper itself in §2.3–2.4: ReLU subadditivity, positive homogeneity, Cauchy–Schwarz, Minkowski's inequality</td><td>Combined into five bounding tools, Eqs. (5)(9)(10)(11)(12), plus proofs of the optimal single-anchor allowance (Proposition 5) and the exact slack decomposition (Proposition 6)</td></tr>
+      <tr><td>Decoding-stage threshold prediction</td><td>GVR's temporal correlation (Cheng et al., 2026)</td><td>No full predict–verify–refine loop; only borrows "keys selected in recent steps as witnesses" to obtain a conservative threshold lower bound used to compact candidate records</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted" style="font-size:13px">Citations follow the paper's inline attributions; this page has not checked each entry against the bibliography.</p>
+
+  <h3>8.3 Limitations the paper states itself</h3>
+  <ul class="tight">
+    <li><b>Every key is still scanned:</b> "DoSA still scans every key" — what is saved is the per-key <b>full-head scoring</b>, not the scan itself. So if the certificate's preparation cannot be amortized thinly enough, short contexts lose more than they gain.</li>
+    <li><b>Short contexts or loose bounds may not pay off:</b> "short contexts or loose bounds can leave insufficient savings to offset screening".</li>
+    <li><b>Conservative evaluation is required:</b> numerical guarantees require conservative evaluation relative to the original scorer; valid tied Top-K sets need not yield identical generated text.</li>
+    <li><b>Computational benefit is proven; task accuracy is not:</b> "The measurements establish computational benefits, not improved task accuracy beyond a model's trained context."</li>
+  </ul>
+
+  <h3>8.4 Not disclosed, worth testing next</h3>
+  <p>The following are this page's questions after a full read, listed separately from the paper's own stated limitations:</p>
+  <ul class="tight">
+    <li><b>The candidate buffer's memory ledger:</b> Appendix D.4 discloses that the capacity repair adds 9.94 GiB of workspace (at about 1M keys), but <b>does not disclose</b> what fraction of GPU memory that is on the tested card, nor its effect on servable concurrency or maximum context. Since this bears directly on production viability, a memory–latency curve across different $C_{\text{buf}}$ values is worth adding, especially the <b>frequency with which the candidate pool fills and triggers full-domain recovery</b> — the paper only mentions in Figure 9 that timings "include recovery", and never gives the trigger rate.</li>
+    <li><b>Tail latency and worst case:</b> the paper reports speedups (median / geometric-mean style), and <b>does not disclose</b> p99 latency or behavior on the worst layer or worst input. Given that Figure 6 shows layer 1 pruning at only 89%–93% (all other layers above 95%), and Appendix D.4 notes four remeasured cells at layer 1, <b>shallow layers are where the system's tail risk lives</b> and deserve a distribution rather than a mean.</li>
+    <li><b>Cost and drift of the activation statistics:</b> majority support $A$ depends on seed-key activation frequencies $p_h$. The paper says frequency affects efficiency but not correctness, but <b>does not disclose</b> how many keys must be sampled for stability, the frequency and cost of updating $A$ online, or whether a domain switch requires resampling. If $A$ is sensitive to distribution drift, the hidden cost of per-domain tuning may be underestimated.</li>
+    <li><b>Joint tuning of head budget $r$ and $d_a$:</b> the paper gives Eq. (21)'s criterion (an extra head pays off only if it avoids enough full rescoring) and states that in the 32-head implementation $r = 14, 16$ use the absolute-value form while $r = 20$ uses the base form; but it <b>does not disclose</b> a measured comparison table of speedup and survival for those three paths. Since $r$ is the knob that directly determines $r + d_a$ (screening rows per key), that table would be key for both reproduction and tuning.</li>
+    <li><b>Independent reproduction and cross-framework consistency:</b> the evaluation rests on the authors' own kernel (flash-indexer) compared against SGLang/LiteTopK; there is <b>no visible</b> third-party reproduction on another inference stack (e.g. vLLM, TensorRT-LLM) or another sparse-attention variant. Moreover, the numerical conditions (Eqs. 26–28) rely on upward-enclosing evaluation and a conservative RMS, and the correctness of such implementations is hard to verify from the paper text alone; a stress test that deliberately injects rounding errors and checks that no winner is lost would be valuable.</li>
+    <li><b>A head-to-head against "approximate but faster" methods:</b> the paper positions DoSA as lossless, so its comparison with methods like MISA is at the <b>property level</b> (no guarantee of the original Top-K), not a head-to-head end-to-end speed contest. For users who care only about task accuracy and do not need bit-exact selection, the speed gap between lossless and approximate at equal accuracy is a worthwhile question the paper does not answer.</li>
+  </ul>
+
+  <h3>8.5 One-line assessment</h3>
+  <p>This is an <b>optimization paper that does both the correctness argument and the system implementation properly</b>. Its core idea (certified rejection by separating an upper bound from a lower bound) is not new; what is new and difficult is <b>building a tight yet cheap per-key certificate for the signed ReLU multihead scoring function inside an LLM</b> — positive heads covered by projecting onto already-computed heads, negative heads folded into a single aggregate row along the activation-majority direction, and Proposition 6 splitting the slack into three attributable blocks. Its account of its own boundaries is candid too (every key is still scanned, short contexts may not pay off, computation is proven but accuracy is not, and the full matrix was not rerun after the capacity repair). What will really decide whether it moves from "paper speedup" to "production gain" is probably not the certificate's mathematics but that 9.94 GiB workspace in Appendix D.4: <b>losslessness is more expensive than approximation largely in the places that never show up in the FLOPs.</b></p>
+</section>
+<!-- ================= 09 GLOSSARY ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Come back here whenever an abbreviation appears; abbreviations in the prose also show their definition on hover.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Reading glossary (abbreviations with a dotted underline in the prose reveal their definition on hover)</caption>
+    <thead><tr><th>Term</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>DoSA</td><td>Dots Sparse Attention</td><td>The paper's method: certified pruning of DSA's indexer via a score upper-bound certificate, preserving exact Top-K</td></tr>
+      <tr><td><abbr title="DeepSeek Sparse Attention">DSA</abbr></td><td>DeepSeek Sparse Attention</td><td>Scores with a multihead indexer and takes the Top-K to choose which tokens to attend (DeepSeek-AI, 2025)</td></tr>
+      <tr><td>Indexer</td><td>Indexer</td><td>The module that decides "which keys to look at"; the target of this paper's optimization</td></tr>
+      <tr><td>$H$ / $r$</td><td>Heads / Retained heads</td><td>$H$ is the total number of indexer heads; $r$ is the number of retained heads evaluated exactly, a tunable budget</td></tr>
+      <tr><td>$K$ / Top-K</td><td>Top-K selection</td><td>Each query keeps the $K$ highest-scoring keys; $K = 2048$ in the experiments</td></tr>
+      <tr><td>$\tau$ / $\tau^\ast$</td><td>Seed threshold / True threshold</td><td>$\tau = \tau_K(S)$ is the <b>lower bound</b> on the true threshold supplied by the seed set; $\tau^\ast$ is the full set's true $K$th largest score</td></tr>
+      <tr><td>$U_i$</td><td>Score upper bound</td><td>An <b>upper bound</b> on token $i$'s score; $U_i < \tau$ means certified rejection</td></tr>
+      <tr><td>$s_i$</td><td>Indexer score</td><td>The original score defined by Eq. (1); final selection uses only this</td></tr>
+      <tr><td>$\Delta_i$ / $\delta_i$ / $b$</td><td>Margin / Slack / Deficit</td><td>Selection margin ($\tau^\ast - s_i$), certificate slack ($U_i - s_i$), threshold deficit ($\tau^\ast - \tau$); rejection requires $\Delta_i > \delta_i + b$</td></tr>
+      <tr><td>$P$ / $N$ / $R$ / $A$</td><td>Positive / Negative / Retained / Aggregate</td><td>Omitted positive heads, omitted negative heads, the retained-head set, and the negative-aggregation support set</td></tr>
+      <tr><td>$E_P$ / $E_P^{\text{joint}}$</td><td>Positive residual allowance</td><td>The residual allowance for omitted positive heads; the joint version exploits residual-direction correlation and is strictly tighter</td></tr>
+      <tr><td>$p_h$</td><td>Activation frequency</td><td>How often negative head $h$ has a positive dot product on seed keys; used both for majority support $A$ and for retained-head priority</td></tr>
+      <tr><td><abbr title="Tensor Memory">TMEM</abbr></td><td>Tensor Memory</td><td>On-chip storage holding tensor-core accumulators on Blackwell; stages ❷❹ read bounds from it</td></tr>
+      <tr><td><abbr title="Matrix Multiply-Accumulate">MMA</abbr></td><td>Matrix Multiply-Accumulate</td><td>Tensor-core matrix multiply instruction; stages ❶❸ are executed by it</td></tr>
+      <tr><td><abbr title="Single Instruction Multiple Threads">SIMT</abbr></td><td>Single Instruction, Multiple Threads</td><td>The regular CUDA core execution model; stages ❷❹ use it for bound evaluation and reduction</td></tr>
+      <tr><td>G2S / T2R</td><td>Global-to-Shared / TMEM-to-Register</td><td>Two levels of data movement: memory→shared memory, and TMEM→registers</td></tr>
+      <tr><td><abbr title="Tensor Parallelism, 8-way">TP8</abbr></td><td>Tensor Parallelism (8-way)</td><td>The eight-way tensor parallelism used in the end-to-end experiments</td></tr>
+      <tr><td><abbr title="Time To First Token">TTFT</abbr></td><td>Time To First Token</td><td>The end-to-end metric: latency from request to the first output token</td></tr>
+      <tr><td><abbr title="High Bandwidth Memory">HBM</abbr></td><td>High Bandwidth Memory</td><td>GPU memory; sparse writeback saves exactly this bandwidth</td></tr>
+      <tr><td>Prefill / Decoding</td><td>Prefill / Decoding</td><td>Prefill (processing the whole prompt, many queries) and decoding (generating token by token, few queries)</td></tr>
+      <tr><td>Chunk</td><td>Prefill chunk size</td><td>The size of the query block processed at once during prefill (4K–32K)</td></tr>
+      <tr><td>Pruning rate</td><td>Certificate pruning rate</td><td>$p = 1 - N_{\text{keep}}/N_{\text{screen}}$, the ratio of query–key pairs before and after screening</td></tr>
+      <tr><td>Full-domain recovery</td><td>Full-domain recovery</td><td>When the numerical certificate is invalid, re-evaluating the original scorer and selector over all visible keys</td></tr>
+      <tr><td><abbr title="Approximate Nearest Neighbor-style retrieval evaluation">LOFT</abbr></td><td>LOFT</td><td>The source of the SciFact retrieval example used in the paper's ablation (Lee et al., 2024)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    This page is a hand-written reading companion to arXiv:2610.13990 "DoSA: Dots Sparse Attention". Figures are extracted from the paper at 300 DPI and displayed scaled (never cropped): 12 figures in total (the paper's main text and appendices contain no numbered tables); notes and any <b>[organized]</b> / <b>[estimated]</b> markers are the editor's.<br>
+    Paper: <a href="https://arxiv.org/abs/2610.13990">arXiv:2610.13990</a> · Code: <a href="https://github.com/llm-sys/flash-indexer">llm-sys/flash-indexer</a><br>
+    <span style="opacity:.75">Dark mode supported · click any image for the original · print friendly · <a href="DoSA论文精读_HTML.html" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文精读版</a></span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

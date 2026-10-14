@@ -151,8 +151,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(五篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the five flagship papers, quick-read editions for the other six).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(六篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the six flagship papers, quick-read editions for the other six).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -176,7 +176,7 @@
 <section id="matrix">
   <div class="sec-no">How to read the collection</div>
   <h2 class="sec">
-    <span class="i18n-zh">机制对照:11 篇论文的分工图</span>
+    <span class="i18n-zh">机制对照:12 篇论文的分工图</span>
     <span class="i18n-en">Mechanism matrix: how the eleven papers divide the work</span>
   </h2>
   <p class="axis">
@@ -246,6 +246,14 @@
       </tr>
       <tr>
         <td class="num">7</td>
+        <td class="pap"><a href="attention-kv-cache/dosa/">DoSA</a></td>
+        <td><span class="i18n-zh">indexer 里"给每个 key 打全部头分数"的那部分计算</span><span class="i18n-en">The all-head scoring of every key inside the indexer</span></td>
+        <td><span class="i18n-zh"><b>分数的上界证书</b>:正头投影到已算过的头上、负头按激活多数聚合成一行(每键、可证不丢 winner)</span><span class="i18n-en"><b>A score upper-bound certificate</b>: positive heads projected onto already-computed heads, negative heads aggregated into one row by activation majority (per-key, provably lossless)</span></td>
+        <td><span class="i18n-zh">零训练(纯推理期内核)</span><span class="i18n-en">Zero training (an inference-time kernel)</span></td>
+        <td><span class="i18n-zh">Indexer 最高 2.74× / 1.69×(vs SGLang / LiteTopK);TTFT 1.86× / 1.94×;剪枝率 97.2%–97.5%</span><span class="i18n-en">Indexer up to 2.74× / 1.69× (vs SGLang / LiteTopK); TTFT 1.86× / 1.94×; 97.2%–97.5% pruning</span></td>
+      </tr>
+      <tr>
+        <td class="num">8</td>
         <td class="pap"><a href="efficient-inference/deepseek-v41-flash/">DeepSeek-V4.1-Flash</a></td>
         <td><span class="i18n-zh">全栈:激活参数、KV cache 体积、量化位宽</span><span class="i18n-en">The whole stack: active parameters, KV-cache size, precision</span></td>
         <td><span class="i18n-zh">架构 + 缓存 + 精度协同(Causal Encoder-Decoder / CSA2 / FP4)</span><span class="i18n-en">Architecture + cache + precision together (Causal Encoder-Decoder / CSA2 / FP4)</span></td>
@@ -253,7 +261,7 @@
         <td><span class="i18n-zh">全局 KV cache 每 token 890 字节;DeepSWE v1.1 74.2;Codeforces 3471</span><span class="i18n-en">890 bytes/token global KV cache; DeepSWE v1.1 74.2; Codeforces 3471</span></td>
       </tr>
       <tr>
-        <td class="num">8</td>
+        <td class="num">9</td>
         <td class="pap"><a href="efficient-inference/reset/">ReSET</a></td>
         <td><span class="i18n-zh">NVFP4 量化带来的精度损失</span><span class="i18n-en">The accuracy lost to NVFP4 quantization</span></td>
         <td><span class="i18n-zh">按解码步骤调整 softmax 温度 + 小 M 解码内核</span><span class="i18n-en">Per-step softmax temperature + a small-M decode kernel</span></td>
@@ -261,7 +269,7 @@
         <td><span class="i18n-zh">AIME-120 +2.6(Qwen3-32B 77.5,超 BF16 的 75.8);内核 1.57–2.49×</span><span class="i18n-en">AIME-120 +2.6 (Qwen3-32B 77.5, above BF16's 75.8); kernels 1.57–2.49×</span></td>
       </tr>
       <tr>
-        <td class="num">9</td>
+        <td class="num">10</td>
         <td class="pap"><a href="efficient-inference/freetoken/">FreeToken</a></td>
         <td><span class="i18n-zh">单机显存与内存带宽瓶颈</span><span class="i18n-en">Single-machine memory and bandwidth limits</span></td>
         <td><span class="i18n-zh">带宽自适应执行</span><span class="i18n-en">Bandwidth-adaptive execution</span></td>
@@ -269,7 +277,7 @@
         <td><span class="i18n-zh">8GB 笔记本跑 35B;台式机跑 284B;单卡工作站跑 753B GLM-5.2</span><span class="i18n-en">35B on an 8GB laptop; 284B on a desktop; 753B GLM-5.2 on one workstation GPU</span></td>
       </tr>
       <tr>
-        <td class="num">10</td>
+        <td class="num">11</td>
         <td class="pap"><a href="efficient-inference/kite/">KITE / SST</a></td>
         <td><span class="i18n-zh">训练算力与 prefill 计算(扩容不延长 KV 生产路径)</span><span class="i18n-en">Training compute and prefill computation (expansion never extends the KV-producing path)</span></td>
         <td><span class="i18n-zh"><b>扩容只加在不产生 KV 的一侧</b>:Prefiller 产 KV、Decoder 读 KV(结构约束,不冻结权重)</span><span class="i18n-en"><b>Grow only the side that produces no KV</b>: a Prefiller that writes KV and a Decoder that reads it (a structural constraint, not frozen weights)</span></td>
@@ -277,7 +285,7 @@
         <td><span class="i18n-zh">67B SST prefill 活跃参数 1.12B(47B 基线 1.48B);训练损失 1.5900 最低;75:25 成本代理 −6.7% / −31.6%</span><span class="i18n-en">1.12B prefill active params for the 67B SST (vs 47B's 1.48B); lowest loss 1.5900; 75:25 cost proxy −6.7% / −31.6%</span></td>
       </tr>
       <tr>
-        <td class="num">11</td>
+        <td class="num">12</td>
         <td class="pap"><a href="benchmarks/mmlongembed/">MMLongEmbed</a></td>
         <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
         <td><span class="i18n-zh">基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型</span><span class="i18n-en">Benchmark construction: 4 tasks / 8 datasets / 8,460 queries / 11 models</span></td>
@@ -296,8 +304,8 @@
     <span class="i18n-en">🎯 Attention &amp; KV Cache</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">一层里「哪些 key 被看到」由谁决定。六篇按决策权排列:<b>结构/位置 → 复用已有选择 → 层内内容打分 → 层内学习路由 → 模型自己声明 → 不需要信号</b>。</span>
-    <span class="i18n-en">Who decides which keys a layer sees. The six papers run from external structure to the model itself, and finally to a deliberate refusal to decide: <b>position/structure → reuse of an existing choice → in-layer content scoring → an in-layer learned router → the model's own declaration → no signal at all</b>.</span>
+    <span class="i18n-zh">一层里「哪些 key 被看到」由谁决定。七篇按决策权排列:<b>结构/位置 → 复用已有选择 → 层内内容打分 → 层内学习路由 → 模型自己声明 → 不需要信号</b>;DoSA 是这一叠里的一个例外——它<b>不改变谁被看到,只改变"筛选"这件事要花多少算力</b>,用一张可证明不丢 winner 的分数上界把选择本身变成条件计算。</span>
+    <span class="i18n-en">Who decides which keys a layer sees. The seven papers run from external structure to the model itself, and finally to a deliberate refusal to decide: <b>position/structure → reuse of an existing choice → in-layer content scoring → an in-layer learned router → the model's own declaration → no signal at all</b>. DoSA is the exception in this stack — it <b>does not change who is seen, only what the screening costs</b>, turning selection itself into conditional computation via a score upper bound that provably discards no winner.</span>
   </p>
   <div class="cards">
 
@@ -418,6 +426,26 @@
       <div class="go">
         <a class="i18n-zh" href="attention-kv-cache/random-attention/">开始阅读 →</a>
         <a class="i18n-en" href="attention-kv-cache/random-attention/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">DSA Indexer · Top-K 选择 · 上界证书 · 无损剪枝 · GPU Kernel</span><span class="i18n-en">DSA Indexer · Top-K Selection · Upper-Bound Certificate · Lossless Pruning · GPU Kernel</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/dosa/">⑦ DoSA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">让"找 Top-K"这件事变成本身可以跳过的计算</span></a>
+        <a class="i18n-en" href="attention-kv-cache/dosa/en.html">⑦ DoSA<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Making "find the Top-K" a computation that can itself be skipped</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">稀疏注意力只访问少数 key,但"找出这些 key"仍要对每个 key 打全部头的分。DoSA 的核心观察是:<b>Top-K 选择只需要排除候选的充分证据,不需要它的完整分数</b>。于是构造一个严格不低于真实分数的上界 <i>U<sub>i</sub></i>,配一个由种子集合给出的阈值下界 <i>τ</i>——两者一旦分离就<b>认证式拒绝</b>该 key,最终选出的 token 与全量打分完全一致(<b>无损</b>)。难点在于打分函数带 ReLU 且头权重有正有负:正头投影到已算过的头上、负头按激活多数聚合成一行。<b>Indexer 最高 2.74× / 1.69×</b>,1M 上下文 TTFT <b>1.86× / 1.94×</b>,剪枝率 <b>97.2%–97.5%</b>。</span>
+        <span class="i18n-en">Sparse attention visits few keys, yet <i>finding</i> them still scores every key with every indexer head. DoSA's observation: <b>Top-K selection needs sufficient evidence to reject a candidate, not that candidate's full score.</b> Build an upper bound <i>U<sub>i</sub></i> that is never below the true score, pair it with a threshold lower bound <i>τ</i> from a seed set — once they separate, the key is <b>certifiably rejected</b>, and the final token set is identical to full scoring (<b>lossless</b>). The hard part is a signed ReLU scorer: positive heads are projected onto already-computed heads, negative heads aggregated into one row by activation majority. <b>Indexer up to 2.74× / 1.69×</b>, TTFT <b>1.86× / 1.94×</b> at 1M context, <b>97.2%–97.5%</b> pruning.</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">12 图</span><span class="i18n-en">12 figures</span></span><span>arXiv:<a href="https://arxiv.org/abs/2610.13990">2610.13990</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/dosa/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/dosa/en.html">Read in English →</a>
       </div>
     </div>
 

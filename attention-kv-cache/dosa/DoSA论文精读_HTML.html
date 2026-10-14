@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="DoSA(Dots Sparse Attention, arXiv:2610.13990)中文精读:用 Top-K 分数上界证书把 DSA indexer 的全头打分变成条件计算,全部图表 300 DPI 高清内嵌,图文配合。">
+<meta name="keywords" content="DoSA, Dots Sparse Attention, DSA, sparse attention, Top-K, indexer, 稀疏注意力, 长上下文, 论文精读, 论文解读, paper reading, Xiaohongshu">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DoSA: Dots Sparse Attention · 论文精读">
+<meta property="og:description" content="arXiv:2610.13990 中文精读:签名多头 indexer 的分数上界证书,无损精确 Top-K 选择,Indexer 最高 2.74× 加速。全部图表 300 DPI 内嵌。">
+<meta property="og:url" content="https://qqtang-code.github.io/DoSA-Project-Page/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>DoSA: Dots Sparse Attention 论文精读 · arXiv:2610.13990</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media print{.lang-toggle{display:none!important}}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">DoSA<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">观察</a>
+      <a class="jump" href="#s4">证书</a>
+      <a class="jump" href="#s5">系统</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">补充</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <a class="lang-toggle" href="en.html" title="Read in English"
+         onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">EN</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2610.13990</div>
+    <h1>DoSA: Dots Sparse Attention<br><span style="font-size:20px; font-weight:600; opacity:.9">让"找 Top-K"这件事变成本身可以跳过的计算</span></h1>
+    <div class="subtitle">稀疏注意力只访问很少的 key,但"找出这些 key"仍要对每个 key 用每个 indexer 头打一遍分。DoSA 的核心观察是:<b>Top-K 选择只需要"能否排除某个候选"的充分证据,而不需要它的完整分数</b>。论文据此构造了一个适配「带符号 ReLU 多头打分」的分数上界证书,在<b>不改变最终选中集合</b>的前提下把全头打分变成条件计算。</div>
+    <div class="meta">
+      <span>作者:Fanxu Meng<sup>*</sup>、Taosong Fang<sup>*†</sup>(Dots Studio, 小红书 Xiaohongshu Inc.)</span>
+      <span>论文:<a href="https://arxiv.org/abs/2610.13990">arXiv:2610.13990</a>(cs.LG, v1 2026-09-26)</span>
+      <span>代码:<a href="https://github.com/llm-sys/flash-indexer">github.com/llm-sys/flash-indexer</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">Sparse Attention</span>
+      <span class="pill">DeepSeek Sparse Attention</span>
+      <span class="pill">Top-K 选择</span>
+      <span class="pill">上界证书 / 安全剪枝</span>
+      <span class="pill">无损精确选择</span>
+      <span class="pill">GPU Kernel</span>
+      <span class="pill">长上下文 Prefill / TTFT</span>
+    </div>
+    <div style="margin-top:14px; font-size:13px; opacity:.85">
+      <sup>*</sup>共同一作,作者顺序由抛硬币决定;<sup>†</sup>通讯作者。
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图文按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:一句话与关键数字</a></li>
+    <li><a href="#s2">背景:稀疏注意力里的"稠密打分"瓶颈</a></li>
+    <li><a href="#s3">观察:排除一个候选,不需要它的完整分数</a></li>
+    <li><a href="#s4">方法:给带符号多头分数造一张"上界证书"</a></li>
+    <li><a href="#s5">系统:把证书落成 GPU 上的四段流水</a></li>
+    <li><a href="#s6">实验:从微基准到端到端 TTFT</a></li>
+    <li><a href="#s7">补充:把配置落到层号与张量上的走查</a></li>
+    <li><a href="#s8">点评:定位、边界与值得追问的地方</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<!-- ================= 01 速览 ================= -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览</h2>
+
+  <p class="lead">这篇论文要回答的问题很具体:<b>在 DeepSeek Sparse Attention(DSA)那类"多头 indexer + Top-K"的稀疏注意力里,能不能不算完所有分数,就确信自己不会漏掉任何一个本该入选的 token?</b>作者的答案是能——只要为每个候选键构造一个<b>严格不低于其真实分数的上界</b> $U_i$,再用一个<b>严格不高于真实 Top-K 阈值</b>的下界 $\tau$(由种子集合给出)。两者一旦分离($U_i < \tau$),这个 key 就被"证明"不可能进入 Top-K,可以安全丢弃。整个过程中最终选出的 token 与全量打分完全一致,所以论文称之为 <b>lossless(无损)</b>。</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">核心机制</div><div class="v">分数上界证书 + 固定种子阈值<small>证书排除候选,种子提供下界;边界值相等时一律保留</small></div></div>
+    <div class="item"><div class="k">选择正确性</div><div class="v">Exact Top-K(定理 1)<small>返回与全量打分相同的 Top-K(公共全序下完全一致)</small></div></div>
+    <div class="item"><div class="k">Indexer 微基准加速</div><div class="v">最高 2.74× / 1.69×<small>相对 SGLang 与 LiteTopK;60/60 个配置最快</small></div></div>
+    <div class="item"><div class="k">端到端 TTFT</div><div class="v">1.86× / 1.94×<small>GLM-5.2 与 DeepSeek-V3.2,约 1M token 输入,相对 SGLang</small></div></div>
+    <div class="item"><div class="k">剪枝率</div><div class="v">97.2%–97.5%<small>域平均;21 层中有 20 层 >95%</small></div></div>
+    <div class="item"><div class="k">模型配置</div><div class="v">32 / 64 头,Top-K=2048<small>GLM-5.2 / DeepSeek-V3.2;均 21 个产生 indexer 的层</small></div></div>
+  </div>
+
+  <div class="note"><b>读数约定:</b>本页全部数字以论文原文为准;凡由本页依据论文配置整理、归纳或换算的内容,均以「<b>整理</b>」「<b>推算</b>」显式标注,便于与论文口径区分。记号沿用论文:$H$ 为 indexer 头数,$r$ 为被直接求值的保留头数,$K$ 为 Top-K 的 K(实验中为 2048),$\Omega$ 为可见 key 集合,$[x]_+ = \max(x,0)$。图注末尾的「报告 p.X」指该图在原文 PDF 中的页码。</div>
+
+  <p>先把论文的四个贡献点位摊开——它们分别对应后面的四章:<b>(1) 证书</b>(第 ③④ 章):一个专门为"带符号的 DSA 分数"设计的每键上界,而不是直接套用文档检索里的 block-max 上界;<b>(2) 分析</b>(第 ④⑦ 章):把证书的松弛量 $\delta_i$ 与选择间距 $\Delta_i$、头预算 $r$ 联系起来,回答"这张证书什么时候有用、多留一个头值不值";<b>(3) 系统</b>(第 ⑤ 章):把"认证式拒绝"翻译成真的省下算力与显存流量,而不只是少算几个数;<b>(4) 实测</b>(第 ⑥ 章):英文/中文/代码三个域、60 个微基准配置、两个真实模型上的 TTFT。</p>
+
+  <div class="takeaway"><b>一句话总结:</b>DoSA 把"文档检索里的 WAND/MaxScore 式上界剪枝"搬到了 LLM 稀疏注意力的 indexer 上,但做了一件检索里不需要做的事——<b>让上界适配一个带 ReLU 的、有正负权重的多头归约</b>。正头用"投影到已算过的头上 + 残差范数"来兜住,负头用"激活模式决定的单一聚合方向"来兜住,再配一套把剪枝变成真实带宽节省的 GPU 实现。</div>
+</section>
+
+<!-- ================= 02 背景 ================= -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">背景:稀疏注意力里的"稠密打分"瓶颈</h2>
+
+  <p>稀疏注意力只让每个 query 去看少数的 key,复杂度看上去是降下来了。但"去看哪几个 key"这一步本身,在 DSA 里由一个有 $H$ 个头的 <b>indexer</b> 完成:每个头算一次 query 与 key 的点积,过 ReLU,再用一个可正可负的权重加权求和,最后取分数最高的 $K$ 个。论文把这件事写成:</p>
+
+  <div class="math">$$s_i = \sum_{h=1}^{H} w_h \,[\,q_h^\top k_i\,]_+ , \qquad i \in \Omega \tag{1}$$</div>
+
+  <p>其中 $q_h \in \mathbb{R}^D$ 是第 $h$ 个头的 query 向量,$w_h \in \mathbb{R}$ 是它的权重,$k_i$ 是第 $i$ 个 token 的 key。注意两个细节,它们后面会反复出现:<b>一是 ReLU 在加权求和之内</b>(所以是"先整流再带符号求和"),<b>二是权重 $w_h$ 有正有负</b>。正是这两点让"简单地少算几个头"变得不安全——丢掉一个正头会低估分数,丢掉一个负头会高估分数。</p>
+
+  <p>于是出现了一个结构性的矛盾:$s_i$ 本身是稀疏使用(只有 $K$ 个 key 最终被真的 attend),但<b>算出 $s_i$ 的过程是稠密的</b>——每个可见 key 都要被所有 $H$ 个头打分一遍。论文用真实模型把这件事量化了出来:</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: Indexer 占 prefill GPU 时间与理论矩阵 FLOPs 的比例随 prompt 长度增长">
+    <figcaption>
+      <b>Figure 1:</b> The indexer becomes a dominant cost of long-context prefill. Left: its fraction of prefill GPU time, including query/key preparation, scoring, and Top-K. Right: its fraction of theoretical matrix FLOPs. Each point averages two requests under SGLang; profiling and FLOP conventions are given in Appendix D.1.
+      <span class="zh"><b>中文解读:</b>左图是 indexer 在 prefill GPU 时间里的占比,右图是它在理论矩阵 FLOPs 里的占比;两组柱子分别是 GLM-5.2(蓝)与 DeepSeek-V3.2(黄)。逐点读:在约 1M token 时,indexer 占 GLM-5.2 prefill GPU 时间的 <b>73.0%</b>、占 DeepSeek-V3.2 的 <b>90.8%</b>;而对应的 FLOPs 占比只有 <b>47.4%</b> 与 <b>83.2%</b>。两张图并排看才是关键:<b>时间占比明显高于算术占比</b>(GLM-5.2 上 73.0% vs 47.4%),说明 indexer 的代价不只是"算得多",还包含选 Top-K 与中间结果读写带来的访存开销——这正是后面 DoSA 除了少算点积之外,还要顺带减少写回与选择工作的原因。曲线随长度单调上升,也预告了 Amdahl 意义上的结论:上下文越长,加速 indexer 越值。</span>
+      <span class="pgref">报告 p.2</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+
+  <h3>已有的三条加速路线,以及它们共同留下的那道缝</h3>
+  <p>论文把相关工作分成三类,并在每一类里指出"缝"在哪里:</p>
+  <ul class="tight">
+    <li><b>预测/复用式的稀疏选择:</b>NSA 把 token 压缩与细粒度选择结合(Yuan et al., 2025),MoBA 用专家路由做块注意力(Lu et al., 2025),DSA 用学到的多头 indexer 选 token(DeepSeek-AI, 2025);IndexCache 跨层复用索引(Bai et al., 2026),SparDA 预测下一层的选择(Fu et al., 2026),HISA 用层次化块索引 + token 精修(Xu et al., 2026),PIVOT 在 query 组之间共享 proxy 扫描(Liu et al., 2026),MISA 用更少的头筛选用完整 indexer 重排(Zhou et al., 2026)。论文的评价是:这些方法<b>不保证保持原打分器的 Top-K</b>,而且<b>重排无法把已经被排除的 winner 找回来</b>。</li>
+    <li><b>精确 GPU 选择与融合打分:</b>Radix selection 用逐位直方图缩小候选(Zhang et al., 2023),GVR 用解码期的时间相关性预测阈值(Cheng et al., 2026),DeepSelect 用有界缓冲区流式处理已物化的分数(Qian et al., 2026),LiteTopK 把全头打分与在线候选过滤融合(Yin et al., 2026)。这些方法加速的是 Top-K 选择本身,但<b>仍然依赖每个 key 的全头分数</b>。</li>
+    <li><b>经典文档检索里的分数上界:</b>MaxScore(Turtle &amp; Flood, 1995)与 WAND(Broder et al., 2003)用词项贡献上界 + 运行中的 Top-K 阈值来跳过不必要的文档打分,Block-Max WAND 进一步为每个 posting list 块收紧上界(Ding &amp; Suel, 2011)。论文在这里给出了自己的定位:<b>块级上界必须覆盖块内所有 key,对单个候选往往过松</b>,因而需要更紧的、per-key 的、能利用 query 头几何与激活结构的上界。</li>
+  </ul>
+
+  <div class="note"><b>把这条缝说清楚:</b>第 1 类方法牺牲了"与原始打分器一致"这个性质来换速度;第 2 类方法保住了正确性但没减少打分本身的工作量;第 3 类方法的原理对,但它的上界形式(块级)在 LLM indexer 这个场景里不够紧。<b>DoSA 要同时拿到"原始打分器的精确 Top-K"与"少算分数"</b>,所以必须新造一种上界。这就是论文那句自问自答的由来:<i>Can we avoid full-score computation while certifying that screening discards no winner?</i></div>
+</section><!-- ================= 03 观察 ================= -->
+<section id="s3">
+  <div class="sec-no">03 · Key Observation</div>
+  <h2 class="sec">观察:排除一个候选,不需要它的完整分数</h2>
+
+  <p>论文的出发点是一句朴素但常被忽略的话:<b>"进入 Top-K"是一个可以用反证来否定的事件。</b>要证明某个 key 不可能入选,我们不需要知道它的分数是多少,只需要知道它<b>至多</b>能有多高,并且这个上界已经低于"入选线"。形式化地说,选一个至少有 $K$ 个可见 key 的种子集合 $S \subseteq \Omega$,用原始打分器算出它们的第 $K$ 大分数 $\tau = \tau_K(S)$。因为 $S$ 只是 $\Omega$ 的子集,它的第 $K$ 大分数必然<b>不高于</b>全集的第 $K$ 大分数:</p>
+
+  <div class="math">$$\tau_K(S) \le \tau_K(\Omega), \qquad s_i \le U_i &lt; \tau_K(S) \;\Longrightarrow\; i \notin \mathrm{TopK}(\Omega) \tag{2}$$</div>
+
+  <p>这给出两个"方向相反"的量:$\tau_K(S)$ 是真实阈值的<b>下界</b>(种子越好越紧),$U_i$ 是 token 分数的<b>上界</b>(证书越紧越好)。两者严格分离,就完成了一次<b>认证式拒绝(certified rejection)</b>。论文同时指出两件工程上很重要的事:<b>差的种子会削弱过滤效果</b>;而<b>额外的精确分数只可能把阈值下界抬高</b>——也就是说,越算越安全,不会因为"多知道一点"反而漏掉 winner。</p>
+
+  <h3>为什么不能只保留一部分头就了事</h3>
+  <p>最自然的"省钱"办法是只算一部分头。论文用一段话就把这条路堵死了,值得原样理解:<b>丢掉正权重的头是不安全的</b>(会低估分数,把一个本该入选的 key 判死),<b>丢掉负权重的头是安全的但上界会很松</b>(因为负头是往下减的,忽略它们只会把上界抬高)。所以 DoSA 采取的策略不是"丢掉一部分头",而是"<b>直接精确算一部分头,给剩下的头造界</b>"。</p>
+
+  <p>具体地,令 $R$ 为 $1 \le r < H$ 个<b>保留头(retained heads)</b>。保留头的贡献被精确算出:</p>
+
+  <div class="math">$$S_R(k_i) = \sum_{j \in R} w_j \,[\,q_j^\top k_i\,]_+ \tag{3}$$</div>
+
+  <p>剩下的头被分成两组:$P = H_+ \setminus R$(被省略的<b>正</b>头,需上界)与 $N = H_- \setminus R$(被省略的<b>负</b>头,需下界其"减去的量")。保留头 $R$ 怎么选,论文给了一条依赖激活频率的规则(见下一章),但作者强调了一句很关键的话:<b>定理对任意 $R$ 都成立,选择 $R$ 只影响效率与紧度,不影响正确性。</b>这个"正确性与启发式解耦"的设计,是全文可信度的基础。</p>
+
+  <h3>"边算边收窄"要处理的一个现实问题:阈值必须固定</h3>
+  <p>经典检索里,阈值可以在扫描过程中随已见文档不断抬高(越扫越紧)。DSA 的场景不一样:候选是逐块扫描的,如果阈值在扫描中途变化,<b>前面已经按旧阈值拒绝掉的 key 就无法追回</b>。论文于是选择"<b>固定阈值</b>"——种子集合一旦定下 $\tau$,在整个 screening 与 refinement 阶段都不再改变(算法 1)。这个取舍牺牲了一部分潜在的紧度,换来的是可证明的、与扫描顺序无关的正确性。论文在附录 B.3 里把这个取舍的量写成了一个等式:$\Delta_i > \delta_i + b$ 才拒绝,其中 $b = \tau^* - \tau \ge 0$ 正是"固定阈值带来的亏欠"(阈值下界与真实阈值之间的差距),$\delta_i = U_i - s_i$ 是证书松弛。这个式子把"种子质量"和"证书紧度"两个独立的改进方向,干净地摆在了同一个不等式两边。</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: DoSA 执行总览,按 ❶–❹ 顺序阅读">
+    <figcaption>
+      <b>Figure 2:</b> DoSA execution overview, read in order ❶–❹: ❶ screening dot products; ❷ bound evaluation, pruning, and candidate compaction; ❸ full-head dot products for survivors; ❹ original-score reduction and sparse writeback. Tensor Cores execute stages ❶ and ❸; SIMT threads execute stages ❷ and ❹ using accumulators from Tensor Memory (TMEM), with gray and purple data tiles indicating avoided computation and writeback, respectively. The center sketches GPU resources; seed initialization and final Top-K selection are omitted.
+      <span class="zh"><b>中文解读:</b>这张图建议按编号读,它同时也是第 ⑤ 章 GPU 设计的路线图。<b>❶ 筛选点积</b>:用 $(r+d_a)$ 行的 $\tilde{Q}$ 与 key 块做张量核矩阵乘——注意这里不是 $H$ 行而是 $r+d_a$ 行,这是"省"的来源;<b>❷ 上界求值、剪枝与候选压缩</b>:由 TMEM 里的累加器算出 $U = p + R$,把 $U < \tau$ 的 key 丢掉,并把幸存者的 ID 压紧(compact);<b>❸ 幸存者全头点积</b>:只有活下来的 key 才拿去和完整的 $Q$、$K[\mathrm{IDs}]^\top$ 相乘,图中灰色块即"被认证省掉的计算";<b>❹ 原始分数归约与稀疏写回</b>:按式 (1) 做 ReLU + 加权求和,只把 $s \ge \tau$ 的记录写出去,图中紫色块即"被省掉的写回"。两张"省"的颜色编码(灰=省算力,紫=省带宽)是全页的视觉线索:DoSA 省的从来不只是 FLOPs。</span>
+      <span class="pgref">报告 p.3</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>这一章的要点:</b>证书的正确性只需要"上界不低、下界不高"这一条不等式,与保留头怎么挑、阈值怎么定无关;而工程上真正难的部分是把这条不等式做成<b>又紧又便宜</b>的上界,以及把"少算"变成"真的省"。前者是下一章(证书),后者是第 ⑤ 章(系统)。</div>
+</section>
+
+<!-- ================= 04 方法:证书 ================= -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">方法:给带符号多头分数造一张"上界证书"</h2>
+
+  <p>现在面对的是全文最核心的技术问题:给定式 (1) 这种"<b>ReLU 在内、权重有正有负</b>"的分数,如何为每个 key 构造一个便宜而且紧的上界 $U_i \ge s_i$?论文分别处理正头与负头,得到了两个性质不同的工具。</p>
+
+  <h3>4.1 省略的正头:投影到"已经算过的头"上,再用残差范数兜底</h3>
+  <p>对于每个被省略的正头 $h \in P$,论文在保留头集合 $R$ 里挑一个<b>锚(anchor)</b> $j_h^\star$,把 $q_h$ 分解成"沿锚方向的分量 + 残差":</p>
+
+  <div class="math">$$j_h^\star = \arg\max_{j \in R} \frac{[\,q_h^\top q_j\,]_+}{\lVert q_j \rVert_2}, \qquad \beta_h = \frac{[\,q_h^\top q_{j_h^\star}\,]_+}{\lVert q_{j_h^\star} \rVert_2^2}, \qquad d_h = q_h - \beta_h\, q_{j_h^\star} \tag{4}$$</div>
+
+  <p>接着用 ReLU 的次可加性、正齐次性与 Cauchy–Schwarz,得到:</p>
+
+  <div class="math">$$[\,q_h^\top k_i\,]_+ \le \beta_h\,[\,q_{j_h^\star}^\top k_i\,]_+ + \lVert d_h \rVert_2 \lVert k_i \rVert_2 \tag{5}$$</div>
+
+  <p>这个不等式值得停一下,因为它同时解释了"为什么便宜"和"为什么紧":<b>右式第一项复用了一个已经算过的保留头点积</b>(所以投影部分是免费的),<b>第二项只依赖 query 侧的 $d_h$ 和 key 侧的 $\lVert k_i \rVert_2$</b>——而 $\lVert k_i \rVert_2$ 对同一个 key 只算一次,可以跨所有正头共享。换句话说,被省略的正头并没有"消失",它们被折算进了一条残差容差里。</p>
+
+  <p>把所有省略正头的贡献汇总,定义折叠权重与总残差容差:</p>
+
+  <div class="math">$$\tilde{w}_j = w_j + \sum_{\substack{h \in P \\ j_h^\star = j}} w_h \beta_h , \qquad E_P = \sum_{h \in P} w_h \lVert d_h \rVert_2 \tag{6}$$</div>
+
+  <p>于是"保留头 + 省略正头"作为一个整体被 $ \sum_{j \in R} \tilde{w}_j [q_j^\top k_i]_+ + E_P \lVert k_i \rVert_2 $ 兜住。这里有个容易被误读的工程细节:$\tilde{w}_j$ 是<b>折叠权重(folded weights)</b>,它只存在于 screening 的这套计划里,<b>不会修改模型参数</b>。若 $P$ 为空(即所有正头都被保留),则 $E_P = 0$、$\tilde{w}_j = w_j$,退化成精确计算。</p>
+
+  <h3>4.2 为什么"非负投影"是最优的单锚选择</h3>
+  <p>论文在附录 B.1(命题 5)回答了一个自然的问题:锚与 $\beta$ 这么选,是不是最优的?结论是:在所有形如 $[q^\top k]_+ \le \beta [p^\top k]_+ + c\lVert k \rVert_2$ 的单锚上界里,<b>能达到的最小统一容差是 $c^\star = \min_{\beta \ge 0} \lVert q - \beta p \rVert_2$</b>,也就是"$q$ 到 $p$ 生成的<b>非负射线</b>的距离",且式 (4) 的取值恰好达到它。</p>
+  <p>证明本身很漂亮,值得记一句:若 $q^\top p \le 0$,代入 $k = q/\lVert q \rVert_2$ 会让锚项对所有 $\beta \ge 0$ 都消失,于是 $c \ge \lVert q \rVert_2 = c^\star$;否则令 $d = q - \beta^\star p$,投影满足 $d^\top p = 0$,代入 $k = d / \lVert d \rVert_2$ 同样让锚项消失而左边等于 $\lVert d \rVert_2$,故 $c \ge c^\star$。论文也诚实地划了边界:这优化的是<b>统一范数容差</b>,不是逐点最优的完整上界,也不是保留头集合的最优选择。</p>
+
+  <div class="note"><b>还有更紧的两条升级路线(附录 A.1),论文给了但主线用的是前者:</b><br>
+  <b>(a) 分组残差(grouped)</b>——把坐标分成 $G$ 组,每组用自己的残差范数 $E_{P,g}$,再用 Minkowski 不等式收成 $\big(\sum_g E_{P,g}^2\big)^{1/2}\lVert k_i \rVert_2$。由 Minkowski 可知它 $\le E_P$,即<b>严格更紧,代价不变</b>(仍然每个 key 一个 RMS 值)。<br>
+  <b>(b) 联合残差(joint)</b>——利用残差方向之间的相关性,式 (7) 给出 $E_P^{\text{joint}} = \frac{1}{2}\big(\lVert \sum_h u_h \rVert_2 + \sqrt{\sum_{h,\ell} |u_h^\top u_\ell|}\big) \le E_P$,其中 $u_h = w_h d_h$。它的收益来自残差几何,<b>不需要额外的 key 读取</b>,但 query 侧代价是省略正头数的平方级——所以论文把它当作可选 tightening,而不是默认路径。</div>
+
+  <h3>4.3 省略的负头:用一个"激活模式决定的方向"做聚合</h3>
+  <p>负头这一侧的处理是全文最有意思的设计,也是消融实验证明最关键的一环。负头的贡献是<b>往下减</b>的,所以要构造分数上界,就得给"减去的量"找一个<b>下界</b>。论文选取一个子集 $A \subseteq N$ 做聚合方向:</p>
+
+  <div class="math">$$a_A = \sum_{h \in A} |w_h|\, q_h , \qquad L_N(k_i) = [\,a_A^\top k_i\,]_+ \le \sum_{h \in N} |w_h|\,[\,q_h^\top k_i\,]_+ \tag{8}$$</div>
+
+  <p>由 ReLU 的次可加性,$L_N$ 不会超过"被省略负头真正减去的量",所以安全。接下来论文问了一个很尖锐的问题:<b>那为什么不干脆把所有负头都放进 $A$?</b>答案是本文一个反直觉但重要的洞见——<b>一个自身不活跃的头(点积为负、过 ReLU 后贡献 0),它的负点积却可以在聚合 ReLU 之前抵消掉其他活跃头的正点积</b>,从而让"减去的量"被低估、上界被放松。所以"多放一个头"并不单调地更好。</p>
+
+  <p>DoSA 用种子 key 的激活模式来解决这件事:对采样的种子 key 记录 $M_i = \{h \in N : q_h^\top k_i > 0\}$,$p_h$ 为头 $h$ 的激活频率,取<b>逐分量多数支持</b>:</p>
+
+  <div class="math">$$A = \{\, h \in N : p_h \ge 1/2 \,\}$$</div>
+
+  <p>论文证明了这是有依据的,而不是拍脑袋:定义可分离代理 $J(A) = \sum_{h \in A} a_h (1 - p_h) + \sum_{h \in N \setminus A} a_h p_h$(其中 $a_h = |w_h|\lVert q_h \rVert_2$),若采样掩码是同一组真实点积的符号,则 $J(A)$ 上界了 $\delta_N(k)/\lVert k \rVert_2$ 的样本均值;而每个头独立地在 $a_h(1-p_h)$ 与 $a_h p_h$ 之间二选一,<b>逐分量多数恰好最小化 $J$</b>,最小值为 $\sum_h a_h \min(p_h, 1-p_h)$。与此同时,前面保留头的挑选规则用同一个 $\min(p_h, 1-p_h)$ 作为优先级,正好把剩余项里最大的一批也拿掉——负头的"选谁保留"和"选谁聚合"是同一个代理目标下的两个决定。</p>
+
+  <p>还有一个漂亮的边界情形:如果某个新 key 的活跃集合恰好就是 $A$,那么聚合是<b>精确</b>的(两个松弛项同时为零);其他激活模式仍然安全,只是上界会松一些。<b>频率只影响效率,不影响正确性</b>——这句话值得记住,它意味着激活统计即使有噪声也不会破坏无损性。</p>
+
+  <h3>4.4 合起来:$U$ 的最终形式,以及每一项的松弛来源</h3>
+  <p>把式 (5)–(8) 合起来,得到本文的<b>分数证书</b>:</p>
+
+  <div class="math">$$U_i = \underbrace{\sum_{j \in R} \tilde{w}_j\,[\,q_j^\top k_i\,]_+}_{\text{保留头(放大的权重)}} + \underbrace{E_P \lVert k_i \rVert_2}_{\text{正头残差容差}} - \underbrace{[\,a_A^\top k_i\,]_+}_{\text{负头聚合}} , \qquad s_i \le U_i \tag{9}$$</div>
+
+  <p>论文进一步把"这张证书到底松在哪"拆成了三个非负项(附录 B.2,命题 6):</p>
+
+  <div class="math">$$U(k) - s(k) = \underbrace{\delta_P(k)}_{\text{正头投影}} \;+\; \underbrace{\sum_{h \in N \setminus A} c_h [x_h]_+}_{\text{漏掉的活跃负头}} \;+\; \underbrace{\min\{Z_A^+(k),\, Z_A^-(k)\}}_{\text{聚合抵消}} \tag{14}$$</div>
+
+  <p>其中 $c_h = |w_h|$、$x_h = q_h^\top k$、$Z_A^\pm$ 是聚合头里正负两侧的贡献量。三块的物理含义分别是:<b>(i)</b> 正头被投影近似所付出的代价;<b>(ii)</b> 那些真正活跃、却没被 $A$ 收进去的负头(白白少减了);<b>(iii)</b> 聚合内部正负相互抵消造成的损失。这个分解解释了为什么"负头聚合"是不可替代的:消融实验里去掉它,候选存活率从 2.65% 暴涨到 95.06%(下章详述)——因为它一旦缺席,第 (ii) 项就会把上界抬到几乎无用。</p>
+
+  <h3>4.5 走查:把论文的配置落到"层号 / 头数 / 张量"上</h3>
+  <p>抽象机制讲完后,值得做一次"配置走查",看看这条公式在真实模型里长什么样。以下数字全部取自论文的正文与附录,标注「整理」的部分是本页依据论文配置做的加总或换算:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>DoSA 关键配置走查(数据取自论文 §2.5、§4.1 与附录 C.1、D.2;「整理」为换算结果)</caption>
+    <thead><tr><th>配置项</th><th>论文给出的值</th><th>走查得到的结论</th></tr></thead>
+    <tbody>
+      <tr><td>GLM-5.2 的 indexer</td><td>$H = 32$ 头,Top-K $= 2048$,21 个产生 indexer 的层</td><td>32 头被分成"保留 $r$ + 省略正头 + 省略负头";保留头数 $r$ 是可调预算</td></tr>
+      <tr><td>$r$ 的实现路径</td><td>论文 §2.5 与附录 C.1:$r = 14, 16, 20$ 三条路径</td><td>$r = 14,16$ 走<b>绝对值形式</b>(所有正头已保留、$P = \varnothing$);$r = 20$ 走<b>基形式</b>并保留正头投影</td></tr>
+      <tr><td>辅助行数 $d_a$</td><td>两个 FP8 辅助行 $v_0, v_1$ 近似负头聚合($a_A \approx v_0 + v_1 + e_A$)</td><td><b>整理:</b>每个筛选请求的"逻辑点积行数"是 $r + 2$,而非 $H = 32$;例如 $r = 14$ 时为 16 行,约为满头的 50%</td></tr>
+      <tr><td>每键的筛选成本</td><td>式 (20) 的归一化工作模型</td><td><b>整理:</b>筛选只有在 $m < 1 - (r + d_a)/H$ 时才省逻辑点积(< $m = M/N_s$ 为存活率);取 $r = 14$、$d_a = 2$、$H = 32$,门槛约 $m < 0.5$——而实测存活率仅 2.65%,余量极大</td></tr>
+      <tr><td>剪枝率实测</td><td>21 层中 20 层 > 95%,域平均 97.2%–97.5%;第 1 层最低,89%–93%</td><td><b>整理:</b>对应存活率约 2.5%–2.8%,与附录 D.2 的 2.65% 一致</td></tr>
+      <tr><td>数值安全</td><td>式 (26):$U_i^{\mathrm{num}} = \mathrm{Eval}^{\uparrow}\!\big[\alpha_i(\hat{U}_i + \rho_i C) + \varepsilon_{\text{raw}} + \varepsilon_{\text{out}}\big]$</td><td>证书要在 FP8/FP32 下仍然成立,需要<b>向上取整</b>的包络、保守的 key RMS 摘要 $\rho_i$,并把舍入误差显式地做成容差项</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="takeaway"><b>这一章的要点:</b>正头投影解决"省略正头会低估",负头聚合解决"省略负头会高估",两者都是<b>每键、query 侧预计算、跨 key 共享</b>的结构——这正是它能比块级上界更紧、又比完整打分更便宜的原因。而命题 6 的三项松弛分解,提前预告了消融实验的结论:负头聚合是这张证书的命门。</div>
+</section><!-- ================= 05 系统 ================= -->
+<section id="s5">
+  <div class="sec-no">05 · GPU Kernel Design</div>
+  <h2 class="sec">系统:把证书落成 GPU 上的四段流水</h2>
+
+  <p>证书只保证了"少算",但 GPU 上"少算"未必等于"变快"。论文在开篇就把这个陷阱点破了:<b>认证剪枝减少了算术量,但不规则的幸存者集合会限制 GPU 利用率,还会引入零散的 key 访问。</b>第 ③ 章因此用三个具体的设计决定,把证书翻译成真实的收益。</p>
+
+  <h3>5.1 设计一:把 query 分组,让筛选走稠密张量核</h3>
+  <p>第一个决定是"分组 + 流水"。</p>
+  <ul class="tight">
+    <li><b>按保留头预算分组:</b>把保留头预算相近的 query 归进固定宽度的 tile,这样只需要少数几个筛选 kernel 就能用<b>稠密张量核 MMA</b>,避免了为每个 query 单独定制宽度带来的碎片化;</li>
+    <li><b>query 侧只准备一次:</b>保留的 query 行、折叠权重 $\tilde{w}_j$、以及两个 FP8 辅助行,<b>准备一次后跨所有 key tile 复用</b>——这是第 ③ 章反复强调的"query-side quantities are reused across keys"的落地;</li>
+    <li><b>阈值在扫描期固定:</b>用种子 key 的精确分数初始化每个 query 的阈值,扫描期间不再变化(与第 ③ 章的固定阈值取舍一致);</li>
+    <li><b>生产者/消费者分工:</b>专门的 warp 发异步 key 加载与 MMA,消费者 warp 从 TMEM 累加器里算上界;缓冲的 key tile 让加载与计算重叠。只有 $U_i^{\mathrm{num}} < \tau$ 才拒绝,并用 <b>warp ballot 把幸存决策压成紧凑掩码</b>供 refine 使用。</li>
+  </ul>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: 筛选、精修与稀疏写回的数据流">
+    <figcaption>
+      <b>Figure 3:</b> Data flow through screening, refinement, and sparse writeback. Blue and orange illustrate successive tiles within each stage, where key loading overlaps computation. SIMT threads evaluate bounds U from TMEM accumulators; gray full-head MMA blocks indicate work avoided through certified pruning. Compacted candidate IDs feed refinement, whose outputs are filtered before writeback. G2S and T2R denote global-to-shared and TMEM-to-register transfers.
+      <span class="zh"><b>中文解读:</b>这张泳道图把 Figure 2 的四个阶段摊成"数据在哪里流动"。纵向是硬件层级:<b>SIMT(算上界/归约)→ Registers(fragment)→ TMEM(MMA 累加器)→ Tensor Cores(打分 MMA)→ Shared Memory(tile 复用)→ Global Memory(输入与缓冲)</b>。横向分三段:<b>Pipeline initialization</b>(Q/K tile 交换)、<b>Fused screening</b>(蓝橙两色是同一阶段内相继的两个 key tile,展示加载与计算重叠)、<b>Fused refine + emit</b>。关键读法在 Tensor Cores 那一行:筛选中出现 <code>U &lt; τ pruned</code> 之后,后续的 <code>MMA full heads</code> 块被标成灰色——那是被认证省掉的全头计算;右下角的 <b>Sparse writeback</b> 则只让通过阈值的候选进入候选 ID 缓冲。G2S/T2R 是 global→shared 与 TMEM→register 的搬运标记,它们的存在提醒读者:<b>这套设计的优化目标里有一半是搬运,不是算术</b>。</span>
+      <span class="pgref">报告 p.5</span>
+    </figcaption>
+  </figure>
+
+  <h3>5.2 设计二:refinement 阶段共享 key 加载</h3>
+  <p>第二个决定针对的是"不规则访问"。如果每个 query 各自 gather 自己选中的 key,那么<b>被多个 query 同时选中的 key 会被反复加载</b>。论文的做法是把幸存掩码压成<b>共享流 + 每 query 流</b>:在一个 4 个 query 的组内,若某个 key 至少通过两个上界、且落在该组共同的可见范围内,就进入共享流(一次加载服务整组的全头打分);其余候选走每 query 流。论文明确承认这是一个<b>取舍</b>——它"用一些额外的 query–key 求值换取更少的 key 搬运"(trades some extra query–key evaluations for fewer key transfers)。这个取舍之所以成立,是因为在长上下文里搬 key 的代价(带宽)往往比多算几次点积更贵,与 Figure 1 里"时间占比高于算术占比"的观察互相印证。每个分数仍然按各自的阈值过滤,所以抽取结果不变。</p>
+
+  <h3>5.3 设计三:紧凑写回与精确选择</h3>
+  <p>第三个决定针对"写回与选择"。refinement 把全头打分与阈值过滤<b>融合</b>在一起:只有 $s_i^{\mathrm{ref}} \ge \tau$ 的记录才会产生输出。这些记录用<b>紧凑的单调分数编码 + 精确 key ID</b> 存储,从而同时降低 HBM 流量和选择阶段的输入规模。选择阶段的做法是:严格高于边界编码的记录直接保留,<b>恰好落在边界上的候选再用原始分数逐一裁决</b>。这个"边界单独处理"的细节是无损性的必要条件——它保证了定理 1 里"两种过滤器都保留等号"的要求在实现层面真的被遵守。</p>
+
+  <h3>5.4 解码阶段:换一个思路</h3>
+  <p>Prefill 阶段有大量 query,可以靠 query 分组摊薄证书准备工作。解码阶段每步只有很少的 query,<b>跨 query 组的 key 复用非常有限</b>,同一套收益结构不再成立。论文在这里换了思路保留完整 FP8 打分,转而利用<b>时间一致性</b>:最近若干步里被选中的那些 key 提供了"证人(witness)",用它们在当前 query 上的分数可以给出一个保守的 Top-K 阈值下界;达到或超过这条下界的分数被压紧以供精确选择,同时更新证人集合与选中的索引。所以解码期的收益来源是<b>减少选择工作</b>,而不是减少打分——这解释了 Figure 5 里解码加速(1.06×–1.26×)远小于 prefill 加速的现象。</p>
+
+  <div class="note"><b>附带的数值工程(附录 C):</b>证书要在真实硬件上成立,必须把 FP8/FP32 的舍入误差显式地做成容差。论文给出了式 (26) 的形式 $U_i^{\mathrm{num}} = \mathrm{Eval}^{\uparrow}[\alpha_i(\hat{U}_i + \rho_i C) + \varepsilon_{\text{raw}} + \varepsilon_{\text{out}}]$,并强调三点:<b>(1)</b> 必须用<b>向上取整</b>的包络(定向舍入或显式误差界),"round-to-nearest alone is insufficient";<b>(2)</b> 保守的 key RMS 摘要必须满足 $\rho_i \sqrt{D} \ge \lVert \bar{k}_i \rVert_2$,最近舍入的 RMS 不够;<b>(3)</b> 一旦出现非有限值或无法建立覆盖,证书即失效,该 query 保持 flagged 状态,直到走<b>全域恢复(full-domain recovery)</b>——即用原始打分器与选择器把<b>所有可见 key(包括在错误检测之前就被丢弃的那些)</b>重新算一遍。论文特别警告:<b>"从不完整的缓冲区里重新选择"是不够的。</b>这一节读起来像一份工程契约,它划清了"数学上无损"与"在浮点硬件上无损"之间的距离。</div>
+</section>
+
+<!-- ================= 06 实验 ================= -->
+<section id="s6">
+  <div class="sec-no">06 · Experiments</div>
+  <h2 class="sec">实验:从微基准到端到端 TTFT</h2>
+
+  <p>先把实验台子交代清楚,后面的数字才好读。论文在 NVIDIA GPU 上评测 <b>GLM-5.2</b>(32 个 indexer 头)与 <b>DeepSeek-V3.2</b>(64 个头),两者 Top-K 均为 2048;<b>微基准在单卡上跑 GLM-5.2</b>,<b>端到端用 8 路张量并行(TP8)</b>,prefill chunk 分别为 32K(GLM-5.2)与 16K(DeepSeek-V3.2)。工作负载取自 InfiniteBench 的英文/中文书籍与代码,补充 Project Gutenberg 与 SQLite 源码以拉长上下文,每个域按 token 化后的长度挑样本,截取 128K 到约 1M token 的连续上下文。基线是 <b>SGLang v0.5.18</b>(全多头打分 + Top-K)与 <b>LiteTopK</b>(把打分、候选过滤与选择融合)。计时用 CUDA events,预热后测量;端到端用 TTFT,并且在请求之间<b>清空 prefix cache</b>。</p>
+
+  <h3>6.1 Prefill 微基准:60 个配置里全胜,且随长度拉开差距</h3>
+  <p>微基准扫描 128K/256K/512K/768K/1M 五档上下文 × 4K/8K/16K/32K 四档 chunk,共 60 个配置,每个配置重放最后一个 query chunk 覆盖全部 21 个 indexer 层,<b>而且把 query/key 准备工作也算进延迟里</b>(这一点很重要——证书的准备工作是成本,不能藏在计时之外)。</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: 不同上下文长度、输入域与 prefill chunk 下的完整 Indexer 加速比">
+    <figcaption>
+      <b>Figure 4:</b> Complete-Indexer speedup over SGLang across context lengths, input domains, and prefill chunk sizes.
+      <span class="zh"><b>中文解读:</b>纵轴是相对 SGLang 的加速比(所以 SGLang 与 LiteTopK 自身是 1× 基准线),横轴是上下文长度(128K–1M),三行分别是英文/中文/代码三个域,四列是 4K/8K/16K/32K 四档 chunk。读法上最该注意两件事:<b>(1) 绿色柱(DoSA)在全部 60 个配置里最高</b>,对 SGLang 的加速在 <b>1.12×–2.74×</b> 之间,在 512K 及以上<b>每个配置都超过 2×</b>;对 LiteTopK 为 <b>1.17×–1.69×</b>;在 1M 时达到 2.47×–2.74×(vs SGLang)与 1.47×–1.69×(vs LiteTopK)。<b>(2) 曲线形状是"随长度涨、随 chunk 平"</b>:论文的解释是,更长的上下文扩大了每个 query 要评估的 key 集合,而<b>证书的准备工作被复用</b>;增大 chunk 只是把 query batch 一起放大,对所有方法同向变化。论文把这个对比总结成一句很好的话:<b>DoSA 主要收益来自沿"长 key 维度"削减工作。</b>另外,与 LiteTopK 的对比把"融合"和"认证拒绝"两种收益分开了——LiteTopK 已经省掉了分数流量与选择开销,但全多头计算原封不动,而 DoSA 拆掉的正是这块。</span>
+      <span class="pgref">报告 p.6</span>
+    </figcaption>
+  </figure>
+
+  <p>论文还做了一个很具体的敏感性对比,值得单独记下:<b>英文输入、16K query 时,加速比从 128K 的 1.19× 涨到 1M 的 2.58×;而在 1M 处把 query chunk 从 4K 放大到 32K(八倍),加速比只从 2.47× 变到 2.69×。</b>一个变量带来 2.2× 的增长,另一个变量八倍变化只带来约 0.2× 的差异——这干净地把"收益来自 key 维度的稀释"这件事证明了。</p>
+
+  <h3>6.2 剪枝率:证书到底拒掉了多少</h3>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: 跨 GLM-5.2 各层的证书剪枝率">
+    <figcaption>
+      <b>Figure 6:</b> Certificate pruning rates across GLM-5.2 layers, averaged within each input domain.
+      <span class="zh"><b>中文解读:</b>这里剪枝率的定义是 $p = 1 - N_{\text{keep}}/N_{\text{screen}}$,即 screening 前后的 query–key 对数之比。三条线(英文/中文/代码)在 21 个层里有 20 个超过 95%,域平均为 <b>97.2%–97.5%</b>。最值得注意的是<b>三个域的曲线形状几乎重合</b>:都在第 1 层出现明显低谷(89%–93%,即仍有近九成对被拒),其余层全部 >95%。论文据此给出的判断是:<b>决定剪枝效果的是"层的分数几何",而不是输入的语言或模态</b>——这是一个比"我们在三个域都很快"更强、也更有信息量的结论。用附录 B.3 的语言说,大多数 key 与 Top-K 边界之间的选择间距 $\Delta_i$ 足够大,以至于即使证书有松弛 $\delta_i$、阈值有亏欠 $b$,也仍然满足 $\Delta_i > \delta_i + b$。</span>
+      <span class="pgref">报告 p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.3 解码阶段:收益来自选择而非打分</h3>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: 解码 Indexer 相对 SGLang 的加速比">
+    <figcaption>
+      <b>Figure 5:</b> Decoding Indexer speedup over SGLang.
+      <span class="zh"><b>中文解读:</b>负载由 HELMET、InfiniteBench、LongBench v2 构造的文档分析请求与 SQLite 的代码审查请求组成,每个负载把约 1M token 的 KV cache 填满等长请求。在 256K / 512K / 约 1M 的请求长度上,DoSA 对解码 indexer 的加速分别是 <b>1.06× / 1.11× / 1.26×</b>。这组数字比 prefill 温和得多,原因在第 ⑤ 章已经交代:解码每步 query 太少,跨 query 分组的 key 复用空间有限,所以 DoSA 在解码期<b>不省打分,只省选择工作</b>(用最近步被选中的 key 作证人,给出保守阈值以压紧记录)。把它与 prefill 的 2.74× 并置,恰好说明了本文收益结构的前提:query 端的批量与复用。</span>
+      <span class="pgref">报告 p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.4 消融:screening 与 sparse writeback 各占多少</h3>
+
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7: screening 与 sparse writeback 的消融">
+    <figcaption>
+      <b>Figure 7:</b> Screening and sparse writeback ablation.
+      <span class="zh"><b>中文解读:</b>四种配置是 <b>Base</b>(两者都不开)、<b>Full</b>(只开 sparse writeback)、<b>Dense</b>(只开 screening)、<b>DoSA</b>(两者都开);负载是 LOFT 的 SciFact 检索样例,16K query × 896K key,取 21 层的平均检索延迟。逐柱读:76.2 ms(Base)→ 58.4 ms(Full,−23.4%)→ 47.7 ms(Dense,−37.4%)→ 40.2 ms(DoSA,−47.3%),即相对 Base 的 <b>1.90×</b>。交叉对比更能说明问题:在 Full 之上加 screening 再省 <b>31.1%</b>,在 Dense 之上加 sparse writeback 再省 <b>15.7%</b>。论文的解读是:Full 虽然避开了稠密写回,但每个头照样要算,它到 DoSA 的差距就是<b>融合本身无法消除的那部分计算</b>;Dense 则相反,分数少算了,稠密的中间结果仍然吃掉 HBM 带宽。<b>结论是:剪枝必须配一套匹配的执行策略才能兑现收益。</b></span>
+      <span class="pgref">报告 p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.5 证书组件消融:哪一块是命门</h3>
+
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9: 证书各组件对筛选与 Indexer 延迟的影响">
+    <figcaption>
+      <b>Figure 9:</b> Effects of certificate components on screening and Indexer latency. Bars show the mean candidate survival rate and geometric mean latency relative to DoSA. Breaks mark bars beyond the displayed range; annotations give their measured values.
+      <span class="zh"><b>中文解读:</b>五个变体是 DoSA 本体、<b>All-neg. support</b>(把所有省略负头都放进聚合)、<b>No neg. aggregate</b>(去掉负头聚合)、<b>Strength-only</b>(只按强度挑保留负头)、<b>No pos. projection</b>(去掉正头投影)。左图是候选存活率(越低越好),右图是相对 DoSA 的 Indexer 延迟(越低越好,且<b>这些计时包含了候选池填满时的恢复开销</b>)。最刺眼的一行是 <b>No neg. aggregate:存活率从 2.65% 飙到 95.06%,延迟变为 9.507×</b>——将近十倍。论文的结论很直接:<b>负贡献对"给带符号 Indexer 分数拿到紧证书"是本质性的</b>,少了它筛选几乎失效(这与命题 6 里第 (ii) 项松弛的分析完全吻合)。第二个变体 <b>All-neg. support</b> 也验证了第 ④ 章那个反直觉的洞见:把所有负头都塞进聚合反而更差(存活率升到 4.06%,延迟 +12.0%),说明"激活模式决定支持集"确实有用。另外两个变体(<b>Strength-only</b> 2.84%、<b>No pos. projection</b> 2.66%)在此负载上影响很小;论文补充说明,正头投影在评测的 query-layer 行里<b>只有 0.42% 真正被需要</b>——这是一个诚实且信息量很大的数字:它说明该机制在此工作负载下几乎总是退化路径,而不是主要贡献者。</span>
+      <span class="pgref">报告 p.19</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10: 证书各组件在逐层上的影响">
+    <figcaption>
+      <b>Figure 10:</b> Layer-wise effects of certificate components on candidate survival and Indexer latency. Each layer aggregates the same sample sets. Both vertical axes use logarithmic scales.
+      <span class="zh"><b>中文解读:</b>这是 Figure 9 的逐层展开,两个纵轴都是对数刻度——这一点必须留意,否则会严重误读视觉差距。左图(存活率)中,"No neg. aggregate"曲线在大多数层都贴着接近 100% 的上沿,与 DoSA 的 2–3% 有<b>一到两个数量级</b>的距离。右图(相对延迟)显示出一个有结构的现象:<b>把所有负头都放进聚合的代价在浅层最严重,第 2 层达到 3.41×</b>。这与 Figure 6 里"第 1 层剪枝率最低"的观察相互呼应——浅层的分数几何本来就最难拒绝,证书的紧度在这里最吃紧,任何松弛都会被放大。</span>
+      <span class="pgref">报告 p.20</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.6 端到端 TTFT:收益随上下文变强</h3>
+
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8: GLM-5.2 与 DeepSeek-V3.2 上不同输入长度的 TTFT">
+    <figcaption>
+      <b>Figure 8:</b> Time to first token across input lengths on (a) GLM-5.2 and (b) DeepSeek-V3.2.
+      <span class="zh"><b>中文解读:</b>注意两张子图的<b>纵轴刻度不同</b>:(a) GLM-5.2 是 0–100 s,(b) DeepSeek-V3.2 是 0–400 s,所以不能横向比高度。在约 1M token 处,DoSA 把两个模型的 TTFT <b>几乎减半</b>:相对 SGLang 为 <b>1.86×</b>(GLM-5.2)与 <b>1.94×</b>(DeepSeek-V3.2),相对 LiteTopK 为 <b>1.26×</b> 与 <b>1.50×</b>。图中标注的 131.60 s 与 475.31 s 是基线在 1M 处的 TTFT。(a) 图里还有一个细节:在 128K/256K 处三条柱几乎等高(DoSA 的领先很小),到 768K–1M 才明显拉开——这正是 Amdahl 效应的直接体现。</span>
+      <span class="pgref">报告 p.8</span>
+    </figcaption>
+  </figure>
+
+  <p>论文用 Amdahl 定律把"为什么增益随长度变强"讲清楚了:设 indexer 时间占比 $f$、indexer 加速 $s$,整体加速为 $S = (1 - f + f/s)^{-1}$。GLM-5.2 的 $f$ 从 128K 的 23.6% 涨到 1M 的 73.0%,DeepSeek-V3.2 在 1M 达到 90.8%。$f$ 越大,加速 indexer 能拿走的请求延迟份额越大。论文也解释了为什么 <b>TTFT 加速(1.86×/1.94×)小于 indexer 加速(最高 2.74×)</b>:注意力层与前馈层仍在贡献请求延迟,indexer 不是全部。</p>
+
+  <div class="takeaway"><b>实验章的三条结论:</b><b>(1)</b> DoSA 在全部 60 个微基准配置中最快,且优势随上下文长度单调扩大,说明收益来自削减"长 key 维度"的工作量;<b>(2)</b> 剪枝率 97%+ 且跨语言/模态几乎不变,说明这是分数几何的性质而非数据性质;<b>(3)</b> 消融区分了三种收益——算力(screening)、带宽(sparse writeback)、选择(compact records),其中负头聚合是证书能否成立的命门。</div>
+</section><!-- ================= 07 补充 ================= -->
+<section id="s7">
+  <div class="sec-no">07 · Additional Analysis</div>
+  <h2 class="sec">补充:逐层检索速度与一处值得细读的工程披露</h2>
+
+  <p>附录 D.4 给出了 21 层 × 12 个输入样本 = 252 个格子的逐层检索加速热力图,计时口径是"在准备好的 query/key 上做打分与选择",<b>不含 query/key 准备</b>(与微基准的口径不同,读的时候要注意)。</p>
+
+  <figure class="fig">
+    <img src="figs/fig11.png" alt="Figure 11: 最后 32K query 上逐层相对 SGLang 的检索加速比">
+    <figcaption>
+      <b>Figure 11:</b> Per-layer retrieval speedup over SGLang for the final 32K queries. Columns identify inputs and context lengths; rows identify indexer layers. Crosses mark cells slower than the baseline. The logarithmic color scale is centered at 1×. Five cells use the capacity-repair remeasurements specified in Appendix D.4.
+      <span class="zh"><b>中文解读:</b>列是 12 个输入样本(英文 EN01–EN04、中文 ZH01–ZH04、代码 CD01–CD04)及其上下文长度(132K 到 1M),行是 indexer 层号,颜色是相对 SGLang 的加速比,<b>对数色标以 1× 为中心</b>(所以浅色未必代表"快",要看相对中点的方向),叉号标记比基线<b>慢</b>的格子(即 <1×)。结论是:在实测的格子里,DoSA 对 SGLang <b>252 次比较中赢 251 次(99.6%)</b>,对 LiteTopK 赢 <b>250/252(99.2%)</b>;21 层每一层都至少在一个输入上对 SGLang 达到 2× 以上,最高 <b>3.74×</b>;对 LiteTopK 最高 2.08×。那三次落后的比较带来 0.7%–9.0% 的延迟增加,论文<b>选择保留在图中</b>而不是抹掉——这一点值得肯定。总体看每一层的<b>中位数</b>加速在两个基线上都 >1×。</span>
+      <span class="pgref">报告 p.21</span>
+    </figcaption>
+  </figure>
+
+  <figure class="fig">
+    <img src="figs/fig12.png" alt="Figure 12: 最后 32K query 上逐层相对 LiteTopK 的检索加速比">
+    <figcaption>
+      <b>Figure 12:</b> Per-layer retrieval speedup over LiteTopK. Input and layer ordering, timing scope, remeasured cells, and color scale match Figure 11; crosses retain the two comparisons slower than the baseline.
+      <span class="zh"><b>中文解读:</b>与 Figure 11 同结构、同色标、同计时口径,只是基线换成 LiteTopK。它在这里的作用是把"融合带来的收益"与"认证拒绝带来的收益"分开:一个已经在打分阶段做了融合、省掉了分数写回与选择输入的基线,仍然被 DoSA 以更高比例超过——论文据此论证<b>"避免分数计算"在打分与选择已被融合之后依然能改善服务延迟</b>。把两张图并排看,颜色的整体深浅变化不大,说明这个优势不是由某一两个输入样本带偏的。</span>
+      <span class="pgref">报告 p.21</span>
+    </figcaption>
+  </figure>
+
+  <h3>一处值得单独读的工程披露:候选存储容量修复</h3>
+  <p>附录 D.4 里有一段坦率的"测量范围说明",信息量很大,值得逐点理解:</p>
+  <ul class="tight">
+    <li>矩阵保留了原始运行的 <b>247 个格子</b>,在发现<b>候选存储容量问题并修复</b>之后,用三种方法的配对测量<b>替换了 5 个格子</b>:EN01 的第 26 层,以及 EN02、EN04、ZH04、CD04 的第 1 层;</li>
+    <li>修复保持了打分与选择规则、四锚初始化与 16K 的内部 query scratch 不变;在约 1M key 的容量下,它为每个 query 预留 1,024 个候选 ID 页与 114,688 条输出记录,相对原始分配<b>增加了 9.94 GiB 的工作区</b>;</li>
+    <li>论文明确声明:<b>修复之后没有重跑完整矩阵</b>。</li>
+  </ul>
+  <p>这段披露与附录 C.3 的理论警告是同一个问题在实测中的现身:C.3 早就指出"缓冲区容量 $C_{\text{buf}}$ 并不限制有多少 key 满足 $U_i \ge \tau$——如果所有分数都等于 $\tau$,即使界是精确的,每个 key 都会通过",并强调"丢弃溢出的候选会丢失必需的 Top-K ID"。也就是说,<b>这次容量修复不是调参,而是在修一个正确性问题</b>。而它同时暴露了这套方法的真实空间代价:约 1M key 时额外 9.94 GiB 工作区(附录未给出该数值占单卡显存的比例,故本页不做推算)。这两点合起来,是评估 DoSA 能否上生产时最该追的两条线索。</p>
+
+  <div class="note"><b>另外两个容易被略过但重要的口径细节:</b><b>(1)</b> Figure 1 的 profiling 是在 <b>DoSA 与 LiteTopK 都禁用</b>的情况下做的(用真实模型权重与文本),所以它刻画的是"原始 indexer 的代价",不是 DoSA 的代价;<b>(2)</b> 附录 D.1 明确说明 indexer 区间包含 query/key 准备、key-cache 访问、打分与选择,分母是完整的模型 prefill GPU 区间,<b>排除了 CPU 分词与请求传输,并且与 TTFT 是不同的量</b>——论文特意做了这个区分,避免了用 GPU 占比去解释端到端延迟的常见混淆。此外 D.1 说明 1K = 1,024 token、375K = 384,000 token、约 1M = 1,048,569 token,并声明 DeepSeek 超出其声明上下文支持的测量"只支持计算伸缩性观察,不构成任务精度的结论"。</div>
+
+  <div class="takeaway"><b>这一章的要点:</b>逐层热力图把"平均很快"拆成了"逐格可靠",并诚实地留下了三个落后格子;而候选存储那 5 个格子的重测,是全文最值得注意的工程信号——它说明<b>证书的正确性在真实系统里会以"内存容量"的形式重新出现</b>,而这部分代价论文没有完全量化。</div>
+</section>
+
+<!-- ================= 08 点评 ================= -->
+<section id="s8">
+  <div class="sec-no">08 · Commentary</div>
+  <h2 class="sec">点评:定位、边界与值得追问的地方</h2>
+
+  <h3>8.1 这篇论文真正做对了什么</h3>
+  <p><b>第一,问题选得准。</b>稀疏注意力的"省"和"选"之间有一道长期被默认接受的税:为了省下 99% 的 attention 计算,必须先花掉一次稠密打分。论文用 Figure 1 把这笔税量化成了 73.0%/90.8% 的时间占比,并指出它与 47.4%/83.2% 的算术占比之间的落差——<b>"时间比算术更贵"这个观察直接决定了后面两章的设计</b>(不但要少算,还要少写、少选)。这不是一个先有方法再补动机的叙事。</p>
+
+  <p><b>第二,把"无损"做成了可验证的强性质,而不是模糊的"近似"。</b>Theorem 1 的陈述方式值得学:它明确区分了"给定公共全序时返回完全相同的 Top-K"与"未规定全序时返回一个合法的 Top-K 集合",并且明确说明"有效的并列 Top-K 集合不必然产生相同的生成文本"。同时 Algorithm 1 里两处过滤器都<b>保留等号</b>($U_i \ge \tau$ 保留、$s_i \ge \tau$ 保留),这个细节在实现里很容易写错,论文把它写进了算法而不是留给读者猜。附录 C 进一步把"实数的无损"与"FP8 上的无损"分开处理,给出了必须向上取整、必须保守 RMS、必须全域恢复的清单——<b>这是把正确性主张从数学层延伸到硬件层的负责任做法。</b></p>
+
+  <p><b>第三,正确性与启发式被干净地解耦。</b>论文反复强调:$R$ 的选取、$A$ 的选取、$p_h$ 的估计<b>都不影响正确性,只影响效率</b>("The proof holds for any R"; "The frequencies guide efficiency, not correctness")。这个设计的意义在于:任何针对特定硬件或模型的调优都不会破坏无损性。相比之下,MISA 那类"用更少头筛选 + 全 indexer 重排"的方案,无论重排做得多好,<b>都不可能把已被排除的 winner 找回来</b>——论文用一句话点出了这个不可逆性,是全文对相关工作最有力的一次区分。</p>
+
+  <p><b>第四,消融实验回答了"为什么有效",而不只是"有效"。</b>Figure 9 的 No-neg.-aggregate 变体(存活率 2.65% → 95.06%,延迟 9.507×)是一个信息量极高的负结果:它把"证书的三项松弛里哪一项是主导"从理论(命题 6)坐实到了数字上。而 All-neg.-support 变体(存活率升到 4.06%、延迟 +12.0%)则验证了"不能把负头全塞进聚合"这个反直觉洞见——<b>这条结论在工程上是可操作的:激活频率统计是必要的,且它只花一次采样成本。</b></p>
+
+  <h3>8.2 技术来源一览</h3>
+  <p>DoSA 的两条技术血脉分别是"文档检索的上界剪枝"与"DSA 的带符号多头打分",把它们接起来需要新造的东西不少。下表按论文自己的行内引用口径整理:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>DoSA 各组件的技术来源(按论文行内引用口径整理,非论文原表)</caption>
+    <thead><tr><th>组件</th><th>论文标注的上游</th><th>本代的改造 / 集成</th></tr></thead>
+    <tbody>
+      <tr><td>上界剪枝 + 运行阈值</td><td>MaxScore(Turtle &amp; Flood, 1995)、WAND(Broder et al., 2003)、Block-Max WAND(Ding &amp; Suel, 2011)</td><td>检索侧的上界是<b>块级</b>的(必须覆盖块内全部 key,对单个候选偏松);DoSA 改成<b>每键(per-key)</b>上界,并利用 query 头几何与激活结构收紧</td></tr>
+      <tr><td>被剪枝的打分函数</td><td>DeepSeek Sparse Attention(DeepSeek-AI, 2025):多头 indexer + Top-K</td><td>不改动其定义与参数;证书必须适配 <b>ReLU 在内 + 权重有正负</b>这一形式,并给出严格不低的 $U_i$</td></tr>
+      <tr><td>精确 Top-K 的工程基线</td><td>Radix selection(Zhang et al., 2023)、GVR(Cheng et al., 2026)、DeepSelect(Qian et al., 2026)、LiteTopK(Yin et al., 2026)</td><td>沿用"流式阈值 + 紧凑选择"的思路,但在其<b>之前</b>插入一层认证拒绝,把全头打分也省掉,而不只是省写回</td></tr>
+      <tr><td>少头筛选的对比方案</td><td>MISA(Zhou et al., 2026)</td><td>MISA 用更少头筛选、可选全分重排;<b>重排救不回被排除的 winner</b>。DoSA 改为证明"被排除的一定不是 winner"</td></tr>
+      <tr><td>ReLU 归约的数学工具</td><td>论文 §2.3–2.4 自行使用:ReLU 次可加性、正齐次性、Cauchy–Schwarz、Minkowski 不等式</td><td>组合出式 (5)(9)(10)(11)(12) 等五个上界工具,并证明单锚最优容差(命题 5)与精确松弛分解(命题 6)</td></tr>
+      <tr><td>解码期阈值预测</td><td>GVR 的时间相关性(Cheng et al., 2026)</td><td>不做完整预测-验证-精修流程,只借用"最近步选中的 key 作为证人"来给出保守阈值下界,用于压紧候选记录</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted" style="font-size:13px">引用为论文行内标注口径,本页未逐条核对参考文献条目。</p>
+
+  <h3>8.3 论文自述的局限</h3>
+  <ul class="tight">
+    <li><b>仍然要扫描每个 key:</b>"DoSA still scans every key"——省的是每键的<b>全头打分</b>,不是扫描本身。所以证书的准备工作如果摊不薄,短上下文就会得不偿失;</li>
+    <li><b>短上下文或松界下可能入不敷出:</b>"short contexts or loose bounds can leave insufficient savings to offset screening";</li>
+    <li><b>需要保守评估:</b>数值保证要求相对原始打分器做保守评估;有效的并列 Top-K 集合不必然产生相同的生成文本;</li>
+    <li><b>只证明了计算收益,没有证明任务精度:</b>"The measurements establish computational benefits, not improved task accuracy beyond a model's trained context."</li>
+  </ul>
+
+  <h3>8.4 未披露、值得补测的点</h3>
+  <p>以下几条是本页在通读后的追问,与上面的"自述局限"分开列:</p>
+  <ul class="tight">
+    <li><b>候选缓冲的显存账本:</b>附录 D.4 披露容量修复带来 9.94 GiB 额外工作区(约 1M key),但<b>未见披露</b>它在实测卡型上的显存占比、以及对可服务并发数/最大上下文的影响。考虑到这关系到能否上生产,值得补一组"不同 $C_{\text{buf}}$ 下的显存–延迟曲线",尤其是<b>候选池被填满而触发恢复(full-domain recovery)的频率</b>——论文只在 Figure 9 提到计时"包含恢复开销",未给出触发率。</li>
+    <li><b>尾延迟与最坏情况:</b>论文报的是加速比(中位数/几何平均口径),<b>未见披露</b> p99 延迟与"最坏层/最坏输入"的表现。既然 Figure 6 显示第 1 层剪枝率只有 89%–93%(其余层 >95%),而附录 D.4 又说明第 1 层有 4 个格子被重测,那么<b>浅层就是这个系统的尾部风险所在</b>,值得单独给一组分布而非均值。</li>
+    <li><b>激活统计的采集成本与漂移:</b>多数支持 $A$ 依赖种子 key 的激活频率 $p_h$。论文说明频率只影响效率不影响正确性,但<b>未见披露</b>采样多少 key 才能稳定、在线更新 $A$ 的频率与开销、以及跨域切换时是否需要重采。如果 $A$ 对分布漂移敏感,那么"按域调参"的隐藏成本可能被低估。</li>
+    <li><b>头预算 $r$ 与 $d_a$ 的联合调优:</b>论文给了式 (21) 的判据(多一个头只在它避免足够多的全量重打分时才划算),并说明 32 头实现里 $r = 14,16$ 走绝对值形式、$r = 20$ 走基形式;但<b>未见披露</b>这三个路径各自的实测加速与存活率对照表。既然 $r$ 是直接决定 $r + d_a$(每键筛选行数)的旋钮,这张表对复现和调优都很关键。</li>
+    <li><b>独立复现与跨框架一致性:</b>评测建立在作者自家的 kernel(flash-indexer)与 SGLang/LiteTopK 的对比上;<b>未见</b>第三方在别的推理栈(如 vLLM、TensorRT-LLM)或别的稀疏注意力变体上的复现。此外数值条件(式 26–28)依赖向上取整的包络与保守 RMS,这类实现的正确性很难从论文文本直接验证,值得补一组"故意注入舍入误差后仍不丢 winner"的压力测试。</li>
+    <li><b>与"近似但要更快"的方法的正面对比:</b>论文的定位是无损,因此与 MISA 等方法的对比是<b>性质层面</b>的(不保证原 Top-K),而非端到端速度的正面对撞。对于只关心任务精度、不要求 bit-exact 选择的使用者,"无损 vs 近似"在同等精度下的速度差是多少,是一个有价值但论文未回答的问题。</li>
+  </ul>
+
+  <h3>8.5 一句话评价</h3>
+  <p>这是一篇<b>把"正确性论证"和"系统实现"都做实了的优化类论文</b>:它的核心思想(用上界 + 下界分离来认证拒绝)并不新鲜,新鲜且困难的是<b>为 LLM 里那个带符号 ReLU 的多头打分函数造出一张又紧又便宜的 per-key 证书</b>——正的用投影复用已算过的头,负的用激活多数方向聚合成一行,再用命题 6 把松弛拆成可归因的三块。它对自己边界的交代(仍然扫每个 key、短上下文可能不划算、只证计算不证精度、候选容量修复未重跑全矩阵)也足够坦率。真正决定它能否从"论文加速比"走向"生产收益"的,恐怕不是那张证书的数学,而是附录 D.4 里那 9.94 GiB 工作区:<b>无损之所以比近似贵,往往就贵在这些不体现在 FLOPs 里的地方。</b></p>
+</section>
+
+<!-- ================= 09 术语 ================= -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>DoSA</td><td>Dots Sparse Attention</td><td>本文方法:用分数上界证书对 DSA 的 indexer 做认证式剪枝,保持精确 Top-K</td></tr>
+      <tr><td><abbr title="DeepSeek Sparse Attention">DSA</abbr></td><td>DeepSeek Sparse Attention</td><td>用一个多头 indexer 打分后取 Top-K 来选择要 attend 的 token(DeepSeek-AI, 2025)</td></tr>
+      <tr><td>Indexer</td><td>Indexer</td><td>负责"挑出该看哪些 key"的模块;本文的优化对象</td></tr>
+      <tr><td>$H$ / $r$</td><td>Heads / Retained heads</td><td>$H$ 是 indexer 头总数;$r$ 是被直接精确求值的保留头数,是可调预算</td></tr>
+      <tr><td>$K$ / Top-K</td><td>Top-K selection</td><td>每个 query 保留分数最高的 $K$ 个 key;实验里 $K = 2048$</td></tr>
+      <tr><td>$\tau$ / $\tau^\ast$</td><td>Seed threshold / True threshold</td><td>$\tau = \tau_K(S)$ 是种子集合给的真实阈值<b>下界</b>,$\tau^\ast$ 是全集的真实第 $K$ 大分数</td></tr>
+      <tr><td>$U_i$</td><td>Score upper bound</td><td>token $i$ 分数的<b>上界</b>;$U_i < \tau$ 即认证拒绝</td></tr>
+      <tr><td>$s_i$</td><td>Indexer score</td><td>式 (1) 定义的原始分数,最终选择只用它</td></tr>
+      <tr><td>$\Delta_i$ / $\delta_i$ / $b$</td><td>Margin / Slack / Deficit</td><td>选择间距($\tau^\ast - s_i$)、证书松弛($U_i - s_i$)、阈值亏欠($\tau^\ast - \tau$);拒绝条件为 $\Delta_i > \delta_i + b$</td></tr>
+      <tr><td>$P$ / $N$ / $R$ / $A$</td><td>Positive / Negative / Retained / Aggregate</td><td>省略正头、省略负头、保留头集合、负头聚合支持集</td></tr>
+      <tr><td>$E_P$ / $E_P^{\text{joint}}$</td><td>Positive residual allowance</td><td>省略正头的残差容差;joint 版本利用残差方向相关性,严格更紧</td></tr>
+      <tr><td>$p_h$</td><td>Activation frequency</td><td>负头 $h$ 在种子 key 上"点积为正"的频率;多数支持 $A$ 与保留头优先级都用它</td></tr>
+      <tr><td><abbr title="Tensor Memory">TMEM</abbr></td><td>Tensor Memory</td><td>Blackwell 上张量核累加器所在的片上存储;阶段 ❷❹ 从它读出上界</td></tr>
+      <tr><td><abbr title="Matrix Multiply-Accumulate">MMA</abbr></td><td>Matrix Multiply-Accumulate</td><td>张量核矩阵乘指令;阶段 ❶❸ 由它执行</td></tr>
+      <tr><td><abbr title="Single Instruction Multiple Threads">SIMT</abbr></td><td>Single Instruction, Multiple Threads</td><td>常规 CUDA 核心执行模型;阶段 ❷❹ 用它算上界与归约</td></tr>
+      <tr><td>G2S / T2R</td><td>Global-to-Shared / TMEM-to-Register</td><td>两级数据搬运:显存→共享内存、TMEM→寄存器</td></tr>
+      <tr><td><abbr title="Tensor Parallelism, 8-way">TP8</abbr></td><td>Tensor Parallelism (8-way)</td><td>端到端实验用的 8 路张量并行</td></tr>
+      <tr><td><abbr title="Time To First Token">TTFT</abbr></td><td>Time To First Token</td><td>端到端指标:请求到第一个输出 token 的延迟</td></tr>
+      <tr><td><abbr title="High Bandwidth Memory">HBM</abbr></td><td>High Bandwidth Memory</td><td>GPU 显存;sparse writeback 省的就是它的带宽</td></tr>
+      <tr><td>Prefill / Decoding</td><td>Prefill / Decoding</td><td>预填充(处理整个 prompt,query 多)与解码(逐 token 生成,query 少)</td></tr>
+      <tr><td>Chunk</td><td>Prefill chunk size</td><td>prefill 时一次处理的 query 分块大小(4K–32K)</td></tr>
+      <tr><td>Pruning rate</td><td>Certificate pruning rate</td><td>$p = 1 - N_{\text{keep}}/N_{\text{screen}}$,screening 前后 query–key 对数之比</td></tr>
+      <tr><td>Full-domain recovery</td><td>Full-domain recovery</td><td>数值证书失效时,用原始打分器与选择器对全部可见 key 重算一遍</td></tr>
+      <tr><td><abbr title="Approximate Nearest Neighbor-style retrieval evaluation">LOFT</abbr></td><td>LOFT</td><td>论文消融实验所用 SciFact 检索样例的来源(Lee et al., 2024)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv:2610.13990《DoSA: Dots Sparse Attention》的人工精读笔记。图片以 300 DPI 摘自论文原文并按比例缩放展示(未裁剪),共 12 张 Figure(论文正文与附录未包含编号 Table);解读与「整理」「推算」标注为编者观点。<br>
+    原文:<a href="https://arxiv.org/abs/2610.13990">arXiv:2610.13990</a> · 代码:<a href="https://github.com/llm-sys/flash-indexer">llm-sys/flash-indexer</a><br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好 · <a href="en.html" onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">English edition</a></span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>
