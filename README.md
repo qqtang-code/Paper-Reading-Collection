@@ -2,9 +2,9 @@
 
 我的论文中文精读页合集。每篇论文一个**图文配合**的单文件 HTML 精读页:全部 Figure / Table 以 **300 DPI 高清 PNG** 内嵌在对应讲解段落中(等比缩放、不裁剪),配中文逐点解读,支持深色模式、点击看原图、KaTeX 公式渲染、打印友好。
 
-> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——六篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash、CoWindow Attention、HySparse2、KITE/SST、DoSA)为**完整英译**(`en.html`),其余六篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
+> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——七篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash、CoWindow Attention、HySparse2、KSA V2、KITE/SST、DoSA)为**完整英译**(`en.html`),其余五篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
 >
-> This collection ships a **full Chinese deep-read plus an English edition for every paper** — complete English editions for the six flagship papers (Declarative Attention, DeepSeek-V4.1-Flash, CoWindow Attention, HySparse2, KITE/SST, DoSA), and English quick-read editions (full digest of the argument + every figure with its original caption) for the rest. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
+> This collection ships a **full Chinese deep-read plus an English edition for every paper** — complete English editions for the seven flagship papers (Declarative Attention, DeepSeek-V4.1-Flash, CoWindow Attention, HySparse2, KSA V2, KITE/SST, DoSA), and English quick-read editions (full digest of the argument + every figure with its original caption) for the rest. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
 
 > 由 [paper-reading-html](https://github.com/qqtang-code/paper-reading-html) skill 制作 · 在线门户:[**qqtang-code.github.io/Paper-Reading-Collection**](https://qqtang-code.github.io/Paper-Reading-Collection/)
 
@@ -22,9 +22,9 @@
 
 **结构/位置(①)** → **复用同模型已有的选择(②)** → **层内内容打分(③)** → **层内学习的轻量路由(④)** → **模型自己在思维链里声明(⑤)** → **不由信号决定(⑥)**
 
-这条谱系越往后,决定权越靠近模型自身或越被刻意放弃:① 完全不需要选择,②③④ 用越来越贵的方式做选择(跨层复用 → 金字塔 Top-K → 层内路由器),⑤ 把选择权交给模型的自然语言输出,⑥ 则是把「选择信号到底值多少」当作被检验的对象。
+这条谱系越往后,决定权越靠近模型自身或越被刻意放弃:① 完全不需要选择,②③④⑤ 用越来越贵的方式做选择(跨层复用 → 复用自家 Summary → 金字塔 Top-K → 层内路由器),⑥ 把选择权交给模型的自然语言输出,⑦ 则是把「选择信号到底值多少」当作被检验的对象。
 
-**⑦ DoSA(screening cost,而非 visible set)是这一叠里的例外**:它不改变「谁被看到」,而是问「**筛选这件事本身要花多少算力**」。当其余六篇都在重新设计可见集合时,DoSA 保持 DSA 的路由规则与最终 Top-K 逐位不变,只用一个可证明不丢 winner 的分数上界,把全头打分变成条件计算——这是同一条「省在注意力层内」的轴上,第一次把刀口对准**选择器自身**的工作量。
+**⑧ DoSA(screening cost,而非 visible set)是这一叠里的例外**:它不改变「谁被看到」,而是问「**筛选这件事本身要花多少算力**」。当其余七篇都在重新设计可见集合时,DoSA 保持 DSA 的路由规则与最终 Top-K 逐位不变,只用一个可证明不丢 winner 的分数上界,把全头打分变成条件计算——这是同一条「省在注意力层内」的轴上,第一次把刀口对准**选择器自身**的工作量。
 
 ## 论文总览
 
@@ -37,13 +37,14 @@
 | 5 | **Declarative Attention** — Language Models Can Control Their Own Attention | [注意力与 KV Cache](attention-kv-cache/) | 声明式稀疏注意力 · KV Cache · 长上下文 · CoT · vLLM | [中](attention-kv-cache/declarative-attention/) · [EN 完整版](attention-kv-cache/declarative-attention/en.html) | 2026-09 | 10 图 10 表 | [arXiv:2609.02737](https://arxiv.org/abs/2609.02737) |
 | 6 | **Random Attention** — Rethinking KV Cache Eviction for Efficient Reasoning | [注意力与 KV Cache](attention-kv-cache/) | KV Cache 驱逐 · 推理模型 · 长思维链 · vLLM | [中](attention-kv-cache/random-attention/) · [EN 速读](attention-kv-cache/random-attention/en.html) | 2026-09 | 5 图 11 表 | [arXiv:2609.03430](https://arxiv.org/abs/2609.03430) |
 | 7 | **DoSA** — Dots Sparse Attention | [注意力与 KV Cache](attention-kv-cache/) | DSA Indexer · Top-K 选择 · 上界证书 · 无损剪枝 · GPU Kernel | [中](attention-kv-cache/dosa/) · [EN 完整版](attention-kv-cache/dosa/en.html) | 2026-09 | 12 图 | [arXiv:2610.13990](https://arxiv.org/abs/2610.13990) |
-| 8 | **DeepSeek-V4.1-Flash** — 552B 多模态 MoE 高效推理技术报告 | [高效推理](efficient-inference/) | KV Cache 压缩 · MoE · 多模态 · 长上下文 · FP4 | [中](efficient-inference/deepseek-v41-flash/) · [EN 完整版](efficient-inference/deepseek-v41-flash/en.html) | 2026-09 | 12 图 5 表 | [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page) |
-| 9 | **ReSET** — Accurate Latency-Critical NVFP4 Reasoning via Step-Aware Temperature Scaling | [高效推理](efficient-inference/) | 量化 · NVFP4 · 低精度推理 · 温度缩放 | [中](efficient-inference/reset/) · [EN 速读](efficient-inference/reset/en.html) | 2026-08 | 8 图 16 表 | [arXiv:2606.13233](https://arxiv.org/abs/2606.13233) |
-| 10 | **FreeToken** — 边缘原生的 MoE 服务系统(Bandwidth-Adaptive Execution) | [高效推理](efficient-inference/) | MoE · 边缘部署 · 服务系统 · 带宽自适应 | [中](efficient-inference/freetoken/) · [EN 速读](efficient-inference/freetoken/en.html) | 2026-09 | 5 图 1 表 | [arXiv:2608.16157](https://arxiv.org/abs/2608.16157) |
-| 11 | **KITE / SST** — KV-Invariant Transformer Expansion for Efficient Agentic LLM Scaling | [高效推理](efficient-inference/) | 架构扩展 · KV 复用 · Prefill/Decode 成本分离 · MoE · Agentic | [中](efficient-inference/kite/) · [EN 完整版](efficient-inference/kite/en.html) | 2026-09 | 6 图 7 表 | [arXiv:2609.27294](https://arxiv.org/abs/2609.27294) |
-| 12 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
+| 8 | **KSA V2** — Kwai Summary Attention V2 Technical Report | [注意力与 KV Cache](attention-kv-cache/) | Summary Token 混合架构 · KV Cache 压缩 · 块稀疏路由 · Retrofit | [中](attention-kv-cache/ksa-v2/) · [EN 完整版](attention-kv-cache/ksa-v2/en.html) | 2026-10 | 13 图 11 表 + 1 自绘 | [arXiv:2610.18654](https://arxiv.org/abs/2610.18654) |
+| 9 | **DeepSeek-V4.1-Flash** — 552B 多模态 MoE 高效推理技术报告 | [高效推理](efficient-inference/) | KV Cache 压缩 · MoE · 多模态 · 长上下文 · FP4 | [中](efficient-inference/deepseek-v41-flash/) · [EN 完整版](efficient-inference/deepseek-v41-flash/en.html) | 2026-09 | 12 图 5 表 | [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page) |
+| 10 | **ReSET** — Accurate Latency-Critical NVFP4 Reasoning via Step-Aware Temperature Scaling | [高效推理](efficient-inference/) | 量化 · NVFP4 · 低精度推理 · 温度缩放 | [中](efficient-inference/reset/) · [EN 速读](efficient-inference/reset/en.html) | 2026-08 | 8 图 16 表 | [arXiv:2606.13233](https://arxiv.org/abs/2606.13233) |
+| 11 | **FreeToken** — 边缘原生的 MoE 服务系统(Bandwidth-Adaptive Execution) | [高效推理](efficient-inference/) | MoE · 边缘部署 · 服务系统 · 带宽自适应 | [中](efficient-inference/freetoken/) · [EN 速读](efficient-inference/freetoken/en.html) | 2026-09 | 5 图 1 表 | [arXiv:2608.16157](https://arxiv.org/abs/2608.16157) |
+| 12 | **KITE / SST** — KV-Invariant Transformer Expansion for Efficient Agentic LLM Scaling | [高效推理](efficient-inference/) | 架构扩展 · KV 复用 · Prefill/Decode 成本分离 · MoE · Agentic | [中](efficient-inference/kite/) · [EN 完整版](efficient-inference/kite/en.html) | 2026-09 | 6 图 7 表 | [arXiv:2609.27294](https://arxiv.org/abs/2609.27294) |
+| 13 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
 
-点击论文名直达精读页:**[① CoWindow Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/)** · **[② HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[③ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)** · **[④ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑤ Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[⑥ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑦ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑧ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[⑨ FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[⑩ KITE/SST](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/)** · **[⑩ EN](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/en.html)** · **[⑪ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)**
+点击论文名直达精读页:**[① CoWindow Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/)** · **[② HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[③ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)** · **[④ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑤ Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[⑥ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑦ KSA V2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/ksa-v2/)** · **[⑧ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑨ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[⑩ FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[⑪ KITE/SST](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/)** · **[⑪ EN](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/en.html)** · **[⑫ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)**
 
 ## 机制对照表
 
@@ -58,7 +59,7 @@
 | 5 | **Declarative Attention** | 解码时实际读取的 KV cache 量 | **模型自己**在思维链里声明(`<global>`/`<focus>`/`<local>`) | 零训练、零样本 | 注意力读取 −52.0% / −31.1%;精度 −1.27pp / −2.75pp;解码墙钟 0.71× / 0.77× |
 | 6 | **Random Attention** | 被驱逐的那部分 KV 条目本身 | **不由任何信号决定**:保住 prompt + 每个 KV 头内均匀随机 | 零训练(免调参) | 4 模型 × 6 任务共 60 格中 31 格显著领先;vLLM 吞吐 +32–43% |
 
-点击论文名直达精读页:**[① CoWindow Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/)** · **[② HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[③ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)** · **[④ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑤ Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[⑥ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑦ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑧ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[⑨ FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[⑩ KITE/SST](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/)** · **[⑩ EN](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/en.html)** · **[⑪ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)**
+点击论文名直达精读页:**[① CoWindow Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/)** · **[② HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[③ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)** · **[④ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑤ Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/)** · **[⑥ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑦ KSA V2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/ksa-v2/)** · **[⑧ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑨ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[⑩ FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[⑪ KITE/SST](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/)** · **[⑪ EN](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/en.html)** · **[⑫ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)**
 
 ## 机制对照表
 
@@ -85,14 +86,15 @@
 Paper-Reading-Collection/
 ├── README.md                    ← 本文件(总索引)
 ├── index.html                   ← 在线门户页(GitHub Pages 首页,中英双语切换)
-├── attention-kv-cache/          ← 分类一:注意力与 KV Cache(7 篇)
+├── attention-kv-cache/          ← 分类一:注意力与 KV Cache(8 篇)
 │   ├── cowindow-attention/      ← arXiv:2609.32704(4 图 10 表 + 2 算法)
 │   ├── hysparse2/               ← arXiv:2609.26368(5 图 5 表)
 │   ├── pisa/                    ← arXiv:2609.31093(3 图 7 表 + 1 算法)
 │   ├── elastic-attention/       ← OpenReview rLO2NTUHSW(17 图 14 表)
 │   ├── declarative-attention/   ← arXiv:2609.02737(10 图 10 表)
 │   ├── random-attention/        ← arXiv:2609.03430(5 图 11 表)
-│   └── dosa/                    ← arXiv:2610.13990(12 图)★ 最新
+│   ├── dosa/                    ← arXiv:2610.13990(12 图)
+│   └── ksa-v2/                  ← arXiv:2610.18654(13 图 11 表 + 1 自绘)★ 最新
 ├── efficient-inference/         ← 分类二:高效推理与部署(4 篇)
 │   ├── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
 │   ├── reset/                   ← arXiv:2606.13233(8 图 16 表)
@@ -112,7 +114,7 @@ Paper-Reading-Collection/
 
 ### 🎯 attention-kv-cache/ · 注意力与 KV Cache
 
-一层里「哪些 key 被看到」由谁决定。七篇按决策权排列:结构 → 复用已有选择 → 层内内容打分 → 层内学习路由 → 模型自述 → 不需要信号。
+一层里「哪些 key 被看到」由谁决定。八篇按决策权排列:结构 → 复用已有选择 → 复用自家 Summary → 层内内容打分 → 层内学习路由 → 模型自述 → 不需要信号。
 
 **① CoWindow Attention(2026-10 · HKUST(GZ) × BAAI · arXiv:2609.32704)**
 把「每个 head 都要重复看到完整因果历史」换成「**一组 KV head 合起来看到完整因果历史**」:所有 KV head 共享近邻窗与前缀 sink 窗,剩余长程距离均分成互补区间、每个 head 认领一段。不带路由器也不带索引器,训练前向/反向、prefill 与自回归解码共用一条位置定义的规则,并按全局 KV-head 编号分配以对齐张量并行。8K 关联召回上 100% 覆盖拿到 **89.73%**(满注意力 89.97%;同窗宽、只覆盖 12.5% 的重复窗版本仅 21.32%),说明收益来自「互补」而非「窗口更大」;128K、8×H100、TP=8 的算子级基准里前向快 **7.4×**、反向 **8.6×**、解码 **3.0×**,解码算子峰值显存低 **7.6×**;0.6B→14B 上困惑度与满注意力持平,14B 训 32K 时总训练 FLOPs 降 **28.5%**。→ [精读页](attention-kv-cache/cowindow-attention/) · [原文](https://arxiv.org/abs/2609.32704)
@@ -131,6 +133,9 @@ Paper-Reading-Collection/
 
 **⑥ Random Attention(2026-09 · Salesforce AI Research + UIUC)**
 KV cache 驱逐不需要打分:保住 prompt + 每个 KV 头内均匀随机驱逐、不打任何分,4 模型 × 6 推理任务追平最强基线(**60 格中 31 格显著领先**、仅 1 格落后),vLLM 部署吞吐再快 **32–43%**。机制账:prompt 是 cache 的脆弱部分;推理轨迹靠"文本复述 + 跨头复制"两层冗余自我保护——选择信号真正剩下的用武之地,是"只说一次、从不复述"的稀有事实。→ [精读页](attention-kv-cache/random-attention/) · [原文](https://arxiv.org/abs/2609.03430)
+
+**⑦ KSA V2(2026-10 · 快手 OneRec Team · arXiv:2610.18654)**
+KSA 这类 Summary token 混合架构里,每个 chunk 后面的 Summary 每层都被算出来、又被逐层精修,却只被当作"低分辨率记忆"读。KSA V2 的观察是:**同一套 Summary 可以同时演两个角色**。作为**记忆**,它可以在**存储时**被再压一次——把每 $k_m$ 个连续 Summary KV 池化成一个层私有的 Meta 条目,远端历史压缩率从 $k_s=8$ 提到 $k_s k_m=\mathbf{1024}$,而**层间流动的 Summary 表示完全不动**——于是"压多狠"与"传多粗"这两个原本焊死在同一个参数($k_s$)上的旋钮被拆开(C-KSA)。作为**索引**,它又当路由查询给每个 $b$-token 文本块打分,让原来读全部因果 KV 的 Full 层只读 sink + 被选中的块 + 局部窗口(S-KSA)。两者都不增 token、不改布局,可直接 retrofit 进已训好的模型。1.9B/128K 下常驻缓存 **6.31 GiB**(Hybrid KSA 10.59、Full 24.00,降 **40.4% / 73.7%**),prefill **44,971 tok/s**(**1.51×** / **2.16×**),decode **198.85 tok/s**(**1.27×**),而六长度 RULER 均值仅从 72.61 掉到 **72.39**。明确退化项:块选择在聚合型任务上失分,频繁词抽取从 45.00 掉到 **26.67**。→ [精读页](attention-kv-cache/ksa-v2/) · [原文](https://arxiv.org/abs/2610.18654)
 
 ### ⚡ efficient-inference/ · 高效推理与部署
 

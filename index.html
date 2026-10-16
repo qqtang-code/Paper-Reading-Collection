@@ -151,8 +151,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(六篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the six flagship papers, quick-read editions for the other six).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(七篇旗舰论文为完整英译,其余五篇为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the seven flagship papers, quick-read editions for the other five).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -254,6 +254,14 @@
       </tr>
       <tr>
         <td class="num">8</td>
+        <td class="pap"><a href="attention-kv-cache/ksa-v2/">KSA V2</a></td>
+        <td><span class="i18n-zh">远端历史的 Summary KV 体积 + Full 层读全部 KV 的算力</span><span class="i18n-en">Distant-history Summary-KV volume + the compute Full layers spend reading all KV</span></td>
+        <td><span class="i18n-zh"><b>复用模型自己已有的 Summary</b>:存储时池化成层私有 Meta 条目(压缩),同一批 Summary 又当块级路由查询(索引)</span><span class="i18n-en"><b>Reuses the model's own Summaries</b>: pooled at storage time into layer-local Meta entries (compression), and reused as block-level routing queries (indexing)</span></td>
+        <td><span class="i18n-zh">Retrofit 继续预训练(1.9B 6.7B+3.4B;4B 6.7B+15.9B+4.2B token)</span><span class="i18n-en">Retrofit continued pretraining (1.9B: 6.7B+3.4B; 4B: 6.7B+15.9B+4.2B tokens)</span></td>
+        <td><span class="i18n-zh">128K 常驻缓存 −40.4%;prefill 1.51×、decode 1.27×;RULER 均值 72.39(vs 父模型 72.61)</span><span class="i18n-en">128K resident cache −40.4%; prefill 1.51×, decode 1.27×; RULER mean 72.39 (parent 72.61)</span></td>
+      </tr>
+      <tr>
+        <td class="num">9</td>
         <td class="pap"><a href="efficient-inference/deepseek-v41-flash/">DeepSeek-V4.1-Flash</a></td>
         <td><span class="i18n-zh">全栈:激活参数、KV cache 体积、量化位宽</span><span class="i18n-en">The whole stack: active parameters, KV-cache size, precision</span></td>
         <td><span class="i18n-zh">架构 + 缓存 + 精度协同(Causal Encoder-Decoder / CSA2 / FP4)</span><span class="i18n-en">Architecture + cache + precision together (Causal Encoder-Decoder / CSA2 / FP4)</span></td>
@@ -261,7 +269,7 @@
         <td><span class="i18n-zh">全局 KV cache 每 token 890 字节;DeepSWE v1.1 74.2;Codeforces 3471</span><span class="i18n-en">890 bytes/token global KV cache; DeepSWE v1.1 74.2; Codeforces 3471</span></td>
       </tr>
       <tr>
-        <td class="num">9</td>
+        <td class="num">10</td>
         <td class="pap"><a href="efficient-inference/reset/">ReSET</a></td>
         <td><span class="i18n-zh">NVFP4 量化带来的精度损失</span><span class="i18n-en">The accuracy lost to NVFP4 quantization</span></td>
         <td><span class="i18n-zh">按解码步骤调整 softmax 温度 + 小 M 解码内核</span><span class="i18n-en">Per-step softmax temperature + a small-M decode kernel</span></td>
@@ -269,7 +277,7 @@
         <td><span class="i18n-zh">AIME-120 +2.6(Qwen3-32B 77.5,超 BF16 的 75.8);内核 1.57–2.49×</span><span class="i18n-en">AIME-120 +2.6 (Qwen3-32B 77.5, above BF16's 75.8); kernels 1.57–2.49×</span></td>
       </tr>
       <tr>
-        <td class="num">10</td>
+        <td class="num">11</td>
         <td class="pap"><a href="efficient-inference/freetoken/">FreeToken</a></td>
         <td><span class="i18n-zh">单机显存与内存带宽瓶颈</span><span class="i18n-en">Single-machine memory and bandwidth limits</span></td>
         <td><span class="i18n-zh">带宽自适应执行</span><span class="i18n-en">Bandwidth-adaptive execution</span></td>
@@ -277,7 +285,7 @@
         <td><span class="i18n-zh">8GB 笔记本跑 35B;台式机跑 284B;单卡工作站跑 753B GLM-5.2</span><span class="i18n-en">35B on an 8GB laptop; 284B on a desktop; 753B GLM-5.2 on one workstation GPU</span></td>
       </tr>
       <tr>
-        <td class="num">11</td>
+        <td class="num">12</td>
         <td class="pap"><a href="efficient-inference/kite/">KITE / SST</a></td>
         <td><span class="i18n-zh">训练算力与 prefill 计算(扩容不延长 KV 生产路径)</span><span class="i18n-en">Training compute and prefill computation (expansion never extends the KV-producing path)</span></td>
         <td><span class="i18n-zh"><b>扩容只加在不产生 KV 的一侧</b>:Prefiller 产 KV、Decoder 读 KV(结构约束,不冻结权重)</span><span class="i18n-en"><b>Grow only the side that produces no KV</b>: a Prefiller that writes KV and a Decoder that reads it (a structural constraint, not frozen weights)</span></td>
@@ -285,7 +293,7 @@
         <td><span class="i18n-zh">67B SST prefill 活跃参数 1.12B(47B 基线 1.48B);训练损失 1.5900 最低;75:25 成本代理 −6.7% / −31.6%</span><span class="i18n-en">1.12B prefill active params for the 67B SST (vs 47B's 1.48B); lowest loss 1.5900; 75:25 cost proxy −6.7% / −31.6%</span></td>
       </tr>
       <tr>
-        <td class="num">12</td>
+        <td class="num">13</td>
         <td class="pap"><a href="benchmarks/mmlongembed/">MMLongEmbed</a></td>
         <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
         <td><span class="i18n-zh">基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型</span><span class="i18n-en">Benchmark construction: 4 tasks / 8 datasets / 8,460 queries / 11 models</span></td>
@@ -304,8 +312,8 @@
     <span class="i18n-en">🎯 Attention &amp; KV Cache</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">一层里「哪些 key 被看到」由谁决定。七篇按决策权排列:<b>结构/位置 → 复用已有选择 → 层内内容打分 → 层内学习路由 → 模型自己声明 → 不需要信号</b>;DoSA 是这一叠里的一个例外——它<b>不改变谁被看到,只改变"筛选"这件事要花多少算力</b>,用一张可证明不丢 winner 的分数上界把选择本身变成条件计算。</span>
-    <span class="i18n-en">Who decides which keys a layer sees. The seven papers run from external structure to the model itself, and finally to a deliberate refusal to decide: <b>position/structure → reuse of an existing choice → in-layer content scoring → an in-layer learned router → the model's own declaration → no signal at all</b>. DoSA is the exception in this stack — it <b>does not change who is seen, only what the screening costs</b>, turning selection itself into conditional computation via a score upper bound that provably discards no winner.</span>
+    <span class="i18n-zh">一层里「哪些 key 被看到」由谁决定。八篇按决策权排列:<b>结构/位置 → 复用已有选择 → 复用模型自己的 Summary → 层内内容打分 → 层内学习路由 → 模型自己声明 → 不需要信号</b>;DoSA 是这一叠里的一个例外——它<b>不改变谁被看到,只改变"筛选"这件事要花多少算力</b>,用一张可证明不丢 winner 的分数上界把选择本身变成条件计算。</span>
+    <span class="i18n-en">Who decides which keys a layer sees. The eight papers run from external structure to the model itself, and finally to a deliberate refusal to decide: <b>position/structure → reuse of an existing choice → reuse of the model's own Summaries → in-layer content scoring → an in-layer learned router → the model's own declaration → no signal at all</b>. DoSA is the exception in this stack — it <b>does not change who is seen, only what the screening costs</b>, turning selection itself into conditional computation via a score upper bound that provably discards no winner.</span>
   </p>
   <div class="cards">
 
@@ -446,6 +454,26 @@
       <div class="go">
         <a class="i18n-zh" href="attention-kv-cache/dosa/">开始阅读 →</a>
         <a class="i18n-en" href="attention-kv-cache/dosa/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">Summary Token 混合架构 · KV Cache 压缩 · 块稀疏路由 · Retrofit</span><span class="i18n-en">Summary-Token Hybrid · KV Cache Compression · Block-Sparse Routing · Retrofit</span></span>
+      <h3>
+        <a class="i18n-zh" href="attention-kv-cache/ksa-v2/">⑧ KSA V2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">同一套 Summary,既当压缩记忆又当稀疏索引</span></a>
+        <a class="i18n-en" href="attention-kv-cache/ksa-v2/en.html">⑧ KSA V2<br><span style="font-size:14px; font-weight:600; color:var(--muted)">One Summary Hierarchy, Both Memory and Index</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">在 KSA 的 3:1 混合里,每个 chunk 的 Summary 每层都被算出来、逐层精修,却只当"低分辨率记忆"用。KSA V2 让它演两个角色:作为<b>记忆</b>,在<b>存储时</b>把每 <i>k<sub>m</sub></i> 个连续 Summary KV 池化成层私有的 Meta 条目,远端压缩率从 <i>k<sub>s</sub></i>=8 提到 <b>1024</b>,而层间流动的 Summary 表示<b>完全不动</b>(C-KSA);作为<b>索引</b>,拿它当路由查询给每个 <i>b</i>-token 块打分,原来读全部因果 KV 的 Full 层只读 sink + 选中块 + 局部窗口(S-KSA)。两者都不增 token、不改布局,可直接 retrofit。1.9B/128K 下常驻缓存 <b>−40.4%</b>、prefill <b>1.51×</b>、decode <b>1.27×</b>,RULER 均值只从 72.61 掉到 <b>72.39</b>。</span>
+        <span class="i18n-en">In KSA's 3:1 hybrid, each chunk's Summary is computed and refined every layer yet used only as low-resolution memory. KSA V2 gives it two roles: as <b>memory</b>, every <i>k<sub>m</sub></i> consecutive Summary KV entries are pooled <b>at storage time</b> into a layer-local Meta entry, lifting distant-history compression from <i>k<sub>s</sub></i>=8 to <b>1024</b> while the inter-layer Summary representation stays <b>untouched</b> (C-KSA); as an <b>index</b>, it becomes the routing query that scores each <i>b</i>-token block, so Full layers that read all causal KV now read only sinks + selected blocks + a local window (S-KSA). Neither adds tokens nor changes layout, so both retrofit. At 1.9B/128K: cache <b>−40.4%</b>, prefill <b>1.51×</b>, decode <b>1.27×</b>, RULER mean 72.61 → <b>72.39</b>.</span>
+      </p>
+      <div class="meta">
+        <span>2026-10</span><span><span class="i18n-zh">13 图 11 表 + 1 张本页自绘</span><span class="i18n-en">13 figures · 11 tables · 1 self-drawn</span></span><span>arXiv:<a href="https://arxiv.org/abs/2610.18654">2610.18654</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="attention-kv-cache/ksa-v2/">开始阅读 →</a>
+        <a class="i18n-en" href="attention-kv-cache/ksa-v2/en.html">Read in English →</a>
       </div>
     </div>
 

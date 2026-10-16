@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Kwai Summary Attention V2 (KSA V2) — an in-depth English reading of the technical report: one set of Summary tokens serving both as compressible KV memory and as a sparse routing index, cutting resident cache by 40.4% and lifting prefill throughput 1.51&times; at 128K. All 13 figures and 11 tables embedded at 300 DPI from the original paper.">
+<meta name="keywords" content="paper reading, KSA V2, Kwai Summary Attention, KV cache compression, sparse attention, long context, RULER, arXiv 2610.18654">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · Kwai Summary Attention V2 (KSA V2)">
+<meta property="og:description" content="One set of Summary tokens that is both compressible KV memory and a sparse routing index: an in-depth reading with all 13 figures and 11 tables at 300 DPI.">
+<meta property="og:url" content="https://arxiv.org/abs/2610.18654">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<title>Paper Reading · Kwai Summary Attention V2 (KSA V2)</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --warn:#b4530a; --warn-soft:#fdf0e2; --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --warn:#e9a866; --warn-soft:#33240f; --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:860px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .caveat{background:var(--warn-soft); border-left:4px solid var(--warn);
+          border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .zh{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+<!-- Top bar: section jumps + dark-mode toggle + language switcher -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">KSA V2<span>·reading</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s4">Motivation</a>
+      <a class="jump" href="#s9">C-KSA</a>
+      <a class="jump" href="#s11">S-KSA</a>
+      <a class="jump" href="#s13">Cache</a>
+      <a class="jump" href="#s15">Experiments</a>
+      <a class="jump" href="#s18">Efficiency</a>
+      <a class="jump" href="#s21">Commentary</a>
+      <a class="jump" href="#s25">Glossary</a>
+      <button class="theme-toggle" aria-label="Toggle dark / light theme" title="Toggle dark / light theme">🌓</button>
+      <a class="lang-toggle" href="KSA-V2论文精读_HTML.html" title="阅读中文版"
+         onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2610.18654</div>
+    <h1>Kwai Summary Attention V2: one set of Summary tokens as both compressed memory and sparse index</h1>
+    <div class="subtitle">A technical report from Kuaishou's OneRec team. On top of KSA's 3:1 hybrid layout, two drop-in modifications: C-KSA compresses the remote Summary KV one level further into layer-local Meta entries, and S-KSA uses those same Summaries as queries to score and select text blocks. At 1.9B and 128K context, resident cache drops by 40.4%, prefill throughput rises 1.51&times; and decode 1.27&times;, while the mean RULER score moves only from 72.61 to 72.39.</div>
+    <div class="meta">
+      <span>Authors: OneRec Team (Kuaishou)</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2610.18654">arXiv:2610.18654</a></span>
+      <span>Type: Technical Report</span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">KV cache compression</span><span class="pill">Summary token</span><span class="pill">Block-sparse attention</span><span class="pill">Long context</span><span class="pill">Hybrid architecture</span><span class="pill">RULER</span><span class="pill">Inference speedup</span></div>
+  </div>
+</header>
+
+<div class="wrap"><nav class="toc">
+  <h2>Reading map (text and exhibits interleaved in narrative order)</h2>
+  <ol>
+    <li><a href="#s1">Overview: KSA V2 in one sentence</a></li>
+    <li><a href="#s2">Background: where long-context serving gets expensive</a></li>
+    <li><a href="#s3">The upstream KSA recap: how <abbr title="Summary token: an aggregate token appended after each chunk">Summary tokens</abbr> work</a></li>
+    <li><a href="#s4">Two bottlenecks: Summary tokens are under-used</a></li>
+    <li><a href="#s5">The core insight: one Summary, two roles</a></li>
+    <li><a href="#s6">Architecture overview and overall payoff</a></li>
+    <li><a href="#s7">Three contributions and how to read this page</a></li>
+    <li><a href="#s8">Notation and overall layout</a></li>
+    <li><a href="#s9">C-KSA: a second-level compression of Summary KV</a></li>
+    <li><a href="#s10">Attention-mass correction</a></li>
+    <li><a href="#s11">S-KSA: Summary-guided block sparsity</a></li>
+    <li><a href="#s12">Putting the configuration on concrete numbers: a walkthrough</a></li>
+    <li><a href="#s13"><abbr title="KV cache: the cached key/value pairs used during autoregressive decoding">KV cache</abbr> layout and memory analysis</a></li>
+    <li><a href="#s14">Kernel design</a></li>
+    <li><a href="#s15">Experimental setup and the adaptation protocol</a></li>
+    <li><a href="#s16">The two-stage loss</a></li>
+    <li><a href="#s17">Model quality: 1.9B and 4B</a></li>
+    <li><a href="#s18">Long-context retrieval analysis and inference efficiency</a></li>
+    <li><a href="#s19">Analysis and ablations</a></li>
+    <li><a href="#s20">Lineage of each component</a></li>
+    <li><a href="#s21">Commentary: strengths, limits, and what is worth testing next</a></li>
+    <li><a href="#s25">Glossary (look things up while reading)</a></li>
+  </ol>
+</nav><!-- ============ 1. Overview ============ -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: KSA V2 in one sentence</h2>
+
+  <p class="lead">The whole report argues one thing: <b>in hybrid architectures built around Summary tokens such as KSA, those Summary tokens are wasted</b> — they are computed at every layer and refined layer by layer, yet they are only ever read as a "low-resolution memory" by the KSA layers. The authors observe that the same Summaries can do two jobs at once: <b>act as KV memory that can be compressed further</b>, and <b>act as the index for sparse routing</b>. Two drop-in layer types follow from that idea, together called KSA V2.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">Resident cache (1.9B, 128K)</div><div class="v">6.31 GiB <small>vs Hybrid KSA 10.59 / Full 24.00; &minus;40.4% / &minus;73.7%</small></div></div>
+    <div class="item"><div class="k">Prefill throughput (128K)</div><div class="v">44,971 tok/s <small>vs 29,837 / 20,830; 1.51&times; over Hybrid KSA, 2.16&times; over Full</small></div></div>
+    <div class="item"><div class="k">Decode throughput (128K)</div><div class="v">198.85 tok/s <small>vs Hybrid KSA 157.02; 1.23–1.32&times; across lengths</small></div></div>
+    <div class="item"><div class="k"><abbr title="RULER: a long-context retrieval benchmark suite (4K–128K)">RULER</abbr> six-length mean (1.9B)</div><div class="v">72.39% <small>vs the parent Hybrid KSA at 72.61%, Full at 67.55%</small></div></div>
+    <div class="item"><div class="k">Remote-history compression factor</div><div class="v">$k_s k_m = 1024$ <small>KSA alone only has $k_s = 8$</small></div></div>
+    <div class="item"><div class="k">S-KSA remote budget</div><div class="v">$K = 4096$ tokens <small>about 3.9% of the positions in a 128K context</small></div></div>
+  </div>
+
+  <p>Figure 1 is the report card for the whole paper: capability on the left, cost on the right. On the left, the horizontal axis is RULER accuracy at six sequence lengths (4K&rarr;128K); blue <b>Full</b> is dense attention, <b>Hybrid KSA</b> is the parent model, and the rightmost <b>C-KSA+S-KSA (Ours)</b> is the model of this paper. All three are plotted across all six lengths, and the reading is direct: the new model matches or slightly beats the parent at 4K/8K/16K, trails it by less than one point from 32K to 128K, while Full has already collapsed to 48.75% at 128K. The two small panels on the right cover cost: matrix <abbr title="FLOPs: floating point operations">FLOPs</abbr> per token, and the ratio relative to Full.</p>
+
+<p>Figure 1 is the report card for the whole paper: capability on the left, cost on the right. On the left, the horizontal axis is RULER accuracy at six sequence lengths; blue <b>Full</b> is dense attention, <b>Hybrid KSA</b> is the parent model, and the rightmost <b>C-KSA+S-KSA (Ours)</b> is the model of this paper; the two small panels on the right cover cost: matrix FLOPs per token, and the ratio relative to Full. <b>The full reading of this figure, and one place where the paper's own numbers disagree with each other, are in Section 6 and Section 7.</b></p>
+  <p class="zoom-hint">💡 Click any image to open the full-resolution original; click again or press Esc to close.</p>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page takes the paper as its authority. Where this page organizes, summarizes, or converts the paper's own configuration, that is marked explicitly with <b>[organized]</b> or <b>[estimated]</b>, so it can be told apart from the paper's own figures. Symbols follow the paper: $k_s$ is the text chunk size per Summary, $k_m$ is how many Summaries one Meta entry aggregates, $b$ is the routing block size, $W$ is how many chunks the local window covers, $K$ is the remote token budget of a sparse layer, and $N$ is the text length.</div>
+
+  <div class="takeaway"><b>One-line mnemonic:</b> C-KSA is about <b>saving memory</b> (compressing the remote Summary KV by a further factor of $k_m$, but only the copy that gets stored, never coarsening the Summary representation that flows between layers); S-KSA is about <b>saving compute</b> (replacing the Full layers that used to read all history with "first let the Summaries pick blocks, then read only the selected original text blocks"). Neither adds input tokens or changes the token layout, which is exactly why both can be retrofitted into an already-trained model.</div>
+</section><section id="s2">
+<h2 class="sec"><span class="sec-no">Section 2</span>Background: where long-context serving actually gets expensive</h2>
+
+<p>To see why KSA V2 looks the way it does, split "expensive" into three distinct kinds of expensive. Each has a different best answer, and lumping them together leads to the wrong conclusion.</p>
+
+<ul>
+<li><b>Expensive to store (<abbr title="KV cache: the cached key/value pairs used during autoregressive decoding">KV cache</abbr> grows linearly with the sequence).</b> In standard full attention every token must keep one key and one value in the cache. Double the sequence and you double the memory. This line is <b>linear</b>, and it is the first wall long-context serving hits — batch concurrency is set directly by the per-sequence cache footprint.</li>
+<li><b>Expensive to compute (<abbr title="prefill: the stage that processes the input prompt">prefill</abbr> is quadratic).</b> During prefill every query attends to every earlier key, so the work is $O(N^2)$. At 128K this term outweighs the weight matrix multiplications and dominates prefill time.</li>
+<li><b>Expensive to read (<abbr title="decode: the token-by-token generation stage">decode</abbr> reads all history for every query).</b> Every generated token reads the entire history's KV back out of memory. This is a bandwidth bottleneck rather than a compute bottleneck, and it penalizes latency and throughput at the same time.</li>
+</ul>
+
+<p>The four technical routes the field has taken are, at bottom, trade-offs between these three bills rather than solutions to a single problem:</p>
+
+<ol>
+<li><b>Per-token compression</b> (<abbr title="GQA: Grouped-Query Attention, where several query heads share KV heads">GQA</abbr> (Ainslie et al., 2023), <abbr title="MLA: Multi-head Latent Attention, low-rank latent KV">MLA</abbr> (DeepSeek-AI et al., 2024), and quantization methods such as KIVI) — makes storage <b>per position</b> cheaper while <b>leaving the number of positions unchanged</b>. It compresses "how many bytes per token", not $N$. The payoff on this line is clean and lossless, but the ceiling is explicit.</li>
+<li><b>Sparse attention</b> (<abbr title="DSA: DeepSeek Sparse Attention, token-level sparsity">DSA</abbr> (DeepSeek-AI et al., 2025), MoBA (Lu et al., 2025), NSA (Yuan et al., 2025)) — keeps token-level KV and only reduces <b>which positions</b> each query reads. It brings compute and bandwidth down, but the cache itself does not shrink, and it needs an extra criterion for "where should I read".</li>
+<li><b>Sliding window / linear and recurrent attention</b> (sliding window in Mistral (Jiang et al., 2023); recurrent variants in Gated DeltaNet (Yang et al., 2025)) — both storage and compute come down, and the recurrent state is even independent of context length. The price is that <b>direct access to distant original tokens is lost</b>: history can only be read back indirectly through a repeatedly aggregated state.</li>
+<li><b>Hybrid architectures</b> — interleave the above classes by layer, keeping a few full attention layers for direct access to the original text. This is the most robust engineering compromise, and it is where the KSA family sits.</li>
+</ol>
+
+<div class="note">
+<b>Why hybrid is the main line rather than pure linear.</b>The failure mode of purely linear/recurrent models is not "slightly worse average metrics" but a sudden collapse on tasks that require retrieving an exact distant literal span — an aggregated state is an irreversible summary. Hybrid uses a few full layers as a safety net, downgrading that failure mode from "collapse" to "somewhat more expensive". But it leaves a structural hazard behind: <b>those few full attention layers become the performance and cost bottleneck of the entire model</b>. KSA V2 is aimed squarely at that hazard.
+</div>
+</section>
+
+<section id="s3">
+<h2 class="sec"><span class="sec-no">Section 3</span>The upstream KSA recap: how <abbr title="Summary token: an aggregate token appended after each chunk">Summary tokens</abbr> work</h2>
+
+<p>Kwai Summary Attention (KSA, (Chu et al., 2026)) is a rather unusual instance of the hybrid route. Its core mechanism fits in one sentence: <b>after every $k_s$ text tokens, insert one learnable Summary token</b>.</p>
+
+<p>Inside a KSA layer, the visible set of a text query splits in two: <b>nearby chunks are read at full resolution</b> (nearby detail matters and is cheap), while <b>distant chunks are read only through their Summary</b> (one KV entry per chunk). That compresses the number of KV entries for distant history from $k_s$ down to 1 — a $k_s$-fold compression along the sequence dimension.</p>
+
+<p>Hybrid KSA interleaves these KSA layers with full attention layers at a <b>3:1</b> ratio: three KSA layers followed by one full layer. The left half of Figure 2 in the paper shows exactly this structure.</p>
+
+<div class="takeaway">
+<b>The most important and most easily missed point: the Summary's KV flows between layers.</b> A Summary token is not an auxiliary entry used only as a cache inside its own layer; its hidden state is passed on as input to the next layer, which reads it and refines it further. The deeper the layer, the more "mature" the information the Summary carries.<br>
+This is the key to every design decision in KSA V2: <b>because the Summary must be passed forward, any coarsening of it pollutes every subsequent layer</b>. Conversely, if you want distant history stored more cheaply without polluting later layers, the only way out is "compress on the way into storage, do not compress on the way forward". C-KSA is that sentence translated into an architecture.
+</div>
+
+<p>The payoff from KSA is real: the paper reports that it outperforms same-sized full attention models on long-range information retrieval. But it also leaves two spaces unexploited — and those two spaces are the entire motivation for KSA V2.</p>
+</section>
+
+<section id="s4">
+<h2 class="sec"><span class="sec-no">Section 4</span>Two bottlenecks: Summary tokens are under-used</h2>
+
+<p>The paper's motivation statement is explicit and can be compressed into one line: <b>a Summary is computed and refined at every layer, yet only ever used as low-resolution memory — losing on both ends.</b></p>
+
+<h3>Bottleneck (i): the compression rate is tied to the chunk</h3>
+
+<p>A KSA layer "stores one entry per distant chunk", so <b>compressing harder means only one thing: raising $k_s$</b>. But $k_s$ also determines the granularity of the Summary: the larger $k_s$ is, the more original text each Summary must summarize, so it is a coarser summary; and that coarser Summary is then read and refined by <b>every later layer</b>. In other words, <b>raising $k_s$ is a global coarsening of the representation, and the whole network pays for it</b>.</p>
+
+<p>This is not a theoretical worry. KSA reports its own 4B ablation showing that coarser Summary chunks degrade retrieval performance (the paper restates this conclusion in Related Work, and KSA V2 Section 3.7 runs a dedicated direct-versus-hierarchical compression comparison).</p>
+
+<div class="note">
+<b>In engineering terms:</b> inside KSA, "save memory" and "keep retrieval accuracy" are two ends of the same knob, and you cannot have only the first. To reach 1024&times; compression you must move $k_s$ from 8 to 1024, which means each Summary summarizes 1024 tokens — no longer a summary but a flattened average. What KSA V2 does is <b>pull apart two things that used to be welded together: how much you store, and how coarse what you pass forward is</b>.
+</div>
+
+<h3>Bottleneck (ii): the full layer reads all the KV yet pays quadratic prefill</h3>
+
+<p>The other half of the waste sits in the full attention layers. Interspersing them among KSA layers does preserve exact access to the original text, but it costs: $O(N^2)$ attention compute during prefill, and reading the whole history for every query during decode. Meanwhile the Summary tokens demonstrably "describe every chunk", and the full layer <b>never consults them at all</b>.</p>
+
+<p>The problem is that most of what the full layer reads in is irrelevant. The measurement the paper offers (an <abbr title="oracle: an upper bound on block selection that uses dense attention probabilities directly">oracle</abbr> block-selection experiment on a frozen Hybrid KSA, corresponding to Figure 12 and Table 10):</p>
+
+<div class="takeaway">
+At 128K context, oracle block selection restricts the main attention's read set to <b>about 3.9%</b> of the text positions, yet <b>retains about 82% of the decode <abbr title="attention mass: the total share of attention probability falling on a set of positions">attention mass</abbr></b> and achieves retrieval performance close to dense.
+</div>
+
+<p>That statement carries two implications, and both are worth pausing on:</p>
+
+<ol>
+<li><b>Attention is highly concentrated.</b> Roughly 97% of positions contribute less than 20% of the attention mass. Dense attention spends $O(N^2)$ compute on positions that do not matter.</li>
+<li><b>What is missing is not sparsity but a cheap criterion for "where to look".</b> The oracle is called an oracle because it uses dense attention probabilities to choose. A real system does not have those probabilities, so it needs a router that is <b>cheap enough and learnable during training</b>. And the Summary — which already describes every chunk — is precisely a ready-made router, except that KSA never consults it.</li>
+</ol>
+</section>
+
+<section id="s5">
+<h2 class="sec"><span class="sec-no">Section 5</span>The core insight: one Summary, two roles</h2>
+
+<p>Put the two bottlenecks of Section 4 side by side and the answer is almost self-evident. The paper's insight can be written as one asymmetric statement:</p>
+
+<div class="takeaway">
+<b>As memory, a Summary can be compressed once more at the moment it is stored, without coarsening the representation that is passed on; as an index, a Summary can direct the exact-access layers to which original blocks to look at.</b> The efficient layers store coarsely, the exact layers read finely, and the Summary connects the two.
+</div>
+
+<p>Note the most delicate part of that sentence — it avoids coarsening by choosing <b>when</b> to compress rather than <b>how hard</b>:</p>
+
+<ul>
+<li><b>Compress when storing (C-KSA)</b>: pool every $k_m$ consecutive Summary KV entries into one <abbr title="Meta KV: the second-level compression product of C-KSA, private to a layer">Meta KV</abbr> entry, used to read distant history <b>only inside this layer</b>. The Meta entry <b>is not passed forward</b>. So distant history gains another $k_m$-fold storage compression (a combined $k_s k_m$), while the granularity of the Summary sequence flowing between layers is <b>completely unchanged</b> — later layers still receive Summaries refined at $k_s = 8$ granularity. This dissolves bottleneck (i): the compression rate is decoupled from the representation granularity.</li>
+<li><b>Use it as an index when reading (S-KSA)</b>: use the existing Summaries to pool the original-text KV of each $b$-token block into block-level routing keys, then use the <abbr title="Lightning Indexer: DSA's lightweight block scorer">Lightning Indexer</abbr> (DeepSeek-AI et al., 2025) to select top blocks, and let the main attention read only the <b>original</b> KV of those blocks. This dissolves bottleneck (ii): the full layer is replaced, prefill is no longer quadratic, and the number of routing candidates is $b$ times smaller than with a token-level index.</li>
+</ul>
+
+<p>There is also one property that matters enormously in practice: <b>neither layer type adds tokens or rearranges the Summary layout.</b> Both consume Summaries that already exist, so they can be <b>retrofitted directly into a pre-trained hybrid model</b> — no tokenizer change, no pre-training from scratch. Every experiment in the paper follows that route, which is also why its experimental cost stays at the "continued pretraining" scale.</p>
+
+<div class="note">
+<b>Difference from neighbouring work (citation attribution follows the paper's own labelling).</b> CSA in DeepSeek-V4 (DeepSeek-AI et al., 2026) also performs learned dimension-wise aggregation, but it aggregates the <b>KV of text tokens</b> and lets the result participate in subsequent computation as a new entry; C-KSA aggregates the <b>KV of Summaries</b>, and its product is private to the layer. S-KSA differs from DSA in that DSA selects at token level whereas S-KSA drops to block level, with $b$ times fewer routing candidates; and differs from CSA in that CSA's main attention reads compressed text, while S-KSA's main attention reads the <b>original</b> text KV.
+</div>
+</section>
+
+<section id="s6">
+<h2 class="sec"><span class="sec-no">Section 6</span>Architecture overview and overall payoff</h2>
+
+<p>The figure below is worth a few minutes to map every block onto the text. On the left is the Hybrid structure of KSA V1, in the middle the two ways the new layers are substituted in, and on the right the overall shape of KSA V2.</p>
+
+<figure class="fig"><img src="figs/fig2.png" alt="Architecture overview: from Hybrid KSA to KSA V2"><figcaption><b>Figure 2:</b> Architecture overview: from Hybrid KSA to KSA V2. <span class="ex">Left: the Hybrid structure of KSA V1, with Full layers and KSA layers interleaved 3:1 and the KV compression rate tied rigidly to the Summary layout. Middle: how the two new layer types substitute in — three KSA layers become C-KSA (compressing Summary KV into Meta KV inside the layer; note the $1/k_m$ marked in the figure), and the fourth, Full layer becomes S-KSA (sink + selected blocks + local KV). Right: the final shape of KSA V2, where the Summary token layout is completely unchanged, which is what makes retrofit possible. The thing to hold onto when reading this figure is <b>"no new tokens, no layout change — the only thing that changes is how each layer reads and writes KV"</b>.</span>
+          <span class="pgref">Report p.3</span>
+    </figcaption></figure>
+
+<p>The overall conclusion the paper draws condenses into one line: <b>at 1.9B (<abbr title="MHA: Multi-Head Attention, with independent Q/K/V per head">MHA</abbr>) and 128K sequence scale, resident cache drops 40.4%, prefill throughput rises 1.51&times;, and decode throughput rises 1.27&times;</b> relative to Hybrid KSA; relative to Full the cache reduction is 73.7% and the prefill speedup 2.16&times;.</p>
+
+<p>The finer breakdown lives in Figure 1. It has two panels answering two different questions, and they should not be read as one.</p>
+
+<figure class="fig"><img src="figs/fig1.png" alt="Left: long-context and general capabilities; Right: per-token FLOPs and cache size"><figcaption><b>Figure 1:</b> Left: long-context and general capabilities of 1.9B C-KSA+S-KSA and the reference models reported in KSA. Right: per token inference <abbr title="FLOPs: floating point operations">FLOPs</abbr> and cache size (1GiB = 2<sup>30</sup> bytes). <span class="ex">The left panel answers "did any capability drop": across six <abbr title="RULER: a long-context retrieval benchmark suite (4K–128K)">RULER</abbr> lengths plus Mean plus nine general-capability benchmarks, C-KSA+S-KSA's RULER mean of 72.4 is essentially level with Hybrid KSA's 72.6 while sitting well above Full's 67.6, and general capabilities are broadly on par. The right panel answers "how much was saved": the curves fan out with sequence length, and the two annotations attach to the FLOPs panel and the cache panel respectively. <b>The paper's claim only emerges when the two panels are read together: the savings were not bought with capability.</b> The multipliers annotated in the figure, and their relationship to the paper's text, are covered in the note below — the text and the in-figure labels do not fully agree, and that matters for reproduction.</span>
+          <span class="pgref">Report p.1</span>
+    </figcaption></figure>
+
+<div class="note">
+<b>The multipliers in the right panel: the text and the in-figure labels disagree, so always say which source you are quoting.</b><br>
+&bull; <b>Text (Section 3.6):</b> at 128K, per text token matrix-FLOPs is lower by <b>6.38&times;</b> relative to Full and by <b>2.76&times;</b> relative to Hybrid KSA; the BF16 KV <b>and index-key</b> cache is smaller by <b>3.86&times;</b> relative to Full and by <b>1.35&times;</b> relative to Hybrid KSA.<br>
+&bull; <b>In-figure labels:</b> the FLOPs panel reads "6.4&times; lower" and "2.3&times; lower"; the cache panel reads "3.9&times; smaller" and "2.9&times; smaller".<br>
+&bull; <b>Cross-check [organized]:</b> the two comparisons against Full agree (6.4&asymp;6.38, 3.9&asymp;3.86); <b>the two comparisons against Hybrid KSA do not</b> — the in-figure 2.3&times; / 2.9&times; correspond to the text's 2.76&times; / 1.35&times;. The cache item can also be cross-validated against the paper's own measured values: at 128K the resident cache is Full 24.00 GiB, Hybrid KSA 10.59 GiB, C-KSA+S-KSA 6.31 GiB, so $24.00/6.31 = 3.80$ (matches the in-figure 3.9) while $10.59/6.31 = 1.68$ (matches <b>neither</b> the text's 1.35 nor the in-figure 2.9). This page consistently uses the <b>written Section 3.6 numbers</b>, and marks 2.3&times; / 2.9&times; as "in-figure label, inconsistent with the text".
+</div>
+</section>
+
+<section id="s7">
+<h2 class="sec"><span class="sec-no">Section 7</span>Three contributions and how to read the rest</h2>
+
+<p>The paper states three contributions, each matching a problem it solves:</p>
+
+<ol>
+<li><b>C-KSA</b>: at <b>storage</b> time, compress Summary KV into layer-local Meta entries, so that further compression of distant history no longer requires coarser Summaries.</li>
+<li><b>S-KSA</b>: turn the existing Summaries into block-level routing keys and run sparse attention over the selected original-text blocks.</li>
+<li><b>Deployment and boundaries</b>: a retrofit recipe and GPU kernels that convert a pre-trained Hybrid KSA, with RULER performance level with the parent model; plus an explicit report of <b>where the remaining cost sits and under what conditions the method fails</b>.</li>
+</ol>
+
+<p>The third deserves a separate sentence. This report is candid about failure modes: the remaining cost is mainly the original-text KV kept by the sparse layers, and block selection degrades on <b>aggregation-heavy tasks</b> (frequent-word extraction falls from 45.00% to 26.67%). A technical report willing to spell out its degradation is worth more to an engineer than two extra points of headline metric.</p>
+
+<div class="takeaway">
+<b>How to read on.</b>Section 8 onwards is the method proper: notation and overall layout first (Section 8), then C-KSA's two-level aggregation (Section 9) and attention-mass correction (Section 10), then S-KSA's block aggregation and routing (Section 11). Section 12 uses the configuration in Table 2 to turn every symbol into a countable integer — it is worth doing the arithmetic yourself as you go. Section 13 covers the KV cache layout and memory analysis, and Section 14 the kernels.
+</div>
+</section>
+<section id="s8">
+<h2 class="sec"><span class="sec-no">Section 8</span>Notation and overall layout: count your cards first</h2>
+
+<p>The method section pins down its symbols immediately. Every formula that follows uses them, so two minutes spent here pays for itself many times over.</p>
+
+<ul>
+<li>$T_i$ — a text token. The thing the model is actually trained to predict.</li>
+<li>$S_c$ — a chunk Summary. The summary token of the $c$-th chunk, <b>inserted once every $k_s$ text tokens</b>.</li>
+<li>$M_g$ — a <abbr title="Meta KV: the second-level compression product of C-KSA, private to a layer">Meta KV</abbr> entry. The compressed product of the $g$-th group of Summaries, <b>used only in its own layer</b>.</li>
+<li>$k_s$ — the chunk size, i.e. how many text tokens one Summary covers. <b>Both 1.9B and 4B use 8.</b></li>
+<li>$k_m$ — how many consecutive Summaries are compressed into one Meta entry. <b>128 for 1.9B, 32 for 4B.</b></li>
+<li>$b$ — how many text tokens one routing block contains. <b>Set to 4</b>, and $b$ is required to divide $k_s$.</li>
+<li>$W$ — how many <b>complete chunks</b> the local window covers. KSA/C-KSA use a "sliding chunk number" of 128, which with $k_s=8$ gives a local window of 1024 text tokens.</li>
+<li>$K$ — the remote budget, <b>measured in original text tokens</b>, 4096 for both 1.9B and 4B. Note that it counts tokens, not blocks: the number of selectable blocks is $K/b$.</li>
+<li>$q_t$, $O_t$ — the attention query and output at position $t$.</li>
+</ul>
+
+<p>The overall layout follows Hybrid KSA's <b>3:1</b>: <b>three C-KSA layers followed by one S-KSA layer</b>, repeating. This matters — KSA V2 <b>does not change the layer ratio</b>, it only replaces each layer of the old "three KSA + one Full" pattern with a stronger version. The conversion is therefore drop-in: layer count, width, Summary layout and tokenizer are all untouched.</p>
+
+<div class="note">
+<b>Why does the 3:1 ratio not need changing?</b>Because the two new layer types address two orthogonal wastes inside the hybrid structure: C-KSA makes the memory-saving layers cheaper still, and S-KSA makes the exact-access layer cheaper. The 3:1 ratio itself encodes an empirical question — "how thick does the accuracy safety net need to be" — and KSA V2 has no evidence to move it, so it does not. That is engineering restraint in the right place.
+</div>
+</section><section id="s9">
+<h2 class="sec"><span class="sec-no">Section 9</span>C-KSA part one: two-level aggregation, Equations (1)–(4)</h2>
+
+<p>What C-KSA does fits in one sentence: <b>KSA already inserted Summaries into the text sequence; C-KSA aggregates the Summary sequence once more.</b> It pools every $k_m$ consecutive Summary KV entries into a single Meta KV entry, so the compression factor for distant history goes from $k_s$ to $k_s k_m$, while nearby text stays directly readable.</p>
+
+<p>There are two levels of aggregation here, pointing in completely different directions — do not mix them up:</p>
+
+<h3>Level one: Text &rarr; Summary (pre-existing in KSA)</h3>
+
+<p>Cut the text sequence into chunks of $k_s$ tokens and append one <abbr title="Summary token: an aggregate token appended after each chunk">Summary token</abbr> $S_c$ at the end of each chunk. All Summaries share <b>the same learnable initial embedding</b> and use exactly the same attention and FFN parameters as text tokens — a Summary is not a special side module, it is simply another kind of token in the sequence.</p>
+
+<p>At each layer, $S_c$ attends to <b>the text tokens inside its own chunk plus itself</b>, aggregating chunk-level information from them. There is one positional detail: <b>text tokens keep their original position indices, while $S_c$ uses the position of the last text token in its chunk.</b></p>
+
+<div class="note">
+<b>Why does a Summary reuse its chunk's last position?</b>Three reasons stack up: (1) it is <b>causal</b> — a Summary may only see its own chunk and earlier text, and the last position does not let it peek at the future; (2) it places the Summary <b>right next to the content it summarizes</b> in position space, consistent with the distance semantics used in Section 10; (3) reusing the position means no extra position bucket and no change to the position-embedding table. <b>The cost is</b> that a Summary shares a position with the last text token of its chunk, so the two can only be told apart by content rather than by position — which is exactly why Section 10 has to distinguish "local text KV" from "boundary Summary KV" as two separate classes of visible entry.
+</div>
+
+<h3>Level two: Summary &rarr; Meta (new in C-KSA)</h3>
+
+<p>Now the core of the paper. Inside each C-KSA layer, cut the Summary sequence into <b>non-overlapping</b> groups of $k_m$. For the $r$-th Summary in group $g$ ($0 \le r &lt; k_m$), let its normalized layer input be $h_r \in \mathbb{R}^d$ ($d$ being the hidden size). Equation (1) computes three things at once:</p>
+
+<div class="math">$$
+k_r = \mathrm{RMSNorm}(W_K h_r), \qquad v_r = W_V h_r, \qquad z_r = A h_r. \tag{1}
+$$
+</div>
+
+<p>Take it term by term, because each term plays a different role:</p>
+
+<ul>
+<li>$k_r$, $v_r$ — the key and value of this Summary. Note that $W_K, W_V \in \mathbb{R}^{d_{KV} \times d}$ <b>are the backbone's existing projections</b>, not new ones. In other words, what gets pooled is the very pair of KV the model would compute anyway — nothing extra, nothing bolted on.</li>
+<li>$z_r = A h_r$ — the <b>aggregation logit</b>. $A \in \mathbb{R}^{d_{KV} \times d}$ is an <b>additional learnable projection</b> whose output width is deliberately aligned with $d_{KV}$ (the total key/value width across all heads). This is C-KSA's only new "brain".</li>
+</ul>
+
+<p>One shape detail is worth noting: <b>the RMSNorm is applied independently per attention head</b>. That means the key scales of different heads do not interfere with one another, and aggregation weights can form separately within each head.</p>
+
+<p>Equation (2) then turns these logits into weights:</p>
+
+<div class="math">$$
+[\alpha_0, \ldots, \alpha_{k_m-1}] = \mathrm{softmax}_{\text{group}}\big[\, z_0 + B_0,\; \ldots,\; z_{k_m-1} + B_{k_m-1} \,\big]. \tag{2}
+$$
+</div>
+
+<p>Three points:</p>
+
+<ol>
+<li><b>$B_r \in \mathbb{R}^{d_{KV}}$ is a new, learnable intra-group positional bias</b>. It gives "the $r$-th Summary in the group" an identity — without it, pooling would be entirely symmetric with respect to order inside the group, whereas intra-group position does carry information (later Summaries cover more recent content).</li>
+<li><b>The softmax runs over the $k_m$ Summaries</b>, so for each group $\sum_r \alpha_r = 1$ (coordinate-wise). It is a convex combination, so the output naturally lies inside the convex hull of the inputs and cannot blow up numerically through aggregation.</li>
+<li><b>The softmax is taken independently for each feature coordinate</b> (the paper explicitly writes "independently for each feature coordinate"). This is counter-intuitive but important: $\alpha_r$ is not a scalar weight but a <b>vector of width $d_{KV}$</b>. Feature dimension 37 can prefer the second Summary in the group while dimension 38 prefers the fifth. This is what the paper calls dimension-wise aggregation (the same lineage as DeepSeek-V4 (DeepSeek-AI et al., 2026)), and it is why the equations below use element-wise multiplication rather than scalar weighting.</li>
+</ol>
+
+<p>Equation (3) performs the pooling:</p>
+
+<div class="math">$$
+\bar{k} = \sum_{r=0}^{k_m-1} \alpha_r \odot k_r, \qquad \bar{v} = \sum_{r=0}^{k_m-1} \alpha_r \odot v_r, \tag{3}
+$$
+</div>
+
+<p>Here $\odot$ is element-wise multiplication. <b>The same set of weights aggregates both key and value</b> — a deliberate design choice: if two independent weight sets aggregated K and V, then $\bar{k}$ and $\bar{v}$ could come from different preferences over the Summaries in the group, K and V would no longer be "paired", and both the interpretability and the stability of attention would suffer. Sharing one set of weights guarantees that $\bar{k}$ and $\bar{v}$ describe <b>the same aggregated object</b>.</p>
+
+<p>Finally, Equation (4) attaches position information to the pooled result:</p>
+
+<div class="math">$$
+M_g = \big(\mathrm{RoPE}(\bar{k},\, p_g),\; \bar{v}\big). \tag{4}
+$$
+</div>
+
+<p>Here $p_g$ is <b>the position of the last Summary in the group</b>. Two deliberate choices live here:</p>
+
+<ul>
+<li><b>RoPE is applied after pooling, not before.</b> If each $k_r$ were rotated first and then summed with weights, the rotations at different positions would mathematically interfere with each other, and the result would be neither the key at $p_g$ nor the key at any real position. Pool first, rotate afterwards, and the Meta entry sits cleanly at $p_g$. $v_r$ is not rotated (standard practice; RoPE applies only to key/query).</li>
+<li><b>Take the group's last position.</b> A Meta entry represents "the whole stretch of history covered by these $k_m$ Summaries", and causal attention can only look backwards, so taking the last position means the Meta does not claim to know the future — it is the most conservative choice and the farthest from the current query. This reprises the same design principle as "a Summary uses its chunk's last position" at level one.</li>
+</ul>
+
+<h3>Meta is used only inside its own layer and is not passed forward</h3>
+
+<p>Right after Equation (4), the paper nails down the foundation the whole method rests on:</p>
+
+<div class="takeaway">
+<b>Meta entries are used only inside the layer that constructs them; the original Summary states continue to propagate across layers.</b> Therefore $k_m$ can vary freely across C-KSA layers without changing the shared Summary token layout.
+</div>
+
+<p>That sentence explains how bottleneck (i) from Section 4 is dissolved. Look back: the reason raising $k_s$ is dangerous in KSA is that the Summary is passed forward, so coarsening pollutes every later layer. C-KSA makes the compression product $M_g$ <b>private to its layer</b> — it is a read-only view that is discarded after use, never entering the hidden-state sequence. Consequently:</p>
+
+<ul>
+<li>storage for distant history gains another $k_m$-fold saving (a combined $k_s k_m$),</li>
+<li>while <b>the granularity of the Summary sequence flowing between layers is completely unchanged</b>: later layers still receive Summaries refined at $k_s=8$ granularity,</li>
+<li>and there is extra freedom: <b>each layer can choose its own $k_m$</b> (layer privacy imposes no cross-layer consistency constraint), which the paper explicitly lists as a direction for future work.</li>
+</ul>
+
+<p>Now the cost side, which deserves the same clarity. <b>A Meta that is not passed forward is not a "better representation", only a "cheaper read view"</b>: what this layer reads from the Meta cannot be inherited directly by the next layer, which must re-compress from the Summaries handed down to it. In addition, the parameters $A$ and $\{B_r\}$ are <b>per-layer</b> ("specific to each layer") but <b>shared across groups</b> ("shared across groups") — a layer has one set of aggregation rules used by all Meta groups, so the parameter overhead is $O(d \cdot d_{KV} + k_m d_{KV})$ rather than multiplied by the number of groups.</p>
+
+<figure class="fig"><img src="figs/fig3.png" alt="Compressed KSA with ks=4 and km=2"><figcaption><b>Figure 3:</b> Compressed KSA with $k_s = 4$ and $k_m = 2$. Complete remote Summary groups are compressed into Meta KV, while boundary Summary KV and local text KV remain directly accessible. <span class="ex">This figure states "who can be seen" most clearly. The sequence is laid out with one chunk per 4 text tokens, and $k_m=2$ means two Summaries per group. In the Remote region on the left, $S_0,S_1$ form a <b>complete</b> group and are compressed into $M_0$, while $S_2,S_3$ become $M_1$ — for the current query they appear only in Meta form. In the Local region on the right, the most recent $S_4$ still appears as a <b>raw Summary</b> (it is a boundary Summary, because its group is not yet full), and the current chunk's text tokens are visible as original text. The line at the bottom, $a_{tj}=q_t^\top k_j/\sqrt{d} + \mathbb{1}_{j \in \mathrm{Meta}}\log k_m$, is the correction term from Section 10 — for now it is enough to remember "add a constant to Meta".</span>
+          <span class="pgref">Report p.4</span>
+    </figcaption></figure>
+</section>
+
+<section id="s10">
+<h2 class="sec"><span class="sec-no">Section 10</span>C-KSA part two: three classes of visible KV and attention-mass correction</h2>
+
+<h3>Three classes of visible KV: one softmax, three sources</h3>
+
+<p>For each text query, C-KSA's visible set is assembled from three parts:</p>
+
+<ol>
+<li><b>local text</b> — the causal prefix of the current chunk, plus the original text KV of up to $W$ <b>complete</b> preceding chunks. This part is <b>full-resolution and lossless</b>.</li>
+<li><b>boundary Summary</b> — the Summaries immediately preceding the local window that have not yet filled a group (fewer than $k_m$ of them). They <b>remain individually visible</b> until their whole group falls outside the window.</li>
+<li><b>remote Meta</b> — every <b>complete</b> $k_m$-group outside the window, represented by <b>one</b> Meta KV entry.</li>
+</ol>
+
+<div class="note">
+<b>All three classes participate in the same attention softmax.</b>The paper is careful to stress "All three types of entries participate in a single attention softmax" — it is not three attention passes concatenated or blended with weights, but one unified softmax denominator holding entries at three different granularities: local text, boundary Summaries and Meta. That design makes the relative weight between granularities <b>learnable and constrained by a single normalization</b>, with no hand-set mixing coefficient. The price is the problem below.
+</div>
+
+<h3>The problem: compression steals attention mass from the far end</h3>
+
+<p>Replacing $k_m$ entries with 1 entry has a purely statistical side effect: <b>the softmax denominator has fewer terms.</b> Even with local logits completely unchanged, the total mass the far end receives after normalization drops — because $k_m$ entries used to contribute $e^{s_i}$ each, and now only one contributes $e^{s}$.</p>
+
+<p>The paper names this phenomenon <b>attention-mass correction</b>, and handles it by adding $\log k_m$ to every Meta logit <b>before</b> normalization:</p>
+
+<div class="math">$$
+\exp\big(s + \log k_m\big) = k_m \exp(s). \tag{*}
+$$
+</div>
+
+<p>The derivation is one line, but why this particular term is worth spelling out:</p>
+
+<ul>
+<li>We want a single Meta entry to <b>stand in for the sum of the $k_m$ Summaries it represents</b> inside the softmax.</li>
+<li>If the logits of the $k_m$ Summaries in a group have mean $\bar{s}$, together they contribute $k_m e^{\bar{s}}$.</li>
+<li>For one Meta entry to contribute the same amount we need $e^{s'} = k_m e^{\bar{s}}$, i.e. $s' = \bar{s} + \log k_m$.</li>
+<li>Because $\log$ and $\exp$ are inverses, <b>addition in logit space is multiplication in probability space</b> — so a single addition suffices, with no numerical trouble from renormalization.</li>
+</ul>
+
+<div class="takeaway">
+<b>What this term does and does not do.</b>It does <b>not</b> try to recover the intra-group detail lost to pooling (that is information loss, and a constant cannot buy it back); it <b>only</b> corrects the <b>normalization bias</b> introduced by having fewer entries. In one sentence: <b>$\log k_m$ keeps the "remote versus local" share of attention from drifting systematically because of compression</b>. Whether the far end's internal detail is remembered clearly depends on how well the aggregation module learns. The term $+\,\mathbb{1}_{j\in\mathrm{Meta}}\log k_m$ in Figure 3 is exactly this indicator-function form of the correction.
+</div>
+
+<p>Two implementation details remain:</p>
+
+<ul>
+<li>The correction is added only to <b>Meta logits</b> (in indicator-function form); the logits of local text and boundary Summaries are untouched. That guarantees the local window's attention behavior is <b>bit-for-bit</b> identical to the uncompressed case — compression does not change how the near field is read.</li>
+<li>The paper notes, when later visualizing attention, that the attention probabilities C-KSA produces <b>already include</b> this pre-softmax $\log k_m$ correction. That is a hint for reading figures such as Figure 13: the mass Meta receives is stated on the corrected basis.</li>
+</ul>
+</section>
+
+<section id="s11">
+<h2 class="sec"><span class="sec-no">Section 11</span>S-KSA: using Summaries as the router and reading only selected original blocks</h2>
+
+<p>S-KSA replaces the full attention layer. It has exactly one question to answer: <b>given a text query, which original blocks should I read?</b> Its answer is "let the Summaries work it out for me". The pipeline has three steps: block representation &rarr; block scoring &rarr; sparse read.</p>
+
+<h3>Step one: Summary-guided block aggregation, Equations (5)–(6)</h3>
+
+<p>Cut each chunk further into blocks of $b$ consecutive text tokens ($b$ divides $k_s$). For a block $u$, let its normalized layer inputs be $h_1,\ldots,h_b \in \mathbb{R}^d$ and the normalized input of its chunk's Summary be $h_S \in \mathbb{R}^d$. Using <b>one auxiliary attention head of width $d_A$</b> (head subscripts omitted):</p>
+
+<div class="math">$$
+q_S = \mathrm{RoPE}\big(\mathrm{RMSNorm}(W_{Q_A} h_S),\, p_S\big), \qquad
+k_i = \mathrm{RoPE}\big(\mathrm{RMSNorm}(W_{K_A} h_i),\, p_i\big), \qquad
+v_i = W_{V_A} h_i. \tag{5}
+$$
+</div>
+
+<p>Here $W_{Q_A}, W_{K_A}, W_{V_A} \in \mathbb{R}^{d_A \times d}$ are auxiliary projections private to each S-KSA layer and <b>completely independent of the backbone's attention projections</b>. The positions $p_S$ and $p_i$ follow the original sequence positions, with a Summary still sharing the position of its chunk's last text token.</p>
+
+<div class="math">$$
+\hat{z}_u = V^A\, \mathrm{softmax}\!\left(\frac{(K^A)^\top q_S}{\sqrt{d_A}}\right), \qquad K^A = [k_1,\ldots,k_b],\;\; V^A = [v_1,\ldots,v_b]. \tag{6}
+$$
+</div>
+
+<p>The direction of Equation (6) deserves a long look, because it is the most counter-intuitive step in S-KSA:</p>
+
+<ul>
+<li><b>The Summary supplies only the query; the block's text tokens supply key and value.</b> The softmax is taken <b>over the block's $b$ text tokens</b> (the paper states this explicitly: "over the block's $b$ text tokens; the Summary supplies only the query").</li>
+<li>So $\hat{z}_u$ is not "the block's average" but <b>an attention-weighted sum of the block's text, with the weights decided by the Summary</b>. The Summary plays the role of a taste preference — "what does my chunk care about" — used to pick out what matters inside the block.</li>
+<li>Concatenating the outputs of $H_A$ auxiliary heads gives $z_u \in \mathbb{R}^{H_A d_A}$, the final representation of block $u$, which is also the source of its index key below.</li>
+<li>All blocks inside the same chunk <b>share one Summary query</b> but each aggregates its own text tokens. This resembles the landmark pooling of HiLS-Attention (Hu et al., 2026), except that <b>S-KSA reuses an existing Summary and inserts no extra landmark token</b>.</li>
+</ul>
+
+<h3>Step two: block scoring, Equation (7)</h3>
+
+<p>With block representations in hand, a cheap scorer is needed to rank blocks. S-KSA adapts the <abbr title="Lightning Indexer: DSA's lightweight block scorer">Lightning Indexer</abbr> (DeepSeek-AI et al., 2025):</p>
+
+<div class="math">$$
+\rho_u = \sum_{h=1}^{H_I} w_h\, \mathrm{ReLU}\!\left(\frac{(q_h^I)^\top k_u^I}{\sqrt{d_I}}\right). \tag{7}
+$$
+</div>
+
+<ul>
+<li>The Indexer uses $H_I$ query heads of dimension $d_I$ (8 heads &times; 128 dims at both scales).</li>
+<li>The normalized layer input $h_t$ of the text query is mapped to $q_h^I \in \mathbb{R}^{d_I}$, along with one <b>scalar weight</b> $w_h$ per head.</li>
+<li>The block representation $z_u$ is mapped to <b>one</b> index key $k_u^I \in \mathbb{R}^{d_I}$, <b>shared by all heads</b>. This is the key to the cost saving: if every head had its own block key, the number of block keys would be multiplied by $H_I$.</li>
+<li>$\mathrm{ReLU}$ keeps each head's contribution non-negative (a negative correlation is not treated as "negative importance"), and $w_h$, scaled by $1/H_I$, merges the per-head scores into $\rho_u$.</li>
+<li>Before scoring, <b>partial RoPE</b> encodes position information into the query at position $t$ and the key at the block's last position — note that it is partial, rotating only a subset of dimensions.</li>
+<li>One more detail enabled only at 4B: <b>an extra RMSNorm applied to the projected index query/key</b>. Section 3.4 gives the motivation (feature-scale differences between backbones affect index-logit magnitude and optimization) and reports that without it the 4B Indexer loss stays high and remains below the C-KSA+Full parent even after 21.8B tokens, whereas with it only 4.2B tokens are needed to recover to near the parent. 1.9B keeps the original setting for consistency — the paper itself leaves this asymmetry as an open question for future work.</li>
+</ul>
+
+<h3>Step three: sparse access, Equation (8)</h3>
+
+<p>Given block scores $\{\rho_u\}$, S-KSA selects <b>at most $K/b$ remote blocks</b> ($K$ being the remote budget in original text tokens), and then:</p>
+
+<div class="math">$$
+O_t = \mathrm{Attn}\big(q_t,\; [K_{\mathcal{L}_t}, K_{\mathcal{R}_t}],\; [V_{\mathcal{L}_t}, V_{\mathcal{R}_t}]\big), \tag{8}
+$$
+</div>
+
+<p>Square brackets denote concatenation along the sequence dimension, $\mathcal{L}_t$ is the set of local positions and $\mathcal{R}_t$ the set of selected remote positions. Three constraints must hold simultaneously, or causality breaks or budget is wasted:</p>
+
+<ul>
+<li><b>Candidate blocks must belong to completed chunks</b> (otherwise a block's content is incomplete);</li>
+<li><b>Candidate blocks must fall entirely before the causal local window</b> (otherwise they would be read twice, once locally);</li>
+<li><b>The eligible sink blocks at the start of the sequence are kept within this budget</b>, and only the remaining slots are filled by score from high to low.</li>
+</ul>
+
+<p>Attention is then computed by the backbone's <b>original</b> Q/K/V, with a <b>single</b> softmax over local and remote tokens in each head. In other words, the routing score $\rho_u$ is used only to <b>select blocks</b> and <b>does not participate in the attention weighting</b> — inside a selected block, everything is scored by the real q·k as usual. That distinction matters: it makes the main attention numerically identical to dense attention on the selected set.</p>
+
+<h3>The cost ledger: where $O(N^2/b)$ comes from</h3>
+
+<div class="takeaway">
+For $N$ text tokens, S-KSA builds about $N/b$ index keys, so <b>there are $b$ times fewer candidate comparisons than a token-level index</b>; the routing cost during <abbr title="prefill: the stage that processes the input prompt">prefill</abbr> is $O(N^2/b)$, while the main attention reads only the in-budget original blocks for each query.
+</div>
+
+<p>One line of derivation: $N$ queries, each compared against about $N/b$ block keys, computed per head &rarr; $O(N \cdot N/b) = O(N^2/b)$. Against the $O(N^2)$ of token-level <abbr title="DSA: DeepSeek Sparse Attention, token-level sparsity">DSA</abbr>, that saves exactly one factor of $b$ — which is why the choice of $b$ (Section 12) is the trade-off point between retrieval quality and routing cost.</p>
+
+<figure class="fig"><img src="figs/fig4.png" alt="Sparse KSA with ks=4 and b=2"><figcaption><b>Figure 4:</b> Sparse KSA with $k_s = 4$ and $b = 2$. <span class="ex">The left half is the two-level information flow: text tokens inside a block go through $W_K/W_V$ to produce block representations $\hat{z}_4,\hat{z}_5$, while the chunk's Summary $S_2$ supplies the query through $W_Q$; the two paths meet in the "Block indexer" to pick block indices by Top-K. The top right is the key point — <b>the auxiliary attention head and the main attention use independent QKV projections</b> (the "Independent projections" branch in the figure), and what the auxiliary head computes is only an index; the main attention uses the original Q to read the <b>original text</b> KV of Sink + selected blocks + Local, producing $O_t$. Note that the figure uses $b=2$ and $k_s=4$, so each chunk has 2 blocks, and the selected blocks (Block 4, Block 5) participate in attention as original text.</span>
+          <span class="pgref">Report p.5</span>
+    </figcaption></figure>
+</section>
+
+<section id="s12">
+<h2 class="sec"><span class="sec-no">Section 12</span>Putting the configuration on concrete numbers: a countable walkthrough</h2>
+
+<p>Everything so far has been symbols. This section turns them into integers you can count — <b>the most effective thing a reader can do with a technical report is to work through its configuration table by hand.</b> The configuration comes from Table 2. Look at the figure first, then do the arithmetic.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table2.png" alt="Table 2: Configurations of the selected 1.9B and 4B models"><figcaption><b>Table 2:</b> Configurations of the selected 1.9B and 4B models. Module settings apply where the corresponding modules are used. <span class="ex">The top part is the shared backbone, the middle the C-KSA configuration and the bottom the S-KSA configuration. When working through it, focus on these rows: layer count, the 3:1 hybrid ratio, $k_s$, the Summary-to-Meta group size $k_m$, the block size $b$, the remote token budget $K$, the local window length and the sink tokens. Two comparisons are especially interesting: 1.9B uses $k_m=128$ while 4B uses $k_m=32$ (with a larger hidden size and more layers, 4B chose the more conservative compression granularity), whereas $K$, $b$, the local window and the sink are <b>identical</b> between 1.9B and 4B, marking them as engineering constants fixed across scales.</span>
+          <span class="pgref">Report p.13</span>
+    </figcaption></figure></div>
+
+<p>Take <b>1.9B</b> as the example: 24 layers, 3:1 hybrid ratio, $k_s=8$, $k_m=128$, $b=4$, $K=4096$, local window 1024, sink 8.</p>
+
+<h3>Walkthrough 1: how many layers of each kind in 24 layers</h3>
+
+<p>3:1 means "three C-KSA layers followed by one S-KSA layer" is one cycle of 4 layers. Direct integer division:</p>
+
+<p>$24 \div 4 = 6$ complete cycles, hence <b>C-KSA layers</b> $= 6 \times 3 = \mathbf{18}$ and <b>S-KSA layers</b> $= 6 \times 1 = \mathbf{6}$. Check: $18+6=24$, matching the layer count in Table 2. <span class="ex">([estimated]: obtained by dividing Table 2's layer count by the hybrid ratio.)</span></p>
+
+<p>That number immediately earns its keep: <b>of the 24 layers in the whole model, only 6 need to store original-text KV</b>; the other 18 all take the compressed path. When Section 13 asks "where does the remaining cost sit", it is pointing at these 6 layers.</p>
+
+<h3>Walkthrough 2: how many Meta entries a C-KSA layer holds at 128K</h3>
+
+<p>Work forwards:</p>
+
+<ol>
+<li>Number of text tokens $N = 128\text{K} = 131072$.</li>
+<li>Each Summary covers $k_s=8$ text tokens, so the number of Summaries is $N/k_s = 131072/8 = \mathbf{16384}$. <span class="ex">([estimated]: direct division using $k_s=8$, not counting each chunk's extra Summary position itself.)</span></li>
+<li>Every $k_m=128$ Summaries compress into one Meta, so the number of Meta entries is $16384/128 = \mathbf{128}$.</li>
+</ol>
+
+<div class="takeaway">
+<b>At 128K context, one C-KSA layer holds only about 128 Meta entries to represent all of distant history.</b>The paper uses this to explain why $k_m=128$ is enough: since at 128K only about 128 entries remain, raising $k_m$ further saves very little cache, so the larger compression factors are left for million-token contexts. It is also a neat example of configuration choice meeting diminishing returns — <b>once the entry count is already the same order as a constant, stop</b>.
+</div>
+
+<h3>Walkthrough 3: the remote compression factor $k_s k_m$ and per-token width</h3>
+
+<p>The sequence-dimension compression factor for distant history is the product of the two levels:</p>
+
+<p>$k_s \times k_m = 8 \times 128 = \mathbf{1024}$. <span class="ex">([estimated]: product of the two compression factors.)</span> In other words, distant history is compressed 1024-fold along the sequence dimension.</p>
+
+<p>Translate that into "how much KV width each original token occupies", using Table 1's example settings $H=128$, $d_h=128$, $H_{KV}=8$:</p>
+
+<ul>
+<li><abbr title="MHA: Multi-Head Attention, with independent Q/K/V per head">MHA</abbr>: $2 \times 128 \times 128 = \mathbf{32768}$ scalars / token.</li>
+<li><abbr title="GQA: Grouped-Query Attention, where several query heads share KV heads">GQA</abbr> ($H_{KV}=8$): $2 \times 8 \times 128 = \mathbf{2048}$ scalars / token, about 1/16 of MHA.</li>
+<li>C-KSA (MHA width): $2 \times 16 \times 128 / 1024 = \mathbf{4}$ scalars / token.</li>
+<li>C-KSA + GQA: $2 \times 8 \times 128 / 1024 = \mathbf{2}$ scalars / token.</li>
+</ul>
+
+<p><span class="ex">([estimated]: applies the paper's Table 1 formulas $2 N H d_h /(k_s k_m)$ and $2 N H_{KV} d_h /(k_s k_m)$ with the widths and compression factor above. Note that $H=128$, $d_h=128$ here are Table 1's example settings and <b>not</b> the 1.9B configuration — 1.9B actually has 16 Q/KV heads with head dim 128.)</span></p>
+
+<h3>Walkthrough 4: converting $K$ and $b$ into blocks, and the routing candidate count</h3>
+
+<p>$K=4096$ is a remote budget <b>measured in original text tokens</b>, with block size $b=4$, so:</p>
+
+<p>Selectable remote blocks: $K/b = 4096/4 = \mathbf{1024}$ blocks. <span class="ex">([estimated]: $K$ is defined in tokens, so dividing by the block size gives the block count.)</span></p>
+
+<p>The size of the index space can also be counted: at $N=128\text{K}$ the total number of blocks is $N/b = 131072/4 = 32768$, whereas a token-level index would have 131072 candidates. Block-level routing therefore reduces each query's comparison set <b>from 131072 to 32768, exactly a factor of $b=4$</b>. <span class="ex">([estimated]: direct division from the definition of the candidate count.)</span> This is the concrete origin of the $b$ in Section 11's $O(N^2/b)$.</p>
+
+<p>One more conversion is easy to miss: <b>the 8 sink tokens are already included inside $K=4096$</b>, while the 1024-token local window is retained <b>separately</b> and does not draw on that budget. So a query at 128K context actually reads at most about $4096 + 1024 = 5120$ text tokens, i.e. <b>about 3.9%</b> of 131072. <span class="ex">([estimated]: $5120/131072 \approx 3.91\%$, consistent with the "about 3.9% of positions" the paper reports in the <abbr title="oracle: an upper bound on block selection that uses dense attention probabilities directly">oracle</abbr> experiment.)</span> That 3.9% is the scale at which Section 4's $O(N^2)$ gets cut down — <b>the paper's insight (attention is highly concentrated) and its configuration ($K$, local window) balance their books here.</b></p>
+
+<h3>Walkthrough 5: added parameters and a budget self-check</h3>
+
+<p>Table 2 also gives the added parameter counts: for 1.9B, 80.2M on the C-KSA side and 86.6M on the S-KSA side; for 4B, 71.7M and 163.0M respectively. The checkable part of C-KSA is the aggregation projection $A$ and the positional bias $\{B_r\}$:</p>
+
+<ul>
+<li>1.9B: $A$ is $2048 \times 2048 \approx 4.2\text{M}$ and $\{B_r\}$ is $128 \times 2048 \approx 0.3\text{M}$, for a total of about <b>4.5M</b> — a small fraction of the 80.2M total, which says C-KSA's added parameters are <b>mostly not in the aggregation module itself</b> but spread across whatever each layer does with the KV width. <span class="ex">([estimated]: from multiplying the shapes in Table 2; the conclusion that it is "mostly not in the aggregation module" is an [organized] reading obtained by comparing against the total Table 2 reports.)</span></li>
+<li>4B: $A$ is $1024 \times 2560 = 2.62\text{M}$ and $\{B_r\}$ is $32 \times 1024 = 0.03\text{M}$, for a total of about <b>2.65M</b>, while Table 2 reports 71.7M of added C-KSA parameters. The same phenomenon: dropping $k_m$ from 128 to 32 shrinks the positional-bias table to a quarter.</li>
+</ul>
+
+<div class="note">
+<b>What this set of numbers suggests:</b>the aggregation module itself is "light" (single-digit millions), so C-KSA is a cheap architectural change in parameter terms; what really drives cost is that it <b>changes the read/write width and the entry count of the KV</b>. That is good news for an engineer — retrofitting a trained model requires very little new learning, while the payoff (cache and bandwidth) is large.
+</div>
+</section>
+
+<section id="s13">
+<h2 class="sec"><span class="sec-no">Section 13</span><abbr title="KV cache: the cached key/value pairs used during autoregressive decoding">KV cache</abbr> layout, memory analysis, and mechanism comparison</h2>
+
+<p>Whether a method can ship ultimately depends on how the cache is laid out and updated. C-KSA's cache design has one hard requirement: <b>every text query must be able to read all of its visible KV entries with a single contiguous slice</b>, avoiding the need to stitch several cache segments together at each step. That requirement determines the entire layout.</p>
+
+<h3>12.1 Structure: two components</h3>
+
+<p>Each C-KSA layer maintains two parts:</p>
+
+<ol>
+<li><b>Attention KV Cache</b> — key and value live in two tensors but with <b>identical layouts</b>, ordered along the sequence dimension as: the current chunk, the local text ring, remote history, and finally free slots.</li>
+<li><b>Summary Ring Buffer</b> — holds the Summary KV of the local chunks plus the auxiliary state needed for compression.</li>
+</ol>
+
+<p>On sizes: the current chunk reserves $k_s$ text slots, the local ring reserves $k_s W$ slots (corresponding to $W$ complete preceding chunks), and remote history holds Meta entries plus <b>the Summaries that have not yet filled a $k_m$ group and are waiting to be compressed</b>. The two rings share <b>the same pointer</b>, pointing at the next chunk slot to be replaced.</p>
+
+<p>One rule is easy to overlook but central to understanding the behavior: <b>as long as a chunk is still inside the local window, text queries read its original text KV, not its Summary KV.</b> Only when the chunk is pushed out of the window does its Summary KV enter remote history.</p>
+
+<h3>12.2 The five-step update flow (panels a–e of Figure 5)</h3>
+
+<p>The paper walks the whole update through a small example with $k_s=2$, $W=4$, $k_m=4$. Panel by panel:</p>
+
+<figure class="fig"><img src="figs/fig5.png" alt="C-KSA cache layout and decoding updates"><figcaption><b>Figure 5:</b> C-KSA cache layout and decoding updates with $k_s = 2$, $W = 4$, and $k_m = 4$. Gray ($T$), orange ($S$), and purple ($M$) denote text, Summary, and Meta KV. Blue marks indicate reads or writes. <span class="ex">The five panels are one continuous event sequence and are best read a&rarr;e. (a) is the static layout: the blue outline circles one <b>contiguous</b> visible KV cache (assembled from the local text ring, the Meta entries of remote history, and some Summaries), with the Summary Ring Buffer below, the two linked by the same pointer. (b)(c) are <b>writes</b>: text KV fills the current chunk region right-to-left, and a new Summary attends only to its own chunk's text KV plus itself. (d) is the ring <b>replacement</b>: a new chunk evicts the oldest chunk, and the evicted $S_7$ moves into remote history. (e) is <b>compression</b>: the four Summaries $S_4$–$S_7$ merge into $M_1$, written back into the group's first slot, with the other three slots freed.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption></figure>
+
+<p>Step by step:</p>
+
+<ul>
+<li><b>(a) Cache layout</b> — a text query reads one contiguous slice of KV (the blue box). The Summary Ring Buffer holds the local chunks' Summary KV and the compression state. <b>The point: visibility is one contiguous stretch of memory, not a concatenation of segments</b>.</li>
+<li><b>(b) Text insertion</b> — new text KV is written <b>right-to-left</b> into the current chunk region, so the "filled part" always abuts the local text ring and contiguity is never broken. In the example the incoming $T_{23}$ lands to the left of $T_{22}$, completing chunk 11.</li>
+<li><b>(c) Summary insertion</b> — the Summary query at a chunk boundary <b>attends only to the completed chunk's text KV and its own KV</b>. In the example $S_{11}$ sees only $T_{22}$, $T_{23}$ and itself. <b>Note the causality here: a Summary must never see the next chunk's content.</b></li>
+<li><b>(d) Ring update</b> — once both the text and Summary attention are computed, the completed chunk's text KV is <b>copied</b> into the local text ring, and its Summary KV plus auxiliary state go into the Summary Ring Buffer. If the ring is not full, a free slot is used; if it is full, the oldest local chunk is replaced. The replaced Summary KV <b>moves into remote history but its auxiliary state is kept</b> (it will be needed for future compression). In the example chunk 11 replaces chunk 7: $S_7$ goes remote, $S_{11}$ takes its Summary ring slot, and the pointer advances to $S_8$'s slot.</li>
+<li><b>(e) Meta compression</b> — once remote history accumulates $k_m$ uncompressed Summaries, they are compressed into one Meta entry. That entry <b>overwrites the group's first slot</b>, and the remaining $k_m-1$ slots are freed for reuse. In the example $S_4$–$S_7$ merge into $M_1$, stored next to $M_0$. <b>The key constraint: after the overwrite the visible KV is still contiguous</b>, so a text query still reads it in one slice.</li>
+</ul>
+
+<div class="note">
+<b>The clever part of the design is in (e):</b>compression is not "move four entries somewhere new and free four slots" but "write the result in place into the first slot and free the other three". The cost is having to guarantee that a Meta entry's position is still ordered in sequence semantics (the history it represents really does sit around there); the benefit is that <b>the visible region always remains a single contiguous block of memory</b>. This is also why the <abbr title="decode: the token-by-token generation stage">decode</abbr> path can use plain SDPA without a gather kernel — Section 13 comes back to that point.
+</div>
+
+<h3>12.3 Memory analysis: Equations (9)–(10)</h3>
+
+<p>Let $N$ be the text length, $H$ and $H_{KV}$ the query / KV head counts, $d_h$ the head width, and $w$ the local text window. KSA's main cache term is $2 N H_{KV} d_h / k_s$; C-KSA replaces it, following the compression rules of Section 9, with:</p>
+
+<div class="math">$$
+M_{\text{C-KSA}} = 2 H_{KV} d_h \left[\frac{N}{k_s k_m} + O\!\left(\frac{k_s}{W} + W + k_m\right)\right]. \tag{9}
+$$
+</div>
+
+<p>Read this expression in two blocks, because their magnitudes are entirely different:</p>
+
+<ul>
+<li><b>The growth term $\dfrac{N}{k_s k_m}$</b> — linear in $N$, divided by $k_s k_m$. This is the "distant history" part. With $k_s=8$ and $k_m=128$ it is <b>1/1024</b> of uncompressed attention at the same KV width.</li>
+<li><b>The bounded term $O\!\left(\dfrac{k_s}{W} + W + k_m\right)$</b> — <b>does not grow with $N$</b>. The paper explains what it corresponds to: local text, the most recent Summaries, and groups not yet full. Each of the three has a source: $W$ is the number of chunks in the local window; $k_m$ is the ceiling on the "uncompressed remainder"; and the $k_s/W$ term comes from the rounding relationship between chunk granularity and window granularity.</li>
+</ul>
+
+<div class="takeaway">
+<b>The one thing to remember from this analysis:</b>1024&times; is only the nominal compression factor for <b>distant history</b>; the local and auxiliary terms <b>still exist</b>. At a fixed compression factor the cache is still linear in $N$ — what KSA V2 does is shrink the slope, not turn growth into a constant. Any retelling that claims "the cache no longer grows" has misread it.
+</div>
+
+<p>Another property is <b>orthogonality</b>: C-KSA preserves KSA's orthogonal relationship with per-position compression (GQA / <abbr title="MLA: Multi-head Latent Attention, low-rank latent KV">MLA</abbr>) — the extra $k_m$ factor simply multiplies the sequence compression, <b>changing neither the number of KV heads nor the representation width</b>. So combinations such as C-KSA+GQA and C-KSA+MLA can be written down directly.</p>
+
+<p>Finally, the overall saving of the hybrid model has a compact expression. Let $f$ be the full-layer fraction; when layer counts and KV widths match:</p>
+
+<div class="math">$$
+\frac{M_{\text{C-KSA+Full}}}{M_{\text{Hybrid KSA}}} \simeq \frac{f + (1-f)/(k_s k_m)}{f + (1-f)/k_s}. \tag{10}
+$$
+</div>
+
+<p>Substituting $f = 1/4$ (the 3:1 layout) exposes an important structural fact: <b>$f$ remains in both numerator and denominator, so the Full layers cap how much the whole model can save.</b> In plain language — however hard the KSA layers compress, as long as a quarter of the layers still run dense full attention, that slice of cache saves nothing. <b>This is precisely why S-KSA exists</b>: without removing the last dense layer, the numerator of Equation (10) is forever propped up by $f$. <span class="ex">([estimated] example: substituting $f=1/4$, $k_s=8$, $k_m=128$ into (10) gives a ratio $\approx 0.73$, i.e. whole-model cache falls to about 73% — the same direction as the paper's measured 40.4% reduction; the difference comes from the measured basis also including the indexer, auxiliary state and workspace, and from the Full layer's own larger KV width. The 0.73 here and the 40.4% are not the same basis and must not be compared by subtraction.)</span></p>
+
+<p>The gap between "nominally 73%" and "measured 40.4%" above is not a typo; it is the key to reading the paper's efficiency claim, and it deserves a ledger of its own. The paper's 1024&times; compression is a nominal figure for <b>remote-history KV</b> (Table 1, §2.3.2), whereas the headline "40.4% lower" is a measured figure for <b>128K resident cache</b> (Figure 11a, §3.6) — two orders of magnitude apart. The chart below puts the two bases side by side — <b>nothing in the paper does this</b> (Figure 6 plots cache against sequence length, Figure 11a plots measured bars for three models), so this page adds it:</p>
+
+<figure class="fig" data-selfchart="1">
+  <img src="figs/chart-cache-ledger.svg" alt="Self-drawn: KV cache under two accounting bases — nominal remote-history share versus measured 128K resident cache share">
+  <figcaption>
+    <b>Self-drawn:</b>1024&times; is the ledger for remote history, not for whole-model cache — the gap between the same set of models under two bases: "nominal compression rate" and "measured 128K resident cache".
+    <span class="ex">How to read it: two rows per model — <b>light gray</b> is the nominal remote-history KV as a share of Full, <b>dark</b> is the measured 128K resident cache as a share of Full. <b>All data comes from the paper only</b>: the nominal basis is taken from the Compression Rate column of Table 1 and the $1/(k_s k_m)$ of §2.3.2; the measured basis is taken from Figure 11(a) and the three absolute values in §3.6 (Full 24.00 GiB, Hybrid KSA 10.59 GiB, C-KSA+S-KSA 6.31 GiB), with the shares <b>[estimated]</b> by this page using 24.00 as the denominator (44.1%, 26.3%) rather than given directly by the paper. The gap to look at: C-KSA's nominal remote history is only <b>0.098%</b> of Full, yet the measured resident cache is still <b>26.3%</b> of Full — two orders of magnitude apart. <b>The paper explains where the difference comes from</b>: §2.3.2 notes that $k_m$ acts only on the "growing history term", whereas the local window ($O(k_s W)$), sinks, index keys, auxiliary state and resident workspace are all <b>bounded but do not shrink with $k_m$</b>. So the headline "40.4% lower" is a measured figure against Full and cannot be mixed with "1024&times;".</span>
+    <span class="pgref">Compiled from Table 1 (Report p.8), §2.3.2 (Report p.9), Figure 11a and §3.6 (Report p.18); shares are [estimated]</span>
+  </figcaption>
+</figure>
+
+<h3>12.4 Table 1: mechanism comparison, and how two compressions multiply</h3>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table1.png" alt="Table 1: KV-cache cost comparison for a sequence of N text tokens"><figcaption><b>Table 1:</b> KV-cache cost comparison for a sequence of $N$ text tokens. Example settings use $k_s = 8$, $k_m = 128$, $H = 128$, $d_h = 128$, $H_{KV} = 8$, $d_c = 512$, and $d_r = 64$. Compression rates are relative to MHA. <span class="ex">The value of this table is that it splits "effective context" and "compression rate" into two columns, and the two columns do not say the same thing. Look at the GDN and SWA rows: both have a compression rate marked &asymp;0%, yet their Effective Context column reads <b>ambiguous</b> and <b>$w$ (exactly)</b> — meaning they are not "keeping all positions but storing them more cheaply", they <b>no longer keep all positions at all</b> (a recurrent state cannot be read back position by position, and a sliding window simply cannot see past its edge). The 0% on the right does not mean they save no memory; it means "this compression rate is computed against MHA's KV entry count, and they are no longer in that coordinate system". The KSA row, by contrast, reads <b>$N$ (summarized)</b>: positions are replaced by summaries but remain individually addressable entries. Further down, the C-KSA row moves the compression rate from $1/k_s$ to $1/(k_s k_m)$ — that is what "two compressions multiplying" looks like concretely.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption></figure></div>
+
+<p>Reading the compression column top to bottom reveals a clear lineage (under the example settings, relative to MHA):</p>
+
+<ul>
+<li>GQA $H_{KV}/H \approx 6.25\%$ — compresses only the width per position, leaving the position count alone.</li>
+<li>MLA $\approx 1.76\%$ — also leaves the position count alone, but compresses each position's storage down to a latent.</li>
+<li>KSA $\approx 12.5\% = 1/k_s$ — starts compressing the position count (sequence-dimension compression).</li>
+<li>C-KSA $\approx 0.098\% = 1/(k_s k_m)$ — two levels of sequence compression multiplied together.</li>
+<li>Combined: KSA+GQA &asymp; 0.78%, C-KSA+GQA &asymp; 0.0061%, C-KSA+MLA &asymp; 0.0017%.</li>
+</ul>
+
+<div class="note">
+<b>Why "orthogonality" matters.</b>If two compressions interfered with each other (say sequence compression broke GQA's assumption of shared KV heads), the combined numbers would be meaningless. C-KSA's orthogonality rests on a clean fact: it reduces only the <b>number of entries along the sequence dimension</b>, leaving the KV head count and per-entry width completely untouched. The two optimizations therefore <b>act independently and can be multiplied directly</b>. That is also the property engineering wants most — you can add GQA first and C-KSA second, and the two gains stack instead of eating into each other.
+</div>
+
+<h3>12.5 Figure 6: how to read the curves</h3>
+
+<figure class="fig"><img src="figs/fig6.png" alt="KV cache size comparison across mechanisms as sequence length grows"><figcaption><b>Figure 6:</b> KV cache size comparison across different mechanisms as sequence length grows. The inset uses a logarithmic vertical axis to separate the low-cache curves and labels C-KSA values at 128K. <span class="ex">The main plot has a linear vertical axis and answers "who explodes at what length": the MHA curve climbs steeply past 400 GiB while the C-KSA family stays far below. The inset switches to a logarithmic vertical axis, otherwise the low-cache curves would smear into a single line in the main plot — note this is a <b>reading technique</b>: on a log axis the slope of a curve represents its exponent, and the C-KSA curves still rise linearly on the log axis, visually confirming §12.3's claim that "the growth term is still $O(N)$, just with a slope 1024 times smaller". The values labelled at 128K in the inset: C-KSA 4.22 GiB, C-KSA+GQA 0.264 GiB, C-KSA+MLA 0.074 GiB. The figure is set at 60 layers, batch=1, BF16, local window 1024 tokens. The conclusion to draw from this figure is not "C-KSA is smallest" but that <b>the two compressions stack on the curves while neither breaks the basic rule of linear growth</b>.</span>
+          <span class="pgref">Report p.9</span>
+    </figcaption></figure>
+</section>
+
+<section id="s14">
+<h2 class="sec"><span class="sec-no">Section 14</span>Kernel design: turning the saved <abbr title="FLOPs: floating point operations">FLOPs</abbr> into actual time</h2>
+
+<p>Saving FLOPs algorithmically is not the same as being faster on the wall clock — if the memory access pattern gets worse, or extra gather/scatter is needed, the saved compute is eaten by memory traffic. This section of the paper is about avoiding exactly that.</p>
+
+<h3>13.1 The shared execution skeleton: tiled prefill + online softmax</h3>
+
+<p>Both C-KSA and S-KSA <b>follow FlashAttention's tiled execution and online softmax</b> (Dao et al., 2022). Let a group of text queries be arranged into $Q_B$ (one or more query tiles), with corresponding output $O_B$. Each box in these matrices represents one token vector: in the query–key grid, <b>blue cells are visible pairs and white cells are masked pairs</b>. The key optimization is that <b>each loaded KV tile $(K_j, V_j)$ is reused on chip across the whole query group</b>, while a <b>per-query mask</b> enforces each query's own visible set.</p>
+
+<p>The significance of this skeleton is that it hands "visibility" entirely to the mask, while KV tile loading is <b>shared and independent of any particular query</b>. As a result, the difference between C-KSA and S-KSA is compressed into two things — <b>how KV addresses are computed</b>, and <b>how the tile visit order is scheduled</b>. Everything else is reused.</p>
+
+<h3>13.2 C-KSA: direct mapping from logical intervals to physical addresses, Equations (11)–(12)</h3>
+
+<p>C-KSA's layout is regular, so the kernel can work out which KV each query needs with <b>pure arithmetic</b> — no dense mask, and no block-index table held in memory. The approach treats text, Summary and Meta as three <b>separate zero-based index spaces</b> (logical segments): during prefill the text and Summary Q/K/V are interleaved, while the precomputed Meta K/V sit in a <b>separate buffer</b>.</p>
+
+<p>For a text query at position $t$, first define two quantities:</p>
+
+<div class="math">$$
+a = \max\!\left(0,\; \left\lfloor t/k_s \right\rfloor - W\right), \qquad g = \left\lfloor a/k_m \right\rfloor.
+$$
+</div>
+
+<p>Here $a$ is <b>the first chunk in the local window</b> and $g$ is <b>the number of complete Meta groups before that window</b>. With these two numbers the three logical intervals are closed-form:</p>
+
+<div class="math">$$
+I_T(t) = [\,k_s a,\; t+1\,), \qquad I_S(t) = [\,k_m g,\; a\,), \qquad I_M(t) = [\,0,\; g\,). \tag{11}
+$$
+</div>
+
+<p>The three intervals correspond exactly to the three classes of visible KV from Section 10. Read them out: $I_T$ is the causal local text (from the window's start to $t$ itself); $I_S$ is the boundary Summaries (from the last complete group before the window up to the window start $a$ — the remainder that has not yet filled a group); $I_M$ is the complete remote Meta groups (from 0 to $g$).</p>
+
+<p>Next comes the mapping to physical positions. For a text index $i$ and a Summary index $j$:</p>
+
+<div class="math">$$
+\phi_T(i) = i + \left\lfloor \frac{i}{k_s} \right\rfloor, \qquad \phi_S(j) = j\,(k_s+1) + k_s. \tag{12}
+$$
+</div>
+
+<p>These two expressions are two ways of writing the same intuition:</p>
+
+<ul>
+<li><b>$\phi_T$</b>: every $k_s$ text positions the physical address skips one extra slot (the one occupied by a Summary). $\lfloor i/k_s \rfloor$ is simply the number of Summaries inserted so far.</li>
+<li><b>$\phi_S$</b>: the physical address of the $j$-th Summary is $j(k_s+1)+k_s$, i.e. "the last of the $j$-th group of $(k_s+1)$ slots". Here $k_s+1$ is the total number of slots per chunk-plus-Summary.</li>
+<li>Meta indices address the separate buffer directly, with no offset arithmetic.</li>
+</ul>
+
+<p>Panel (a) of the figure below draws this mapping for $k_s=2$, $k_m=2$, $W=1$, with a blue outline marking the entries visible to $T_9$:</p>
+
+<figure class="fig"><img src="figs/fig7.png" alt="Kernel design for C-KSA and S-KSA"><figcaption><b>Figure 7:</b> Kernel design for C-KSA and S-KSA: (a) direct KV addressing, (b) fused block scoring and selection under a $K$-token budget, and (c) shared tiled prefill with KV reuse. <span class="ex">(a) is the address mapping: the top shows the logical intervals $I_S=[2,3)$, $I_T=[6,10)$, $I_M=[0,1)$; the middle row gives their physical landing spots (such as $\phi_S(2)=8$, $\phi_T(6)=9$, and Meta index 0); only the bottom row is the actually interleaved physical storage sequence — keeping logical index and physical offset separate is what makes the absence of an index table understandable. (b) is S-KSA's fused scoring: $Q_I$ multiplies the shared block keys $K_I$ to produce a grayscale "query &times; candidate block" score matrix, and Top-$K$ block selection happens inside the same kernel; on the right, <b>each row</b> of the blue IDs matrix is the list of block indices chosen by one query (every query selects independently). (c) is the shared tiled prefill: each cell of $Q_B$/$O_B$ is one token vector, blue cells are visible pairs and white cells masked ones, and the KV tiles $K_j,V_j$ are reused on chip after being loaded once per visit, with a per-query mask completing online softmax.</span>
+          <span class="pgref">Report p.10</span>
+    </figcaption></figure>
+
+<p>Once the mapping is done, each query tile knows which KV tile ranges it must visit, and a <b>position-based mask</b> then excludes entries outside that query's visible set. The paper stresses that <b>these intervals and masks are all computed on the fly inside the kernel and occupy no memory</b> — no dense attention mask needs to be stored, and no block-index table either.</p>
+
+<h3>13.3 C-KSA: prefill integration and decode</h3>
+
+<p>During prefill, the text-query kernel <b>carries each query's online-softmax state continuously across the text, Summary and Meta segments</b> (the implementation counterpart of the three entry classes sharing one softmax), and <b>applies the $\log k_m$ correction to Meta logits only</b>. A separate local kernel makes each Summary query attend over its own chunk's text and its self-KV. Both kernels <b>write their outputs straight back into the interleaved physical positions</b>.</p>
+
+<p>The decode stage needs almost nothing special: the cache layout of Section 13 has already placed the visible KV in <b>one contiguous region</b>, so standard scaled dot-product attention (SDPA) works directly, with no gather.</p>
+
+<div class="takeaway">
+<b>Equations (11)–(12) and the layout of Section 13 are two faces of the same thing.</b>The layout guarantees "the visible KV is contiguous"; the mapping formulas guarantee "it can be found arithmetically". Neither suffices alone: with only the former, the kernel still has to scan for boundaries; with only the latter, the fast path degrades into repeated non-contiguous reads. <b>This is the tightest instance in the whole paper of algorithm, layout and kernel working together.</b>
+</div>
+
+<h3>13.4 S-KSA: fused scoring plus sparse tile scheduling</h3>
+
+<p><b>Fused block scoring.</b> If one kernel computed the dot products and another did the multi-head aggregation, the intermediate scores would have to make a round trip through memory. To cut that traffic, S-KSA uses a <b>fused kernel that does the dot product and the weighted multi-head score merge on chip in one pass</b>. In Figure 7b, $Q_I$ is the stacked query matrix of the indexer heads and $K_I$ their shared block keys (the superscript $I$ denotes the indexer); in the grayscale matrix <b>rows are queries and columns are candidate blocks</b>, darker meaning higher score; selection then happens <b>within one kernel</b>: under a budget of $K$ tokens (i.e. at most $K/b$ blocks), remote blocks are chosen <b>independently for each query</b>, and each row of the blue matrix on the right is one query's block-index list.</p>
+
+<div class="note">
+<b>What does "fused" save here?</b>It saves the write and read-back of that $Q \times \text{number of blocks}$ intermediate score matrix. At 128K with 32768 blocks that matrix is substantial even at reduced precision — and it is a <b>pure intermediate</b>, so writing it out and reading it back contributes nothing to the result. After fusion the scores are produced on chip, aggregated on chip, and Top-$K$ is done on chip; only the final block indices need to land in memory.
+</div>
+
+<p><b>KV-tile scheduling.</b> For each group of queries, the selected remote blocks and the local window are mapped onto KV tiles to build a <b>conservative schedule</b>. The schedule skips KV tiles that nobody accesses, while block selection, local visibility and causality are all handled by the <b>per-query mask</b> inside the tiles that are scheduled. The schedule and the mask are handed directly to FlashAttention's forward kernel, which runs the tiled prefill.</p>
+
+<p><b>A custom sparse kernel for decode.</b> During decode, first gathering the selected KV entries into a temporary buffer and then computing attention would pay an extra round of reads plus a round of writes. To sidestep that cost, S-KSA uses a <b>custom sparse kernel that reads directly from the KV cache according to the selected block indices</b>.</p>
+
+<div class="takeaway">
+<b>Regrouping the three items in this section by "what they save" makes it clearer:</b><br>
+&bull; <b>Fused scoring</b> saves the <b>memory round trip of intermediate scores</b> (bandwidth).<br>
+&bull; <b>Tile scheduling</b> saves the <b>compute and loads spent on empty tiles</b> (compute + bandwidth).<br>
+&bull; <b>The custom sparse kernel</b> saves the <b>extra reads and writes that gathering would cost</b> (bandwidth).<br>
+None of the three reduces the "mathematical number of multiplications"; all three reduce <b>movement</b>. That is exactly where long-context inference ends up bottlenecked, and why this section deserves to exist on its own.
+</div>
+
+<p>Finally, putting Sections 13 and 14 together leaves one qualitative conclusion worth remembering: <b>KSA V2's remaining main cost is the original-text KV kept by the sparse layers</b> — the incarnation, under the new architecture, of the $f$ term in Equation (10). The paper names it in the conclusion as a natural next direction.</p>
+</section><section id="s15">
+<h2 class="sec"><span class="sec-no">Section 15</span>Experimental setup and the adaptation protocol: converting an existing model into KSA V2</h2>
+
+<p>The experimental section states its problem setting clearly from the start: it does not train a new architecture but asks a retrofit question — <b>can continued pretraining adapt an existing Hybrid KSA to more aggressive KV compression and sparse original-text access while preserving its original capabilities</b>. The route is to validate C-KSA with Full attention first, then layer S-KSA onto the compressed backbone, and finally evaluate along three lines — retrieval, general capability and inference efficiency — with additional ablations on compression granularity, block size, teacher pooling, routing scheme and backbone choice. Unless stated otherwise, all experiments and analyses run on the 1.9B model.</p>
+
+<p>The starting point is the 128K checkpoints of 1.9B and 4B Hybrid KSA from the KSA report. The 1.9B backbone is 24 layers of <abbr title="MHA: Multi-Head Attention, with independent Q/K/V per head">MHA</abbr>; the 4B backbone is 36 layers of <abbr title="GQA: Grouped-Query Attention, where several query heads share KV heads">GQA</abbr> with 32 query heads and 8 KV heads. Both use the 3:1 interleaving of three KSA layers to one Full layer, and both insert one Summary every $k_s = 8$ text tokens. Two variants are evaluated: <b>C-KSA+Full</b> compresses the remote Summary KV into Meta entries inside the KSA layers; <b>C-KSA+S-KSA</b> goes further and replaces the Full layer with S-KSA, i.e. block-sparse original-text attention. Notably, C-KSA supports per-layer compression configurations in the method, but the paper explicitly states that <em>every evaluated configuration uses a uniform $k_m$ across C-KSA layers</em> — a point that returns in the "worth testing next" list below.</p>
+
+<p>Evaluation follows the KSA report's protocol: long context uses <abbr title="RULER: a long-context retrieval benchmark suite (4K–128K)">RULER</abbr> at sequence lengths from 4K to 128K; general capability covers knowledge (MMLU, CMMLU, C-Eval, MMLU-Pro), mathematics (GSM8K, CMATH, MATH) and code generation (MBPP, HumanEval, reporting pass@1), nine benchmarks in total. Baselines reuse KSA's from-scratch results (1.9B) and continued-pretraining results (4B), including Full, Hybrid SWA, Hybrid SCA, Pure KSA and Hybrid KSA, with Hybrid GDN added at 1.9B and Hybrid Linear at 4B. <b>Hybrid KSA is positioned as the parent model for "capability preservation", and Full as the dense-attention reference</b>; training data follows KSA's corpus and mixture, with the context length fixed at 128K.</p>
+
+<p>On the reference point, the paper does something important: it specifically tests whether continued pretraining of the parent model can serve as a stronger control. See the Table 11 discussion at the end of this section — under the tested recipe and data budget, continued pretraining of the unmodified Hybrid KSA brings <b>no</b> consistent RULER improvement, so the paper is entitled to use the original checkpoint as the quality reference. The argument is not glamorous, but it closes off the objection that "you trained more, so you got better".</p>
+
+<p>Start with the backbone and module configuration at the two scales (the full configuration is in Table 2 in Section 12 and is not repeated here). 1.9B is a 24-layer MHA with hidden 2048 and intermediate 6144, 16 query heads and 16 KV heads; 4B is a 36-layer GQA with hidden 2560 and intermediate 9728, 32 query heads and 8 KV heads. Both have head dimension 128, a 3:1 ratio and $k_s$ of 8. The largest divergence is in the C-KSA and S-KSA module configuration: 1.9B uses $k_m = 128$ with KV width $d_{KV} = 2048$, while 4B uses $k_m = 32$ with $d_{KV} = 1024$.</p>
+
+
+
+<p>Looking at the stage budgets in Table 3 shows how "cheap" this conversion is. C-KSA's added parameters are the aggregation projection and positional bias at each scale, 80.2M for 1.9B and 71.7M for 4B; S-KSA's auxiliary attention, Indexer and routing-related parameters are 86.6M for 1.9B and 163.0M for 4B. Against the backbone sizes of 1.9B and 4B these are single-digit-percentage increments, and the inference payoff shows up in the efficiency section later.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table3.png" alt="Table 3: Adaptation hyperparameters and token budgets for the selected models"><figcaption><b>Table 3:</b> Adaptation hyperparameters and token budgets for the selected models. <span class="ex">The trainable scope and token budget of each of the three stages. 1.9B: C-KSA module-only on 6.7B tokens, then full-parameter on 3.4B tokens, then S-KSA module-only on 18.5B tokens; 4B: C-KSA module-only on 6.7B + full-parameter on 15.9B, then S-KSA module-only on 4.2B. The three stages target learning rates of $10^{-4}$, $10^{-4}$ and $10^{-3}$, all starting from $10^{-6}$ with warmup followed by a constant phase, AdamW $(\beta_1, \beta_2) = (0.9, 0.95)$, weight decay 0.01, gradient clipping 1.0, sequence length 128K, global batch 32. The paper notes in particular that <b>the optimizer and learning-rate schedule are re-initialized at every stage switch</b> — a side effect of "align first, then open up" below: stage boundaries are hard boundaries rather than continuous decay.</span>
+          <span class="pgref">Report p.14</span>
+    </figcaption></figure></div>
+
+<p>The adaptation route above is drawn as a pipeline in Figure 8. Start with the module setting — "module settings apply where the corresponding modules are used" is not a throwaway phrase: during the module-only stage only the newly introduced aggregation projection $A$ and positional bias $\{B_r\}$ are trained (and in the S-KSA stage, the new aggregation module and Indexer), with every inherited parameter frozen; the full-parameter stage is what opens up the whole model. C-KSA goes "module-only → full-parameter", whereas the S-KSA stage is <b>module-only only</b>.</p>
+
+<figure class="fig"><img src="figs/fig8.png" alt="Figure 8: Sequential adaptation and parameter selection for KSA V2 at 1.9B"><figcaption><b>Figure 8:</b> Sequential adaptation and parameter selection for KSA V2 at 1.9B. <span class="ex">The sequential adaptation route at 1.9B: starting from Hybrid KSA, 6.7B tokens of module-only followed by 3.4B tokens of full-parameter yields C-KSA+Full, sweeping $k_m \in \{4, 8, 16, 32, 64, 128\}$ along the way and settling on $k_m = 128$; starting from that checkpoint, 18.5B tokens of module-only yields C-KSA+S-KSA, sweeping $b \in \{2, 4, 8\}$ and settling on $b = 4$. Note the dependency "pick the compression granularity first, then pick the sparsity scheme": the sparsity stage must start from an already-chosen compression checkpoint, so this figure is both a process description and the causal ordering of the experimental design.</span>
+          <span class="pgref">Report p.13</span>
+    </figcaption></figure>
+
+<p>The whole route condenses into one sentence: <b>each adaptation segment solves only for one newly introduced module, and each hyperparameter sweep happens after the previous step is fixed</b>. The cost is more experiment rounds (6 compression granularities &times; 3 sparsity settings); the benefit is that conclusions from different steps do not contaminate one another.</p>
+</section>
+
+<section id="s16">
+<h2 class="sec"><span class="sec-no">Section 16</span>The two-stage loss: align the outputs first, then open up the whole model</h2>
+
+<p>The greatest fear when adapting a pretrained model is "open it up and everything previously learned gets washed away". KSA V2's answer is to split into two stages: first let the new modules <b>align</b> their outputs with the uncompressed version, and only once alignment is achieved open all parameters for ordinary language modeling. This passage is worth reading equation by equation.</p>
+
+<p>The module-only stage trains the aggregation projection $A$ and the positional bias $\{B_r\}$, with all inherited parameters frozen. The new parameters <b>are initialized to zero</b>, so at initialization the aggregation weights are uniform (which is also why an alignment loss is needed: uniform aggregation cannot reproduce the information of so many Summary entries). Let $O^{C}_{l,t,d}$ and $O^{K}_{l,t,d}$ be the attention outputs of C-KSA and uncompressed KSA at layer $l$, text position $t$ and coordinate $d$, both computed from <b>the same input at the same layer</b> and both taken before the output projection. The alignment loss is a per-coordinate squared error (clipped, then averaged):</p>
+
+<div class="math">$$
+\mathcal{L}_{\text{align}} = \frac{1}{|\mathcal{I}_C|\,|\mathcal{T}|\,D} \sum_{l \in \mathcal{I}_C} \sum_{t \in \mathcal{T}} \sum_{d=1}^{D} \min\!\left( \left( O^{C}_{l,t,d} - \mathrm{sg}\!\left( O^{K}_{l,t,d} \right) \right)^2,\ 0.1 \right)
+$$</div>
+
+<p>Here $\mathcal{I}_C$ is the set of C-KSA layers, $\mathcal{T}$ the text positions in a minibatch, $D$ the concatenated attention width, and $\mathrm{sg}(\cdot)$ denotes stop-gradient. Three design details are all practical: the error is measured per <b>coordinate</b> rather than per vector, so no norm-scale choice is involved; each error is clipped at an upper bound of $0.1$, preventing individual outlier coordinates from dominating the gradient; and the stop-gradient on the reference side ensures gradients flow only back into the new modules and never drag the frozen KSA side along.</p>
+
+<p>After alignment completes, the full-parameter stage begins and the objective falls back to plain language modeling:</p>
+
+<div class="math">$$
+\mathcal{L}_{\text{comp}} =
+\begin{cases}
+\mathcal{L}_{\text{CE}} + \lambda_{\text{align}} \mathcal{L}_{\text{align}}, & \text{module-only adaptation}, \\
+\mathcal{L}_{\text{CE}}, & \text{full-parameter adaptation},
+\end{cases}
+\qquad \lambda_{\text{align}} = 5
+$$</div>
+
+<p>In other words, <b>the alignment loss exists only during the module-only stage, with weight 5; once the whole model is opened up it is dropped entirely, leaving only cross-entropy</b>. Why this order rather than joint training from the start? One direct reading: if the whole model were opened up from the beginning with the alignment term applied, the frozen reference $O^{K}$ would itself be moving, making alignment a moving target, and the language-modeling gradient would immediately rewrite the KSA side's representations, leaving "alignment" without a well-defined reference point. Pulling the new modules to a point approximately equivalent to the original behavior first, and only then opening the model, is equivalent to continuing training from a point already close to the original model — minimal forgetting risk. This also dovetails with Table 3's "the optimizer and learning-rate schedule are re-initialized at every stage switch": stage boundaries are treated as fresh starts rather than one continuous annealing run.</p>
+
+<p>The S-KSA stage has a different objective structure: it is a <b>distillation</b> problem rather than a regression one. During training the Full layer still keeps dense attention, and the probabilities it computes supervise block selection. For a query $t$, let $\mathcal{U}_t$ be all eligible remote blocks, $\mathcal{B}_u$ the text positions inside block $u$, and $a_{t,i}$ the dense causal attention probability <b>after averaging across backbone heads</b>. Then the block-level teacher distribution $p_t$, the Indexer distribution $\pi_t$ and the training objective are:</p>
+
+<div class="math">$$
+p_{t,u} = \mathrm{sg}\!\left( \frac{\max_{i \in \mathcal{B}_u} a_{t,i}}{\sum_{v \in \mathcal{U}_t} \max_{j \in \mathcal{B}_v} a_{t,j}} \right),
+\qquad
+\pi_t = \mathrm{softmax}(\rho_t),
+\qquad
+\mathcal{L}_{\text{S-KSA}} = \mathbb{E}_{l,t}\!\left[ D_{\mathrm{KL}}(p_t \,\|\, \pi_t) \right]
+$$</div>
+
+<p>Here $\rho_t$ is the Indexer score defined by Equation (7), taken over all blocks in $\mathcal{U}_t$, and $\mathrm{sg}(\cdot)$ is again stop-gradient. The loss is averaged over valid text queries within each adapted layer, then averaged across layers. Two points are worth calling out: first, the teacher takes the <b>maximum within the block</b> (max pooling) after averaging across heads, which the paper says follows <abbr title="QSA: Qwen Sparse Attention, block-level sparsity">QSA</abbr> and which it contrasts against sum pooling in Section 3.7; second, $\pi_t$ exists only during training — at inference the trained Indexer selects blocks directly and <b>the routing scores are never used as extra attention weights</b>; the main attention still performs a single softmax over the selected original tokens and the local window.</p>
+
+<div class="note"><b>Why align first and open up later [organized]:</b>putting the two losses side by side shows the paper is decoupling two things that interfere with each other — "the new modules' outputs should resemble the old modules'" and "the whole model should keep learning language modeling". The former is a regression/distillation problem with a well-defined reference, well suited to fast convergence while the other parameters are frozen; the latter needs all parameters to cooperate and is best done without extra constraints. Doing them in stages staggers the two optimization problems instead of letting them pull against each other within the same batch of gradients.</div>
+
+<p>There is one more practical difference that is easy to miss: the S-KSA stage has the largest token budget of the three — 18.5B tokens at 1.9B, whereas C-KSA's two stages together come to only 10.1B. In other words, <b>the paper spends most of its adaptation budget teaching the Indexer how to select blocks</b>, not on the compression module. That budget allocation alone says something about how hard sparse routing is.</p>
+</section>
+
+<section id="s17">
+<h2 class="sec"><span class="sec-no">Section 17</span>Model quality: how much is preserved at 1.9B and 4B</h2>
+
+<p>Start with the conclusion, on Table 4: <b>at 1.9B the six-length RULER mean of C-KSA+S-KSA is 72.39%, against 72.61% for the parent Hybrid KSA and 67.55% for Full; at 4B the numbers are 84.15%, 84.45% and 83.69%.</b> In other words, the adapted model essentially preserves the parent's retrieval ability (0.22 percentage points behind at 1.9B, 0.30 at 4B) while staying clearly ahead of Full. But this is not "lossless" — the 128K point has both gains and losses, and general capability pays a measurable price. Take them one at a time.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table4.png" alt="Table 4: Long-context retrieval and general capabilities at 1.9B"><figcaption><b>Table 4:</b> Long-context retrieval and general capabilities at 1.9B (%; pass@1 for code). Bold and underlined values mark the best and second-best scores, respectively, here and in subsequent tables. <span class="ex">The full 1.9B table, with 8 baselines against 2 of ours. RULER over six lengths: C-KSA+S-KSA gives 81.48 / 72.42 / 75.67 / 70.78 / 68.99 / 65.01 with a mean of 72.39; Hybrid KSA gives 80.65 / 73.35 / 74.07 / 72.30 / 69.95 / 65.35 with a mean of 72.61; Full's mean is only 67.55, with 48.75 at 128K. C-KSA+Full has a mean of 72.68 and 66.31 at 128K, showing that <b>compression alone costs almost nothing</b>, and that the loss mainly appears once sparsity is layered on (128K drops from 66.31 to 65.01).</span>
+          <span class="pgref">Report p.15</span>
+    </figcaption></figure></div>
+
+<p>Spreading RULER out length by length makes "what was preserved and what was lost" clearer. Relative to the parent Hybrid KSA, C-KSA+S-KSA is higher at 4K (81.48 vs 80.65) and 16K (75.67 vs 74.07), roughly level at 8K (72.42 vs 73.35, slightly lower), and lower by 1.52, 0.96 and 0.34 percentage points at the three long lengths 32K, 64K and 128K. That is, <b>the loss is concentrated in the 32K–64K band, while 128K is actually held very tight</b>. Against the pure Full attention reference its advantage is overwhelming: Full scores only 48.75 at 128K, 16.26 percentage points below C-KSA+S-KSA.</p>
+
+<p>The C-KSA+Full column deserves its own paragraph (Figure 9(a) gives its recovery curve). It keeps the Full layers and only compresses the remote Summary from $k_s = 8$ to $k_s k_m = 1024$ inside the KSA layers; its mean of 72.68 is even slightly above the parent's 72.61, and its 128K score of 66.31 is above the parent's 65.35. <b>That is a clean single-factor conclusion: 1024&times; compression of remote history by itself costs almost nothing in retrieval.</b> The cost only appears when S-KSA is layered on — 128K falls from 66.31 to 65.01. And applying the same sparse adaptation to an uncompressed Hybrid KSA takes 128K from 65.35 down to 61.06 (Table 9(c)). Measured against their respective dense references, the drops are 1.30 and 4.29 percentage points: <b>a compressed backbone is actually more resilient to sparse adaptation</b>.</p>
+
+<figure class="fig"><img src="figs/fig9.png" alt="Figure 9: Mean RULER scores during compression and sparse adaptation"><figcaption><b>Figure 9:</b> Mean RULER scores during compression and sparse adaptation. Circles mark the checkpoints reported in Table 4. <span class="ex">(a) The three C-KSA + Full curves correspond to $k_m = 8, 32, 128$: retrieval scores keep recovering during the module-only stage (0–6.7B tokens), and the full-parameter stage (6.7–10.1B tokens) moves further toward the two reference lines of Hybrid KSA's 72.61 and Full's 67.55. (b) S-KSA on the selected $k_m = 128$ backbone, comparing $b = 2, 4, 8$ and token-level <abbr title="DSA: DeepSeek Sparse Attention, token-level sparsity">DSA</abbr>, where $b = 4$ approaches the parent's level at around 18.5B tokens. The value of this figure is that it is not "train and look at the result" but a plot of the <b>recovery process</b>: the module stage already closes most of the gap, and the full-parameter stage is the finishing touch.</span>
+          <span class="pgref">Report p.16</span>
+    </figcaption></figure>
+
+<p>Reading Figure 9 together with the budgets in Table 3 reveals something counter-intuitive: <b>the module-only stage (training only 80.2M new parameters) already pulls retrieval scores back substantially from the low point introduced by compression</b>, and the later full-parameter stage contributes "approaching" rather than "turning things around". This echoes the <abbr title="oracle: an upper bound on block selection that uses dense attention probabilities directly">oracle</abbr> experiment in Section 3.7 — if the selection is accurate enough, the backbone does not even need updating.</p>
+
+<p>On general capability the paper's wording is "broadly comparable": relative to Hybrid KSA, C-KSA+S-KSA is higher on three of the nine items (MMLU 47.09 vs 46.83, MMLU-Pro 22.83 vs 22.52, CMATH 63.50 vs 61.83) and lower on the rest, with <b>the largest drop being 2.81 percentage points on GSM8K</b>, and MBPP and HumanEval lower by 1.20 and 1.83 points respectively. Against C-KSA+Full, adding S-KSA changes every item by no more than 1.83 percentage points, with gains and losses both present, indicating that sparse adaptation is not the cause of a systematic decline. Against Full it wins eight of the nine items, the only exception being C-Eval (42.94 vs 44.28).</p>
+
+<div class="takeaway"><b>1.9B summary:</b>the "compression" step is close to free (mean <b>+0.07</b>, 128K <b>+0.96</b> relative to the parent — both gains), while the "sparsity" step costs a little retrieval (128K &minus;1.30), with one- or two-point fluctuations on general capability. Every cost appears after the Full layer is also replaced, not from compression itself.</div>
+
+<p>The 4B experiments (Table 5) answer a different question: does this conversion transfer to a <b>GQA backbone with shared KV heads</b>? The configuration is $k_m = 32$ and $b = 4$; with $k_s = 8$, C-KSA compresses remote KV 8 &times; 32 = 256-fold along the sequence dimension while keeping GQA's shared KV heads. The token budget is 6.7B module-only + 15.9B full-parameter, followed by 4.2B of S-KSA module-only; the remote budget, local window and sink settings match 1.9B; the only architectural difference is that 4B's Indexer additionally normalizes the projected query/key.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table5.png" alt="Table 5: Long-context retrieval and general capabilities at 4B"><figcaption><b>Table 5:</b> Long-context retrieval and general capabilities at 4B (%; pass@1 for code). Baselines are from the KSA report (Chu et al., 2026). <span class="ex">The full 4B table. Across six RULER lengths C-KSA+S-KSA gives 93.38 / 87.78 / 85.45 / 83.60 / 80.28 / 74.41 with a mean of 84.15; the parent Hybrid KSA has a mean of 84.45, C-KSA+Full 83.72, and Full 83.69. The brightest spot is the single 128K point: 74.41 is 2.74 percentage points above the parent's 71.67, 8.55 above Full's 65.86, and also above its own C-KSA+Full starting point of 73.92. <b>At the larger scale, sparse adaptation does not lose 128K at all — it gains</b>.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption></figure></div>
+
+<p>The 4B reversal at 128K is worth noting. At 1.9B, adding S-KSA takes 128K from 66.31 down to 65.01; at 4B the same action takes 128K from 73.92 up to 74.41. <b>"Sparsity always costs points" is not a general rule — it is decided together with the backbone, the data budget and the Indexer configuration.</b> The mean row, however, still slips slightly (84.15 vs 84.45), with the drag coming mainly from 8K, 16K and 32K (87.78 / 85.45 / 83.60, against the parent's 90.53 / 88.86 / 86.65), while both 4K (93.38 vs 92.97) and 64K (80.28 vs 76.04) rise.</p>
+
+<p>On general capability the paper's figures are: C-KSA+S-KSA stays within 0.40 percentage points of C-KSA+Full, and 0.50–2.58 points below Hybrid KSA. C-KSA+Full is itself already somewhat below the parent (for example MMLU 68.79 vs 70.50), so this loss comes more from the full-parameter training of the compression stage than from the sparsity stage.</p>
+
+<p>Then there is the setting that was "only added afterwards" — <b>Indexer Q/K normalization</b>. The paper candidly reports a controlled comparison: <b>without Q/K normalization, 4B's Indexer loss stays high, and even after 21.8B adaptation tokens RULER remains below its C-KSA+Full parent</b>; under the same adaptation setup, normalizing the projected query/key <b>recovers to near the parent with only 4.2B tokens</b>. The paper's explanation is that feature-scale differences between pretrained backbones affect the magnitude and optimization of index logits, and RMSNorm reduces that scale sensitivity. Even more worth recording is the boundary the paper draws itself: <b>1.9B keeps the original setting and was not re-run through the full experimental suite with this change; whether normalization would similarly reduce the adaptation data needed at 1.9B is explicitly left as an open question.</b> That is an honest gap and a very concrete reproduction risk.</p>
+
+<p>Finally, the choice of compression granularity at 4B. Table 6 compares $k_m \in \{8, 16, 32, 64, 128\}$ under one identical budget (6.7B module-only + 15.9B full-parameter for every configuration).</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table6.png" alt="Table 6: RULER scores of 4B C-KSA+Full with different compression granularities"><figcaption><b>Table 6:</b> RULER scores (%) of 4B C-KSA+Full with different compression granularities. <span class="ex">$k_m = 8$ has a mean of 83.94 and $k_m = 32$ a mean of 83.72, only 0.22 percentage points apart, yet $k_m = 32$ reduces the number of remote Meta entries by a further 4&times; — hence the choice of $k_m = 32$. The other settings: 16 gives 82.89, 64 gives 82.46, 128 gives 82.66, all below those two. Length by length, $k_m = 32$ scores 73.92 at 128K, above most settings other than $k_m = 8$'s 74.58 (16 gives 69.56, 64 gives 70.93, 128 gives 71.90), showing that <b>finer is not necessarily better, and that the 128K column is actually friendlier to coarse granularity</b>.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption></figure></div>
+
+<p>Read Table 6 together with Table 9(a) and the difference in granularity sensitivity between the two scales is plain: at 1.9B, sweeping $k_m$ from 4 to 128 moves the RULER mean only within 71.92–72.74, with <b>no systematic decline</b>; at 4B, sweeping from 8 to 128 gives means between 82.46 and 83.94, with the optimum at $k_m = 8$. The paper offers a conjectural explanation for the 1.9B insensitivity: the Full layers can still read the original-text detail lost in compression, so the effect of compression granularity is diluted. On the 4B side, the reason for choosing $k_m = 32$ is the <b>benefit/cost ratio</b> — four times more compression for almost no loss.</p>
+</section>
+
+<section id="s18">
+<h2 class="sec"><span class="sec-no">Section 18</span>Long-context retrieval analysis and inference efficiency</h2>
+
+<p>Mean scores hide differences along the position dimension, so the paper adds a <abbr title="NIAH: Needle-in-a-Haystack retrieval test">NIAH</abbr> grid (Figure 10) and a paired 128K subtask table (Table 7). Start with the grid: across six context lengths (4K to 128K) &times; eleven insertion depths (0% to 100%), it compares the models on identical inputs.</p>
+
+<figure class="fig"><img src="figs/fig10.png" alt="Figure 10: Single-needle retrieval across context lengths and needle depths"><figcaption><b>Figure 10:</b> Single-needle retrieval across context lengths and needle depths. C-KSA+S-KSA maintains high accuracy across the grid, averaging 97.88% over all depths at 128K. <span class="ex">Left is Hybrid KSA and right is C-KSA+S-KSA: a single-needle retrieval grid over six context lengths (4K–128K) &times; eleven insertion depths (0%–100%). Both hold very high accuracy across the whole grid, and <b>C-KSA+S-KSA averages 97.88% across all depths at 128K</b>. This figure answers the worry "would sparse block selection systematically fail at some depth" — the grid shows no depth band collapsing wholesale.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption></figure>
+
+<p>Beyond the grid, Table 7 makes a paired comparison on six RULER-128K subtasks. There is both good news and clear bad news here.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table7.png" alt="Table 7: RULER-128K subtask scores comparing Hybrid KSA and C-KSA+S-KSA"><figcaption><b>Table 7:</b> RULER-128K subtask scores (%). C-KSA+S-KSA exceeds Hybrid KSA on Single, Multiquery, and SQuAD. <span class="ex">Six paired results: NIAH-Single 93.33 &rarr; 98.33, NIAH-Multiquery 91.25 &rarr; 96.25, and SQuAD 30.00 &rarr; 35.00 all rise; NIAH-Multikey 85.00 &rarr; 83.33 and NIAH-Multivalue 91.25 &rarr; 88.75 fall slightly; and <b><abbr title="FWE: Frequent Word Extraction, a RULER subtask">FWE</abbr> (frequent word extraction) falls from 45.00 to 26.67, the largest degradation in the whole comparison</b>. The first five are all retrieval-type tasks that locate one or several needles and read them out; the last is an aggregation-type task that requires counting over the context.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption></figure></div>
+
+<div class="note"><b>Failure mode (recorded honestly):</b>FWE's 45.00 &rarr; 26.67 is an absolute drop of 18.33 percentage points, close to a halving, and it is not noise-level fluctuation. The paper mentions it in two places: the contributions section writes that "aggregation-heavy tasks such as frequent-word extraction degrade under block selection", and the Failure mode discussion in Section 3.7 gives the quantitative form — "the largest 128K subtask drop is frequent-word extraction, from 45.00% to 26.67%, which is an aggregation task". So <b>the paper identifies the phenomenon and attaches a causal label (aggregation task), but offers no mechanism-level explanation and no fix for this class of task</b>. Combined with the direction of the other five items in Table 7, a reasonable reading (<em>[organized] on this page, not a paper conclusion</em>) is that block-level sparse selection picks "a few high-weight positions", which is inherently unfavourable to tasks that require a statistical accumulation over the whole context, since aggregation needs information spread more diffusely. This thread is also worth connecting to the entropy-corrected chunk weights of HiLS-Attention in Section 20 — that work is precisely about applying an entropy correction to block weights.</div>
+
+<p>At the same time, fairness requires saying this: FWE's absolute level was already low (the parent scores only 45.00), and on VT both models sit around 25 (25.00 &rarr; 23.00). Both are hard tasks at 128K for both models, so the correct reading of this table is <b>"sparse adaptation is a net gain on retrieval-type tasks and needs extra care on aggregation-type tasks"</b>, not "degradation overall".</p>
+
+<p>Next is efficiency (Figure 11), which is also KSA V2's main selling point. The measurement basis must be stated first: <b>a 1.9B model, BF16, batch size 1, a single NVIDIA H800</b>, sequence length from 16K to 128K, with C-KSA+S-KSA using $k_m = 128$ and $b = 4$. The cache measurement includes the indexer, auxiliary state, KV storage and resident workspace.</p>
+
+<figure class="fig"><img src="figs/fig11.png" alt="Figure 11: Inference cache size and throughput of 1.9B Full, Hybrid KSA, and C-KSA+S-KSA"><figcaption><b>Figure 11:</b> Inference cache size and throughput of 1.9B Full, Hybrid KSA, and C-KSA+S-KSA ($k_m = 128$, $b = 4$). <span class="ex">The three panels are (a) resident <abbr title="KV cache: the cached key/value pairs used during autoregressive decoding">KV cache</abbr> size, (b) <abbr title="prefill: the stage that processes the input prompt">prefill</abbr> throughput and (c) <abbr title="decode: the token-by-token generation stage">decode</abbr> throughput, each spanning 16K/32K/64K/128K. (a): at 128K C-KSA+S-KSA is 6.31 GiB, Hybrid KSA 10.59 GiB and Full 24.00 GiB; finer ticks show Full rising from 3.00 GiB at 16K to 24.00 GiB, while C-KSA+S-KSA goes from 1.40 GiB to 6.31 GiB with a visibly gentler slope. In (c) the 128K decode rate is 198.9 tok/s (C-KSA+S-KSA) against 157.0 (Hybrid KSA); Full has no comparable value in that panel.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption></figure>
+
+<p><b>Cache.</b> At 128K the resident cache of C-KSA+S-KSA is <b>6.31 GiB</b>, against 10.59 GiB for Hybrid KSA and 24.00 GiB for Full, reductions of <b>40.4%</b> and <b>73.7%</b> respectively. The 40.4% figure is the same basis as the abstract's "reduces resident cache size by 40.4%". One caution: the 6.31 GiB here is not a purely theoretical value — it includes the indexer, the auxiliary compression state and the resident workspace, i.e. the net result after C-KSA's extra overhead has been counted in.</p>
+
+<p><b>Prefill.</b> At 128K C-KSA+S-KSA reaches <b>44,971 tokens/s</b>, against 29,837 for Hybrid KSA and 20,830 for Full, equivalent to <b>2.16&times;</b> Full. The gain over Hybrid KSA grows with length: 1.23&times; at 16K, widening to <b>1.51&times;</b> at 128K. That shape is reasonable — the payoff of sparse access naturally amplifies as sequences get longer.</p>
+
+<p><b>Decode.</b> C-KSA+S-KSA reaches <b>215.50 tokens/s</b> at 16K and <b>198.85 tokens/s</b> at 128K, against 162.87 and 157.02 for Hybrid KSA; across the four sequence lengths the speedup range is <b>1.23–1.32&times;</b>. The abstract's figure of "1.27&times; decode throughput" falls inside that range. Separately, the overall basis given in Figure 1 is per-token inference <abbr title="FLOPs: floating point operations">FLOPs</abbr> and cache size lower by 2.3&times; and 2.9&times; (relative to the reference set), consistent in direction with this section but on a different basis — do not mix the two when quoting.</p>
+
+<p>The paper also gives a finer compute ledger: at 128K, C-KSA+S-KSA's <b>estimated matrix FLOPs per text token is 6.38 times lower than Full and 2.76 times lower than Hybrid KSA</b>; the BF16 KV cache and index-key cache are smaller by <b>3.86 times</b> and <b>1.35 times</b> respectively. That last 1.35 is worth noting — the index-key cache is itself a non-trivial size, not zero. In addition, under the same settings as Table 7, C-KSA raises the remote-history compression rate from $k_s = 8$ to $k_s k_m = 1024$.</p>
+
+<div class="takeaway"><b>Efficiency summary:</b>the 40.4% resident cache reduction, 1.51&times; prefill and 1.23–1.32&times; decode at 128K were all measured under the same 1.9B / BF16 / batch=1 / single-H800 basis. That basis is also the boundary of these numbers: <b>batch size 1 means continuous batching is not covered</b>, which Section 21 lists as something worth testing next.</div>
+</section>
+
+<section id="s19">
+<h2 class="sec"><span class="sec-no">Section 19</span>Analysis and ablations: hierarchical compression, routing choices, and the oracle experiment</h2>
+
+<p>This is the densest section of the paper. It answers four questions: is hierarchical compression better than simply enlarging the chunk? How large should $k_m$ be? How should the sparsity scheme and teacher pooling be chosen? And the most important one — <b>if selection is accurate enough, does the backbone need changing at all?</b></p>
+
+<p><b>Question one: direct coarse granularity versus hierarchical compression.</b> To reach 1024&times; remote compression, a simpler route is to set the Summary chunk straight to $k_s = 1024$. Table 8 compares that one-step route with C-KSA's two-level compression, all retaining the Full layer; the large-chunk model is trained from scratch, while C-KSA is built on a $k_s = 8$ Hybrid KSA.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table8.png" alt="Table 8: RULER performance of direct and hierarchical compression with Full attention retained"><figcaption><b>Table 8:</b> RULER performance of direct and hierarchical compression with Full attention retained. <span class="ex">Three rows: Hybrid KSA at $k_s = 8$ (reference) with a mean of 72.61; direct enlargement to $k_s = 1024$ with a mean of only 70.63; and C-KSA+Full ($k_s = 8$, $k_m = 128$) with a mean of 72.68. That is, <b>at the same 1024&times; remote compression rate</b>, hierarchical compression is 2.05 percentage points above direct coarse granularity and matches the small-chunk reference. The clearest gap is at 4K: 75.65 versus 81.52.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption></figure></div>
+
+<p>The paper's explanation for the gap is "extra computation": C-KSA uses a summary chunk of 8, which introduces more tokens at the input sequence level, and the compressed KV then passes through an additional module, effectively performing a two-step summary. The paper also notes this agrees with the 4B conclusion in the KSA report — raising $k_s$ from 8 to 64 drops the 4K–64K RULER mean from 82.97 to 77.79. <b>Putting this in the experimental section is valuable: it shows that "compressing harder" and "compressing in one step" are not the same thing, and that keeping a fine-grained intermediate representation pays off.</b></p>
+
+<p><b>Question two: how large should $k_m$ be.</b> Table 9(a) sweeps $k_m \in \{4, 8, 16, 32, 64, 128\}$ on C-KSA+Full, with the six-length RULER mean landing between 71.92 and 72.74 and <b>no systematic decline as compression increases</b>. The paper's conjecture is that the Full layers still provide access to the original-text detail that compression removes. The reason for choosing $k_m = 128$ is marginal return: at 128K with $k_m = 128$ each layer holds only about 128 Meta entries, and compressing further saves little cache, so higher compression ratios are left for million-token contexts.</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table9.png" alt="Table 9: Ablations of compression and sparse attention"><figcaption><b>Table 9:</b> Ablations of compression and sparse attention. Dashes indicate unreported scores since the sequence length is not enough to activate sparse mechanism. <span class="ex">Three panels: (a) $k_m$ granularity, six settings with means from 71.92 to 72.74; (b) sparsity scheme and teacher pooling, all on the same $k_m = 128$ C-KSA+Full backbone, including token-level DSA, QSA ($b=4$, max), S-KSA with $b \in \{2,4,8\}$ and an S-KSA sum variant; (c) backbone choice — the same S-KSA adaptation applied to KSA and to C-KSA respectively. <b>In panel (b), S-KSA with $b = 8$ is the clear outlier (mean 69.79, only 57.62 at 128K), showing that too few candidate blocks hurts retrieval</b>; in panel (c) the 128K comparison is 65.01 versus 61.06.</span>
+          <span class="pgref">Report p.20</span>
+    </figcaption></figure></div>
+
+<p><b>Question three: block size and routing scheme.</b> Panel (b) compares S-KSA with $b \in \{2, 4, 8\}$, token-level DSA, and Qwen Sparse Attention (QSA) on the same backbone. QSA offers a simpler alternative: average the projected token-level index keys within each block. The paper aligns QSA with its own settings by using $b = 4$ and 8 indexer heads, following Qwen's QSA indexer design. The result: <b>$b = 4$ matches $b = 2$ and token-level DSA in mean score while having half and a quarter of their routing candidates respectively</b>, and it beats QSA at the same block size (mean 72.39 vs 71.34, 128K 65.01 vs 61.39). Pushing on to $b = 8$ reduces candidates further but degrades retrieval noticeably, with 128K at only 57.62. So $b = 4$ is the compromise between retrieval quality and routing cost.</p>
+
+<p>Also, in this panel the paper reports RULER only, for a reason it states plainly: <b>most general-capability sequences already fall within the combined remote-plus-local budget, so they discriminate poorly between routing qualities</b>. That is a methodologically defensible choice, but it also means this table cannot be used to infer general capability.</p>
+
+<p><b>Teacher pooling.</b> With $k_m = 128$ and $b = 4$, the paper contrasts the max-pooled teacher of Equation (15) (following QSA) against a sum-pooled teacher (using $\sum_{i \in \mathcal{B}_u} a_{t,i}$ as the block weight), with the two training runs differing only in pooling: <b>max pooling lifts the mean from 71.49% to 72.39% and 128K from 61.68% to 65.01%</b>. The paper's explanation is that retrieval depends on a few salient tokens whereas sum pooling dilutes them with diffuse attention, and the result also confirms that QSA's choice holds on a KSA backbone.</p>
+
+<p><b>Question four: does the backbone need changing.</b> Table 9(c) compares the same S-KSA adaptation ($b = 4$, max-pooled teacher, 18.5B tokens module-only, identical remote budget / local window / sink) applied on Hybrid KSA and on C-KSA+Full: C-KSA+S-KSA gives a mean of 72.39 and 65.01 at 128K, while KSA+S-KSA gives 71.84 and 61.06. Against their respective dense references, <b>the 128K drop is 1.30 percentage points on the C-KSA side and 4.29 on the Hybrid KSA side</b>. Figure 12(c) offers a complementary observation: at the same token budget, oracle block selection retains slightly more decode attention mass on C-KSA than on Hybrid KSA (including local context and sinks), consistent with the smaller retrieval loss after sparse adaptation.</p>
+
+<p>Figure 12 and Table 10 record the most persuasive experiment of all: <b>freeze every parameter and select using Full attention probabilities directly</b>. Token selection ranks by individual probabilities; block selection takes the maximum probability within each $b = 4$ token block, matching the Indexer's teacher pooling rule. The paper calls this oracle selection and compares it against the unmodified Full layer on the same backbone. The remote budget $K$ includes 8 sink tokens, and a 1024-token local window is retained separately.</p>
+
+<figure class="fig"><img src="figs/fig12.png" alt="Figure 12: Oracle selection at 128K with frozen Hybrid KSA and C-KSA+Full"><figcaption><b>Figure 12:</b> Oracle selection at 128K with frozen Hybrid KSA (blue) and C-KSA+Full ($k_m = 128$, red). (a,b) RULER scores. (c) Decode <abbr title="attention mass: the total share of attention probability falling on a set of positions">attention mass</abbr> retained by token and block selection ($b = 4$), including local context and sinks before sparse renormalization. <span class="ex">The horizontal axis is the remote token budget $K$, from 8 all the way to 8K, and the vertical axis is the RULER score; in (a)(b) the three lines are Dense, Token oracle and Block-4 oracle. (c) is the decode attention mass retained at different $K$. The key reading: <b>scores collapse at very small budgets but recover rapidly as $K$ rises</b> — on C-KSA, block-level selection already reaches 64.71 at $K = 512$, and by $K = 4096$ it is essentially touching the dense reference.</span>
+          <span class="pgref">Report p.21</span>
+    </figcaption></figure>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table10.png" alt="Table 10: Dense and oracle RULER results with frozen backbones"><figcaption><b>Table 10:</b> Dense and oracle RULER results with frozen backbones. Oracle selection uses $K = 4096$; Mean averages all six context lengths (4K–128K). <span class="ex">Five backbones &times; three selection modes (Dense / Token oracle / Block-4 oracle), with Mean and 128K in each cell. Take C-KSA+Full ($k_m = 128$) as the example: Dense 72.68 / 66.31, Token oracle 72.84 / 66.67, Block-4 oracle 72.66 / 66.24. <b>Across all five backbones, both oracle selections land within 0.51 percentage points of the dense reference on the mean</b> — and the parameters of those five backbones were frozen, never updated at all.</span>
+          <span class="pgref">Report p.21</span>
+    </figcaption></figure></div>
+
+<p>The argumentative force of these numbers comes from how cleanly they cut: <b>if the selection is accurate enough, not even backbone adaptation is needed, and retrieval performance recovers essentially to dense levels</b>. Two conclusions follow: first, accurate selection alone recovers near-dense RULER without any backbone update, including on a model already adapted to C-KSA; second, <b>full-parameter sparse continued training brings no clear RULER improvement under the recipe and budget the paper tested</b>. Together they support concentrating sparse-adaptation effort on the aggregation module and the Indexer rather than on changing the backbone.</p>
+
+<p>The attention-mass part is more intuitive: at $K = 4096$, the selected remote tokens plus the 1024-token local window <b>cover only about 3.9% of a 128K context</b>, yet retain <b>82.83%</b> of decode attention mass, with a corresponding RULER of <b>66.24</b> against dense attention's <b>66.31</b> — a gap of 0.07 percentage points. At the same budget Hybrid KSA retains 81.71%. The paper adds a key qualification: <b>local context and sinks alone already retain a considerable share of attention mass, yet retrieval performance is poor</b>, which in turn shows that "selecting the relevant remote content" is what makes sparse attention viable, not the retained-mass number itself.</p>
+
+<p>The last set of visualizations grounds all of this in a concrete example. Figure 13 compares per-layer attention and block selection between Hybrid KSA and the main model C-KSA+S-KSA on the same 16K NIAH sample (the latter with $k_m = 128$, $b = 4$, $K = 4096$); both retrieve the answer correctly from outside the local window.</p>
+
+<figure class="fig"><img src="figs/fig13.png" alt="Figure 13: Per-layer attention and block selection on a shared 16K NIAH example"><figcaption><b>Figure 13:</b> Per-layer attention and block selection on a shared 16K NIAH example for Hybrid KSA (left) and C-KSA+S-KSA (right). Teal strips mark selected remote blocks, dashed lines mark the answer, and gray shading denotes the local window. <span class="ex">The left and right columns each show four layers from the shallow group (L0–L3), the middle group (L12–L15) and the deep group (L20–L23); the horizontal axis is the original-text position (0–16K tokens), and colors distinguish Summary KV / <abbr title="Meta KV: the second-level compression product of C-KSA, private to a layer">Meta KV</abbr> / Text KV. The paper's key points: in the shallow layers shown, Meta entries receive only 7.7–13.7% of C-KSA's attention mass, whereas in the middle and deep layers they receive <b>73.1–87.8%</b>, showing that compressed remote memory is used substantially; and in all three displayed S-KSA layers the selected blocks cover the answer span, <b>retaining 87.6–97.3% of the dense attention mass together with local context while accessing only 31.5% of the original-text positions</b>.</span>
+          <span class="pgref">Report p.22</span>
+    </figcaption></figure>
+
+<p>The "shallow versus middle-and-deep" difference in Figure 13 is interesting (<em>[organized] on this page</em>): Meta entries are barely used in the shallow layers (7.7–13.7%) and only become dominant in the middle and deep layers (73.1–87.8%). This agrees with the common observation that shallow layers rely more on local, fine-grained information while deep layers do coarse integration, and it hints that using the same $k_m$ at every layer may not be optimal — but the paper runs no per-layer-$k_m$ experiment on that basis, which is left to Section 21.</p>
+
+<p>Finally there is the control experiment that establishes the legitimacy of the reference point (Table 11). Because the adapted models receive more training than the baselines, the paper needs to rule out the "more training is just better" explanation, so it performs full-parameter continued pretraining of the <b>unmodified Hybrid KSA</b> from the same 128K checkpoint (global batch 256, peak learning rate $4 \times 10^{-4}$, warmup–stable–decay schedule).</p>
+
+<div class="tbl-wrap"><figure class="fig"><img src="figs/table11.png" alt="Table 11: RULER scores after continued pretraining of Hybrid KSA"><figcaption><b>Table 11:</b> RULER scores after continued pretraining of Hybrid KSA. <span class="ex">The five evaluated checkpoints cover 5.7–51.3B additional tokens. The original checkpoint (0) has a mean of 72.60 and 65.27 at 128K; after additional training the means are 70.84 (5.7B), 70.77 (17.1B), 71.86 (28.5B), 69.74 (39.9B) and 71.95 (51.3B), <b>all below the original 72.60</b>; at 128K only the 28.5B checkpoint rises, to 66.76, and later checkpoints fall back (63.62 at 51.3B).</span>
+          <span class="pgref">Report p.23</span>
+    </figcaption></figure></div>
+
+<p>The paper's conclusion is that under the tested recipe and data budget, continued pretraining <b>does not</b> give Hybrid KSA a consistent RULER improvement, so using the original checkpoint as the quality reference is justified. <b>That argument is crucial to the credibility of the whole paper</b> — it turns the most easily challenged point, "you trained more", into a testable control, and it honestly reports the result that additional training slightly hurts.</p>
+
+<div class="takeaway"><b>Key points of this section:</b>(1) at the same 1024&times; compression rate, hierarchical compression at 72.68 beats direct coarse granularity at 70.63; (2) $k_m$ is insensitive at 1.9B (71.92–72.74), and 128 is chosen for marginal cache benefit; (3) $b = 4$ is the quality/cost compromise and $b = 8$ is clearly worse (69.79); (4) max pooling beats sum pooling (128K 65.01 vs 61.68); (5) the oracle experiment proves that "selecting accurately" alone approaches dense performance (66.24 vs 66.31) and the backbone need not change; (6) the 3.9% of positions &rarr; 82.83% of attention mass figure is the core of why S-KSA is viable.</div>
+</section>
+<section id="s20">
+<h2 class="sec"><span class="sec-no">Section 20</span>Lineage of each component: where every piece comes from</h2>
+
+<p>KSA V2 is not an architecture grown from nothing; it grafts two modifications onto an existing hybrid backbone, each drawing on several existing lines of research. The paper marks every such borrowing explicitly, and this section collects those marks so it is clear what is inherited and what is this generation's own choice.</p>
+
+<p>Start with the positioning of the main line. The <abbr title="Summary token: an aggregate token appended after each chunk">Summary token</abbr> mechanism itself comes from KSA (Chu et al., 2026), and Hybrid KSA's 3:1 layer interleaving comes from the same paper; KSA V2 leaves the layer structure alone and changes two components — C-KSA further compresses the Summary KV of distant history, and S-KSA replaces dense attention over original text with Summary-guided block sparsity. So the table below reads: <b>"Upstream" is the provenance the paper itself labels, and "This generation's change" is what KSA V2 does differently from that provenance</b>. The second column is [organized] by this page from the paper's method and Related Work sections, not the paper's own wording.</p>
+
+<table class="data wrap">
+  <caption>Upstream attribution the paper labels for each KSA V2 component, against this generation's change</caption>
+  <thead>
+    <tr><th>Component</th><th>Upstream, as labelled by the paper</th><th>This generation's change</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Summary token mechanism (the overall backbone)</td>
+      <td>KSA (Chu et al., 2026)</td>
+      <td>Keeps KSA's Summary layout and 3:1 layer interleaving unchanged, and uses the same Summaries in two roles at once: compressible memory and routing index. The granularity of the Summary sequence itself is not coarsened.</td>
+    </tr>
+    <tr>
+      <td>C-KSA's dimension-wise aggregation</td>
+      <td>Compressed Sparse Attention (CSA) and Heavily Compressed Attention (HCA) in DeepSeek-V4 (DeepSeek-AI et al., 2026)</td>
+      <td>Upstream performs learned dimension-wise aggregation over the KV of text tokens and uses different compression granularities in the CSA/HCA tiers; C-KSA applies dimension-wise aggregation to <b>Summary KV</b>, and the resulting Meta entry is used only inside the layer that constructs it, never entering the hidden-state sequence, and never coarsening the Summaries passed between layers.</td>
+    </tr>
+    <tr>
+      <td>S-KSA's <abbr title="Lightning Indexer: DSA's lightweight block scorer">Lightning Indexer</abbr> routing</td>
+      <td>DeepSeek Sparse Attention / <abbr title="DSA: DeepSeek Sparse Attention, token-level sparsity">DSA</abbr> (DeepSeek-AI et al., 2025)</td>
+      <td>Upstream's Lightning Indexer selects <b>individual tokens</b>; S-KSA drops selection to block granularity ($b$ tokens per candidate, with $b$ times fewer candidate comparisons) and builds index keys from Summary-guided block representations. It also differs from CSA in that S-KSA's main attention never reads compressed text, only the original KV of the selected blocks.</td>
+    </tr>
+    <tr>
+      <td>Block-level max-pool teacher</td>
+      <td><abbr title="QSA: Qwen Sparse Attention, block-level sparsity">QSA</abbr> (Qiu et al., 2026)</td>
+      <td>Adopts QSA's "average across heads, then take the block maximum" as the teacher distribution and trains the Indexer by KL distillation; the paper additionally runs a sum-pooling control confirming max pooling is better (128K 65.01 vs 61.68). QSA itself averages the projected token-level index keys within a block and appears here as a same-block-size comparison method.</td>
+    </tr>
+    <tr>
+      <td>The meta-gist style of hierarchical compression</td>
+      <td>H-SSA (Mao et al., 2026)</td>
+      <td>Upstream inserts meta-gist tokens to summarize a group of gist tokens and support coarse-to-fine retrieval; C-KSA adds no tokens and instead compresses $k_m$ Summary KV entries in place into one Meta entry that is private to the layer.</td>
+    </tr>
+    <tr>
+      <td>Using memory tokens as a retrieval interface</td>
+      <td>Landmark Attention (Mohtashami and Jaggi, 2023)</td>
+      <td>Upstream introduces a landmark token per context block and learns block retrieval by attending to the landmark; S-KSA reuses the existing Summary (every chunk already has one) for that interface role rather than inserting an extra landmark token.</td>
+    </tr>
+    <tr>
+      <td>Tiled execution</td>
+      <td>FlashAttention (Dao et al., 2022)</td>
+      <td>Adopts its tiled execution and online softmax; C-KSA and S-KSA share one tiled <abbr title="prefill: the stage that processes the input prompt">prefill</abbr> execution path, with KV-tile scheduling and prefix masks implementing block selection, local visibility and causality, plus a custom sparse <abbr title="decode: the token-by-token generation stage">decode</abbr> kernel that reads the <abbr title="KV cache: the cached key/value pairs used during autoregressive decoding">KV cache</abbr> directly by selected block index.</td>
+    </tr>
+    <tr>
+      <td>The analogy of Summary-guided pooling</td>
+      <td>HiLS-Attention (Hu et al., 2026)</td>
+      <td>Upstream uses a landmark query to pool token keys and then merges intra-block attention outputs with entropy-corrected chunk weights; S-KSA is similar in pooling tokens within a block using a query, but it <b>reuses an existing Summary as that query</b> rather than inserting a landmark token, and its routing scores are used only for block selection, not as extra attention weights — the main attention performs a single softmax over the selected original text and the local context.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="tbl-foot">The "Upstream, as labelled by the paper" column is taken from inline attributions in the paper's body and Related Work; the "This generation's change" column is <em>[organized] on this page</em>, summarized from the paper's Method and Related Work rather than quoted from it. <b>Citations follow the paper's own inline attribution; this page has not checked each reference entry.</b></p>
+
+<p>Read the table vertically and two fairly clear lines of difference emerge.</p>
+
+<p><b>The first: no new tokens.</b> H-SSA adds meta-gist tokens, Landmark Attention adds landmark tokens, HiLS-Attention adds landmark queries — all of these upstream schemes insert new structure into the sequence. Both C-KSA and S-KSA in KSA V2 <b>reuse existing Summaries</b>: a Meta entry exists only inside the layer that constructs it and is never passed forward, and the routing block representations are computed on the fly from existing Summaries and block tokens. The direct benefit is that the Summary layout is unchanged, so the conversion retrofits onto an already-pretrained Hybrid KSA without touching sequence length — which is the technical basis for the paper listing "retrofit-friendly" as a selling point.</p>
+
+<p><b>The second: routing scores do not enter attention.</b> NSA uses learned block compression to guide fine-grained selection and fuses compressed, selected and local attention paths; HiLS-Attention merges intra-block outputs with entropy-corrected chunk weights; SAS learns context ranking inside the attention normalization. All of these let the routing signal <b>participate in weighting the final output</b>. S-KSA separates the two: the Indexer's scores decide only <b>which blocks to read</b>, and the main attention then performs one softmax over the selected original tokens and the local context. The paper states this explicitly in Related Work, and it is one of the preconditions for S-KSA and C-KSA coexisting on the same tiled execution path.</p>
+
+<div class="note"><b>A note on provenance:</b>this section only collects the citation relationships the paper itself labels. Whether the upstream methods mentioned match the versions cited, and whether the paper's descriptions of each upstream method are accurate, have not been checked item by item on this page. To judge the boundary of novelty from this table, go to the original references.</div>
+
+<p>Also worth noting is the paper's own positioning: in Related Work it takes care to distinguish itself from DeepSeek-V4's CSA (the main attention never reads compressed text) and from DSA (routing drops to block granularity rather than token granularity). These two differences are not rhetoric; they correspond to two observable results in Section 19 — reading original text in the main attention is the precondition for <abbr title="RULER: a long-context retrieval benchmark suite (4K–128K)">RULER</abbr> to approach the dense reference, and block-granularity routing is the source of a 4&times; reduction in candidates with no loss in the mean.</p>
+</section><section id="s21">
+<h2 class="sec"><span class="sec-no">Section 21</span>Commentary: strengths, limits, and the gaps worth testing next</h2>
+
+<p>This is a strongly engineering-oriented technical report: it proposes no new attention mechanism, but separately removes two bottlenecks of an existing hybrid architecture (the compression rate welded to chunk size, and the Full layers still paying quadratic cost), and treats "did the conversion damage existing capability" as a first-class question. Below are strengths and limits, followed by a separate list of "not disclosed, worth testing next".</p>
+
+<h3>Strengths</h3>
+
+<p><b>1. Retrofit-friendly, with quantifiable cost.</b>Both new components reuse existing Summaries, add no tokens and change no Summary layout, so they attach directly to a pretrained Hybrid KSA. The price is stated concretely: C-KSA adds 80.2M parameters at 1.9B and 71.7M at 4B; S-KSA adds 86.6M and 163.0M respectively; the adaptation token budget at 1.9B is 6.7B + 3.4B + 18.5B. That is a list you can budget against directly, far more useful than an adjective like "lightweight adaptation".</p>
+
+<p><b>2. One set of Summary tokens reused in two roles, without increasing input length.</b>As memory it is compressed into layer-local Meta entries; as an index it is used to build block-level routing representations. The paper states this modestly, but it really is the most elegant design choice in the paper — because no tokens are added, the two conversion routes stack on each other without conflict and can coexist on the same tiled prefill execution path.</p>
+
+<p><b>3. Hierarchical compression beats directly enlarging the chunk, and the paper provides the control.</b>Table 8 compares "one step" against "two levels" <b>at the same 1024&times; remote compression rate</b>: 70.63 vs 72.68, a gap of 2.05 percentage points. That conclusion is directly useful to anyone working on KV compression — it shows the <em>shape</em> of the compression path (how many levels, how coarse each one) is itself a design variable to tune, not just the final ratio. The paper also offers a plausible explanation: a two-step summary preserves a fine-grained intermediate representation.</p>
+
+<p><b>4. S-KSA is more resilient on a compressed backbone, and the paper cuts the causality with an <abbr title="oracle: an upper bound on block selection that uses dense attention probabilities directly">oracle</abbr> experiment.</b>Relative to their respective dense references, the 128K drop is 1.30 on the C-KSA side and 4.29 on the Hybrid KSA side. More important is Table 10: <b>with every parameter frozen and oracle block selection driven by Full attention probabilities, the mean on all five backbones is within 0.51 percentage points of the dense reference</b>, and on C-KSA ($k_m=128$) 128K is 66.24 against dense's 66.31. This experiment cleanly removes the confound of "is the selection not good enough, or was the backbone damaged", and concludes that the former bottleneck can be solved by training while the latter need not be touched at all. It is the most convincing piece of argumentation in the paper.</p>
+
+<p><b>5. It handles the "you trained more, so you are better" objection honestly.</b>Table 11 runs continued pretraining of the unmodified Hybrid KSA, and the mean of all five checkpoints (5.7–51.3B tokens) is <b>below</b> the original checkpoint's 72.60. Rather than hiding a result unfavourable to its own recipe, the paper uses it to argue that the original checkpoint is a legitimate reference. Turning an adverse result into support for the argument deserves credit.</p>
+
+<h3>Limits</h3>
+
+<p><b>1. Evaluation stops at 128K.</b>The longest long-context experiment is 128K, and one of the reasons given for $k_m = 128$ is precisely that "at 128K each layer holds only about 128 Meta entries, and compressing further saves little". The paper leaves higher compression ratios to "million-token contexts", but runs no million-scale experiment. <b>The extrapolation range of "compressing harder is lossless at some lengths" has in fact never been tested.</b></p>
+
+<p><b>2. At 4B only RULER is validated; neither general capability nor efficiency is measured.</b>The conclusion says this directly: "General-capability evaluations and efficiency measurements are limited to 1.9B; the 4B validation covers RULER retrieval." That is, <b>the paper has no answer to either "how much general capability does 4B lose" or "how much cache does 4B save and how much faster is it".</b> And 4B is the scale closer to real deployment — all those impressive efficiency numbers in Section 18 (6.31 GiB, 44,971 tok/s) come from 1.9B.</p>
+
+<p><b>3. Aggregation tasks such as <abbr title="FWE: Frequent Word Extraction, a RULER subtask">FWE</abbr> clearly degrade.</b>RULER-128K frequent-word extraction falls from 45.00 to 26.67, a drop of 18.33 percentage points, close to half; VT also falls from 25.00 to 23.00. The paper flags the phenomenon in both the contributions section and the Failure mode discussion in Section 3.7, classifies it as "aggregation-heavy tasks such as frequent-word extraction degrade under block selection", and lists it alongside "the remaining cache is mainly original-text KV in the exact-access layers" as a principal cost. <b>But the paper gives no mechanism-level explanation — why aggregation tasks degrade under block selection, and whether it can be mitigated.</b> This is not a negligible corner: block-level sparsity inherently favours "a few high-weight positions", while aggregation tasks need information spread more diffusely, a structural tension between the two. The paper puts the RULER mean of 72.39 in a prominent place, but a reader must find Table 7 on their own to see the scale of this failure mode.</p>
+
+<p><b>4. The remaining cost is concentrated in the sparse layers' original-text KV.</b>The paper itself concedes in the conclusion that "The remaining cost lies mainly in the original-text KV stored by the sparse layers". There is a shadow of this in the numbers too: at 128K the index-key cache is only 3.86&times; smaller (KV cache) and 1.35&times; smaller (index-key cache), the latter showing that the index side does not disappear along with compression. C-KSA compresses the remote Summary, but the KV of selected original-text blocks must still be kept and read in full — <b>a cost item that has not been touched</b>.</p>
+
+<p><b>5. The measurement basis for the efficiency data is narrow.</b>It comes from 1.9B, BF16, <b>batch size 1</b>, a single H800. Batch=1 is the latency-oriented extreme, whereas real serving is usually throughput-oriented under continuous batching. The paper provides no data at large batch or under continuous batching.</p>
+
+<h4>Not disclosed, worth testing next</h4>
+
+<p>The following questions remain open after reading the paper. Each was checked against the paper first to confirm no answer is given, and is then phrased as an open question.</p>
+
+<ol>
+  <li><b>The per-layer distribution of attention/information on Meta entries.</b>The paper gives the qualitative observation of Figure 13: Meta entries take only 7.7–13.7% of attention mass in the shallow layers shown, but 73.1–87.8% in the middle and deep layers. That is, however, a visualization of <b>one 16K <abbr title="NIAH: Needle-in-a-Haystack retrieval test">NIAH</abbr> sample and one query</b>; <b>the paper does not disclose</b> cross-sample, cross-length per-layer statistics (such as per-layer curves of attention entropy or information content). An aggregate statistic would be worth producing, to establish whether "shallow layers use Meta less" is a reproducible general rule.</li>
+  <li><b>Experiments with a different $k_m$ per layer.</b>Section 3.1 explicitly says C-KSA supports layer-specific compression, but immediately states that <b>every evaluated configuration uses a uniform $k_m$ across C-KSA layers</b>, and puts "how to allocate compression across layers" into future work. Since item 1 above shows layers differ greatly in their reliance on Meta, <b>it would be worth</b> a set of experiments with heterogeneous per-layer $k_m$, to see whether better retrieval scores can be obtained at the same average compression rate.</li>
+  <li><b>How the sparse decode kernel behaves at large batch / under continuous batching.</b>The decode path the paper describes is "a custom sparse kernel reading the KV cache directly by selected block index", and the efficiency measurements are explicitly at batch size 1. Sparse access at batch=1 is almost purely memory-bandwidth bound; <b>to be verified</b>: as batch grows and different requests select different blocks, producing irregular memory access, does the kernel keep its relative advantage? This directly determines whether these speedups transfer to production serving.</li>
+  <li><b>Efficiency numbers and general capability at 4B.</b>The paper's conclusion already concedes that efficiency measurement and general-capability evaluation are limited to 1.9B, with 4B covering only RULER. <b>Worth measuring</b>: 4B's resident cache, prefill/decode throughput at 128K, and the nine general benchmarks — after all, 4B's added S-KSA parameters (163.0M) are nearly twice 1.9B's (86.6M), so its cost structure need not have the same shape.</li>
+  <li><b>The effect of Indexer Q/K RMSNorm at 1.9B has not been reproduced.</b>The paper reports that at 4B, without Q/K normalization, even 21.8B tokens of training stays below the C-KSA+Full parent, whereas with normalization 4.2B tokens are enough to recover to near the parent. But it states explicitly that <b>1.9B keeps the original setting and was not re-run through the full experimental suite with this change</b>, and writes "whether normalization can similarly reduce the adaptation data needed at 1.9B" as an open question. <b>This is the most concrete reproduction gap in the paper</b>, and it bears directly on whether the "4.2B tokens is enough" figure transfers at 4B.</li>
+</ol>
+
+<h3>An overall assessment</h3>
+
+<p>If the report had to be summed up in one sentence: <b>it does "converting an existing hybrid attention model" with unusual discipline</b> — every modification has a single-factor control (the compression-path shape in Table 8, $k_m$ in Table 9(a), the sparsity scheme and teacher pooling in Table 9(b), the backbone choice in Table 9(c)), every key claim has reproducible numbers behind it, and the most challengeable point, "you trained more so you got better", is handled head-on by Table 11. The oracle experiment in Table 10 is the highlight: it first proves that "reading only 3.9% of positions retains 82.83% of attention mass", then proves that "if the selection is good, the backbone need not even change", thereby narrowing the problem precisely down to "how do we train a good Indexer".</p>
+
+<p>Its boundaries are equally clear and must be acknowledged: evaluation stops at 128K, 4B covers retrieval only, the efficiency data is a single batch=1 measurement, and there is an obvious degradation on aggregation tasks that is recorded but unexplained (FWE 45.00 &rarr; 26.67). <b>For a reader who wants to reproduce or adopt this scheme, the most valuable first step is probably to reproduce the oracle curve of Table 10</b> — it is the cheapest experiment that tells you whether your own backbone has the kind of attention concentration that makes sparsity viable; whether to go on to the full S-KSA adaptation then depends on whether your workload contains long-context tasks like FWE that require global aggregation.</p>
+
+<div class="takeaway"><b>One-line conclusion:</b>at 1.9B, KSA V2 trades a 40.4% reduction in resident cache, 1.51&times; prefill and 1.23–1.32&times; decode for RULER essentially level with the parent model (72.39 vs 72.61); the trade pays off on retrieval-type tasks, is discounted on aggregation-type tasks, and has not yet been validated beyond 128K, at 4B efficiency, or under batching.</div>
+</section>
+
+<!-- ============ Glossary ============ -->
+<section id="s25">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary (look things up while reading)</h2>
+  <p class="muted">Abbreviations underlined with a dotted line in the prose show their definition on hover; the table below is a one-page reference.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Glossary for this KSA V2 reading, following the paper's own terminology</caption>
+    <thead><tr><th>Abbrev. / symbol</th><th>Full name</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>KSA</td><td>Kwai Summary Attention</td><td>The Summary-token hybrid architecture from Kuaishou: one Summary inserted every $k_s$ text tokens, with 3 KSA layers to 1 Full layer. The starting point of this paper (Chu et al., 2026).</td></tr>
+      <tr><td>C-KSA</td><td>Compressed KSA</td><td>One of this paper's modules. At <b>storage time</b> it pools every $k_m$ consecutive Summary KV entries into a layer-private Meta KV entry.</td></tr>
+      <tr><td>S-KSA</td><td>Sparse KSA</td><td>One of this paper's modules. It uses existing Summaries as routing queries to score each $b$-token text block, and the main attention reads only the original KV of the selected blocks.</td></tr>
+      <tr><td>Meta KV</td><td>Meta Key/Value entry</td><td>The second-level compression product of C-KSA. Obtained by dimension-wise weighted pooling of a group of Summary KV entries; <b>used only in its own layer and never passed forward</b>.</td></tr>
+      <tr><td>Summary token</td><td>Summary token</td><td>A learnable token appended after every $k_s$-token chunk that aggregates that chunk's information; its hidden state flows across layers.</td></tr>
+      <tr><td>$k_s$</td><td>Summary chunk size</td><td>How many text tokens one Summary covers. 8 at both 1.9B and 4B.</td></tr>
+      <tr><td>$k_m$</td><td>Summary-to-Meta group size</td><td>How many Summaries aggregate into one Meta entry. 128 at 1.9B, 32 at 4B.</td></tr>
+      <tr><td>$b$</td><td>block size</td><td>The smallest unit of S-KSA routing: how many text tokens count as one block. Set to 4.</td></tr>
+      <tr><td>$K$</td><td>remote token budget</td><td>The remote token budget of a sparse layer (in original text tokens). Set to 4096, including 8 sink tokens.</td></tr>
+      <tr><td>$W$</td><td>sliding chunk number</td><td>How many complete chunks the local window covers. Set to 128, corresponding to 1024 text tokens.</td></tr>
+      <tr><td>$N$</td><td>text length</td><td>The length of the text sequence.</td></tr>
+      <tr><td>MHA</td><td>Multi-Head Attention</td><td>Each head has independent Q/K/V projections. The 1.9B backbone uses 16-head MHA.</td></tr>
+      <tr><td>GQA</td><td>Grouped-Query Attention</td><td>Several query heads share one set of KV heads, reducing KV width. The 4B backbone is 32 Q / 8 KV.</td></tr>
+      <tr><td>MLA</td><td>Multi-head Latent Attention</td><td>Stores each token's KV as a compressed low-rank latent state (DeepSeek-AI et al., 2024).</td></tr>
+      <tr><td>DSA</td><td>DeepSeek Sparse Attention</td><td>Sparse attention that uses the Lightning Indexer for <b>token-level</b> selection (DeepSeek-AI et al., 2025).</td></tr>
+      <tr><td>QSA</td><td>Qwen Sparse Attention</td><td>A block-level sparse scheme that average-pools token-level index keys within a micro-block (Qiu et al., 2026).</td></tr>
+      <tr><td>Lightning Indexer</td><td>Lightning Indexer</td><td>The lightweight scorer introduced by DSA: several indexer heads emit weighted ReLU scores used to pick top blocks.</td></tr>
+      <tr><td>RULER</td><td>RULER benchmark</td><td>A long-context retrieval benchmark suite; this paper reports scores at six lengths from 4K to 128K (Hsieh et al., 2024).</td></tr>
+      <tr><td>NIAH</td><td>Needle-in-a-Haystack</td><td>Insert one "needle" into a long text and ask about it, testing retrieval (Kamradt, 2023).</td></tr>
+      <tr><td>FWE</td><td>Frequent Word Extraction</td><td>RULER's frequent-word extraction subtask — <b>the one task this paper clearly degrades</b> (45.00 &rarr; 26.67).</td></tr>
+      <tr><td>VT</td><td>Variable Tracking</td><td>RULER's variable-tracking subtask, one that requires aggregation across positions.</td></tr>
+      <tr><td>prefill</td><td>prefill</td><td>The stage that processes the input prompt; its attention is quadratic and dominates total time at long context.</td></tr>
+      <tr><td>decode</td><td>decode</td><td>The token-by-token generation stage; it reads the KV cache once per step and is mainly bandwidth bound.</td></tr>
+      <tr><td>attention mass</td><td>attention mass</td><td>The total share of attention probability falling on a given set of positions. Used here to measure how much dense attention a sparse selection retains.</td></tr>
+      <tr><td>oracle selection</td><td>oracle selection</td><td>Selecting blocks/tokens directly from dense attention probabilities (a god's-eye view), as the performance upper bound of a sparse selector.</td></tr>
+      <tr><td>FLOPs</td><td>floating point operations</td><td>Floating point operation count. In this paper, the estimated matrix FLOPs per text token.</td></tr>
+      <tr><td>retrofit</td><td>retrofit</td><td>Converting a pretrained model into a new architecture by adding modules and continuing training, without changing its token layout.</td></tr>
+      <tr><td>module-only<br>adaptation</td><td>module-only adaptation</td><td>An adaptation stage that trains only the newly added parameters and freezes all inherited ones.</td></tr>
+      <tr><td>full-parameter<br>adaptation</td><td>full-parameter adaptation</td><td>An adaptation stage that unfreezes all parameters and trains them together.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    This page is an English reading of arXiv:2610.18654, "Kwai Summary Attention V2 Technical Report" (OneRec Team, Kuaishou), based on the Chinese edition.<br>
+    All <b>13 figures + 11 tables</b> were extracted at 300 DPI from the original PDF, scaled proportionally (never cropped), and carry the paper's original caption plus an English reading; interpretive paragraphs are the editor's view.<br>
+    Original: <a href="https://arxiv.org/abs/2610.18654">arXiv:2610.18654</a><br>
+    <span style="opacity:.75">Dark mode · click an image for the original · offline formula rendering · print friendly · single file, opens offline</span>
+  </div>
+</footer>
+
+<!-- Offline KaTeX rendering (local assets/, no network needed) -->
+<script src="assets/katex/katex.min.js"></script>
+<script src="assets/katex/auto-render.min.js"></script>
+<script>
+(function(){
+  // Dark mode: remembers the preference, follows the system by default
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox: click an image to see the original
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap && cap.querySelector('figcaption') ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // Back to top
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+
+  // Formula rendering (offline KaTeX)
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError: false,
+      ignoredTags: ['script','noscript','style','textarea','pre','code','option']
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

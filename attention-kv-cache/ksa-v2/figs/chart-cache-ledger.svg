@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 500" width="1040" height="500" font-family="Inter,-apple-system,Segoe UI,PingFang SC,Hiragino Sans GB,Microsoft YaHei,sans-serif">
+<rect width="1040" height="500" fill="#ffffff"/>
+<text x="30" y="34" font-size="17" font-weight="700" fill="#1b2432">本页自绘:1024× 是远端历史的账,不是整机缓存的账</text>
+<text x="30" y="56" font-size="12.5" fill="#5c6675">论文数字重排,不含论文之外的任何数据。浅灰 = 名义远端历史占比(§2.3.2 整理);深色 = 128K 实测常驻缓存占比(Fig 11a / §3.6 整理)</text>
+<rect x="30" y="72" width="12" height="12" fill="#c9d3e6" rx="2"/>
+<text x="48" y="82.5" font-size="12" fill="#5c6675">名义:远端历史 KV 占 Full 的比例</text>
+<rect x="300" y="72" width="12" height="12" fill="#2f5bd9" rx="2"/>
+<text x="318" y="82.5" font-size="12" fill="#5c6675">实测:128K 常驻缓存占 Full 的比例</text>
+<text x="234" y="142" font-size="14" font-weight="600" fill="#1b2432" text-anchor="end">Full</text>
+<rect x="250" y="120" width="560.0" height="26" fill="#c9d3e6" rx="3"/>
+<text x="818.0" y="138" font-size="12" fill="#5c6675">名义 100%</text>
+<rect x="250" y="154" width="560.0" height="26" fill="#2f5bd9" rx="3"/>
+<text x="818.0" y="172" font-size="12" font-weight="600" fill="#2f5bd9">100% · 24.00 GiB</text>
+<text x="234" y="236" font-size="14" font-weight="600" fill="#1b2432" text-anchor="end">Hybrid KSA</text>
+<rect x="250" y="214" width="70.0" height="26" fill="#c9d3e6" rx="3"/>
+<text x="328.0" y="232" font-size="12" fill="#5c6675">名义 12.5%</text>
+<rect x="250" y="248" width="247.1" height="26" fill="#2f5bd9" rx="3"/>
+<text x="505.1" y="266" font-size="12" font-weight="600" fill="#2f5bd9">44.1% · 10.59 GiB</text>
+<text x="234" y="330" font-size="14" font-weight="600" fill="#1b2432" text-anchor="end">C-KSA + S-KSA</text>
+<rect x="250" y="308" width="2.0" height="26" fill="#c9d3e6" rx="3"/>
+<text x="260.0" y="326" font-size="12" fill="#5c6675">名义 0.098%</text>
+<rect x="250" y="342" width="147.2" height="26" fill="#2f5bd9" rx="3"/>
+<text x="405.2" y="360" font-size="12" font-weight="600" fill="#2f5bd9">26.3% · 6.31 GiB</text>
+<line x1="30" y1="412" x2="1010" y2="412" stroke="#dde3ec" stroke-width="1"/>
+<text x="30" y="442" font-size="13.5" fill="#1b2432"><tspan font-weight="700">读法:</tspan>名义远端历史从 12.5% 降到 0.098%(再压 128×,推算);128K 实测常驻缓存只从 44.1% 降到 26.3%(1.68×,推算)。</text>
+<text x="30" y="464" font-size="13.5" fill="#1b2432">差额来自不随 k_m 缩小的部分:局部窗口、sink、index key、辅助状态与常驻 workspace(§2.3.2 与 Fig 11 caption)。</text>
+<text x="30" y="486" font-size="13.5" fill="#1b2432"><tspan font-weight="700">结论:</tspan>"降 40.4%"是对 Full 的实测口径,不是对远端历史的名义口径——两者相差两个数量级。</text>
+</svg>

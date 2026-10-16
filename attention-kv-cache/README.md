@@ -1,6 +1,6 @@
 # 🎯 注意力与 KV Cache(Attention & KV Cache)
 
-**这一层解决「一层里哪些 key 被看到」。** 六篇论文按同一条谱系排列——**可见键集合由谁决定**,决定权从外在结构逐步移向模型自身,直到被刻意放弃:
+**这一层解决「一层里哪些 key 被看到」。** 八篇论文按同一条谱系排列——**可见键集合由谁决定**,决定权从外在结构逐步移向模型自身,直到被刻意放弃:
 
 | 决策者 | 论文 | 机制 | 精读 | 英文版 |
 |--------|------|------|------|--------|
@@ -9,6 +9,7 @@
 | **层内内容打分** | PISA(2026-09) | 键做 $O(\log N)$ 层金字塔,从最粗层逐层 Top-K 展开,块分数用子块摘要上的 LogSumExp | [pisa/](pisa/) | [en.html(英文速读)](pisa/en.html) |
 | **层内学习的轻量路由** | Elastic Attention(2026-09) | 每层 0.27M 参数 Attention Router 按输入决定每个 KV 头走全注意力还是稀疏注意力 | [elastic-attention/](elastic-attention/) | [en.html(英文速读)](elastic-attention/en.html) |
 | **模型自己声明** | Declarative Attention(2026-09) | 模型在思维链里用 `<global>` / `<focus>` / `<local>` 标签声明看哪里,引擎解析后跳过大部分 KV 读取 | [declarative-attention/](declarative-attention/) | [en.html(完整英译)](declarative-attention/en.html) |
+| **复用同模型已有的 Summary** | KSA V2(2026-10) | 3:1 混合里每个 chunk 的 Summary 本就被逐层精修却只当低分辨率记忆用。KSA V2 让它演两个角色:**存储时**把每 $k_m$ 个连续 Summary KV 池化成层私有 Meta 条目(远端压缩率 $k_s\to k_s k_m=1024$,而层间流动的 Summary 表示不动),同一批 Summary 又当块级路由查询给每个 $b$-token 块打分、让原 Full 层只读 sink + 选中块 + 局部窗口 | [ksa-v2/](ksa-v2/) | [en.html(完整英译)](ksa-v2/en.html) |
 | **不需要信号** | Random Attention(2026-09) | 保住 prompt + 每个 KV 头内均匀随机驱逐;证明选择信号几乎不贡献精度 | [random-attention/](random-attention/) | [en.html(英文速读)](random-attention/en.html) |
 
 几个互补的读法:
