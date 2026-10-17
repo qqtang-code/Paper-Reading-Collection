@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="English deep-read of LongHarness Bench (arXiv:2609.38137): stress-testing LM harnesses for long-context reasoning along both accuracy and cost, with all figures and tables embedded at 300 DPI">
+<meta name="keywords" content="paper reading, LongHarness Bench, LM harness, long context, cost efficiency, arXiv 2609.38137">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · LongHarness Bench: Stress-Testing LM Harnesses for Long-Context Reasoning">
+<meta property="og:description" content="An English deep-read of long-context harness evaluation: four information-dense tasks, 5 models × 5 configurations, accuracy and cost on two axes; all figures at 300 DPI.">
+<meta property="og:url" content="https://stringnlplab.github.io/longharness/">
+<meta name="theme-color" content="#2f5bd9">
+<!--
+  MAINTAINER NOTE — inline math delimiters (do not remove):
+  This page must NOT use `$...$` as an inline KaTeX delimiter. The prose contains
+  ~30 distinct dollar amounts (e.g. $0.583, $7.23, $16.3, $20.00, $30.00), so a
+  paired `$` in the body gets consumed as a formula and the text between the two
+  amounts renders as italic garbage. The source stays valid and validate.py still
+  PASSes, so this failure is invisible to static checks.
+  Rule: inline math uses the backslash-paren delimiter pair, display math uses the
+  double-dollar pair, and the auto-render `delimiters` list keeps ONLY those two
+  entries (never a bare dollar-sign inline entry).
+  Verify after any edit:  python3 render_assert.py index.html en.html
+-->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · LongHarness Bench: Stress-Testing LM Harnesses for Long-Context Reasoning</title>
+<style>
+  /* ===== Figure-and-text reading page styles (paper-reading-html skill v2) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* Sticky top navigation */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media (max-width:960px){.topbar a.jump{display:none}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* Abbreviation glossary terms */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* Formulas: rendered by KaTeX (display via $$...$$, inline via $...$; avoids Unicode combining characters) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* Images: proportional scaling, never cropped; click to view the original */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:10px 0 0; padding:10px 16px; background:var(--card);
+                        border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+                        font-size:13.5px; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink)}
+  figure.fig figcaption .ex{display:block; margin-top:6px; color:#3d4756}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#c6cedd}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; padding-top:5px; border-top:1px dashed var(--border); font-size:12px; color:var(--muted)}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox: full-size image view */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* Print */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style></head>
+<body>
+
+<!-- Top bar: section jumps + dark-mode toggle -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">LongHarness<span>·Deep Read</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Overview</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Four Tasks</a>
+      <a class="jump" href="#s4">Task Details</a>
+      <a class="jump" href="#s5">Main Results</a>
+      <a class="jump" href="#s6">Mechanisms</a>
+      <a class="jump" href="#s7">Comparison</a>
+      <a class="jump" href="#s8">Construction</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="jump" href="#s10">Commentary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark / light theme" title="Toggle dark / light theme">🌓</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2609.38137</div>
+    <h1>LongHarness Bench: Stress-Testing Language Model Harnesses for Long-Context Reasoning</h1>
+    <div class="subtitle">It treats the <b>LM harness</b> itself as the object under test: four information-dense tasks whose retrieval demands shift with each reasoning step, scored on accuracy and cost at once. The conclusions are blunt — the best configuration reaches only 68%, the same accuracy can cost 12.4× more, and "more inference" is neither necessary nor sufficient.</div>
+    <div class="meta">
+      <span>Authors: Quang Hieu Pham, Thuy Duong Nguyen, Jocelyn Qiaochu Chen, Xi Ye (University of Alberta / Amii)</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2609.38137">arXiv:2609.38137</a></span>
+      <span>Project page: <a href="https://stringnlplab.github.io/longharness/">stringnlplab.github.io/longharness</a></span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">LM Harness</span>
+      <span class="pill">Long-Context Evaluation</span>
+      <span class="pill">Accuracy–Cost Trade-off</span>
+      <span class="pill">Adaptive Retrieval</span>
+      <span class="pill">Agentic Harness</span>
+      <span class="pill">Exact-Match Scoring</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents (figures and tables are interleaved in narrative order)</h2>
+  <ol>
+    <li><a href="#s1">Overview: what this paper is arguing about</a></li>
+    <li><a href="#s2">Background: what a harness is, and what older benchmarks miss</a></li>
+    <li><a href="#s3">The four tasks: design intent in one figure</a></li>
+    <li><a href="#s4">Task-by-task breakdown: pitfalls and cheaper routes</a></li>
+    <li><a href="#s5">Main results: a 68% ceiling and a 12.4× cost gap</a></li>
+    <li><a href="#s6">Mechanism attribution: why each harness wins or loses</a></li>
+    <li><a href="#s7">Head-to-head: why the old benchmarks cannot separate harnesses</a></li>
+    <li><a href="#s8">Construction method and cost accounting (appendix)</a></li>
+    <li><a href="#s9">Glossary (jump back any time)</a></li>
+    <li><a href="#s10">Commentary: contributions, limits, and what is worth measuring next</a></li>
+  </ol>
+</nav>
+<!-- ===== S1 Overview ===== -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">Overview: what this paper is arguing about</h2>
+
+  <p class="lead">The conclusion first: this paper does not propose a new harness. It proposes a <b>benchmark for evaluating <abbr title="LM harness: the control layer wrapped around a base model that manages its context, tools, and interaction sequence">harnesses</abbr></b>. Its central claim is that long-context systems should be evaluated per <b>model × harness</b> pair, and that <b>efficiency must be reported alongside accuracy</b>.</p>
+
+  <p>The paper opens by naming two gaps. First, accuracy on existing long-context tasks has saturated: whether you use direct inference or wrap the model in an <abbr title="agentic harness: a harness with tool calling and multi-turn interaction">agentic harness</abbr>, the scores bunch into a narrow band, so harness capabilities cannot be told apart. Second, accuracy alone hides cost: with the same underlying model, swapping the harness can change spend by an order of magnitude while accuracy barely moves — so the difference is invisible.</p>
+
+  <p>Figure 1 compresses both points. The upper panel places three benchmarks side by side: on <abbr title="LongBench v2: an existing benchmark covering realistic long-context multi-task settings (Bai et al., 2025)">LongBench-v2</abbr> and <abbr title="OOLONG-Synth: an existing long-context benchmark requiring aggregation over many records (Bertsch et al., 2025)">OOLONG-Synth</abbr> the harness curves nearly coincide; only on the shaded LongHarness region (this paper) do they actually spread out. The lower panel switches to an accuracy-versus-cost scatter: on <abbr title="Outlier Memo Detection: find memos whose statements contradict a relation established elsewhere">Outlier Memo Detection</abbr>, RLM and mini-swe-agent land at similar accuracy, yet their costs differ by 12.4×.</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: LongHarness separates harnesses on both accuracy and cost">
+    <figcaption>
+      <b>Figure 1:</b>LongHarness (ours) reveals harness differences in both accuracy and cost.
+      <span class="ex">Commentary: in panel (a) the horizontal axis lists the three benchmarks and the vertical axis is strict accuracy; on LongBench-v2 and OOLONG-Synth the four harness curves overlap heavily (60–86%), whereas in the shaded LongHarness region the same GPT-5.6-sol backbone spreads from about 68% all the way down to about 40% — only this suite has discriminative power. Panel (b) replaces the x-axis with mean cost per instance on a log scale and keeps accuracy on y: on Outlier Memo Detection, mini-swe-agent is 100% @ $0.583 and RLM is 92% @ $7.23 — an 8-point accuracy gap against a 12.4× cost gap, exactly what accuracy-only reporting hides. Colours denote harness (RLM purple square / OpenCode orange triangle / mini-swe-agent green diamond / ReAct blue circle).</span>
+          <span class="pgref">Report p.1</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to open the full-resolution original; click again or press Esc to close.</p>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page is taken from the paper as written; anything this page has assembled, generalised, or converted from the paper's configuration is explicitly flagged as <b>[organized]</b> or <b>[estimated]</b>, so it stays distinguishable from the paper's own accounting. Notation follows the paper: \(A\) is task accuracy (strict exact match), \(C\) is mean cost per instance (USD), and \(N\) is the number of instances; macro average means the arithmetic mean of the four task accuracies. Costs are converted from API rates; the rate card is Table 6.</div>
+
+  <p>That splits the paper's question into three:</p>
+  <ul class="tight">
+    <li><b>Accuracy</b> — how high can the strongest current model × harness pair push these four tasks?</li>
+    <li><b>Efficiency</b> — at comparable accuracy, how far apart are the compute bills of different harnesses?</li>
+    <li><b>Attribution</b> — which processing mechanism is responsible for the gain (or the loss) a harness brings?</li>
+  </ul>
+
+  <div class="kv">
+    <div class="item"><div class="k">Best macro accuracy</div><div class="v">68.0%<small>GPT-5.6-sol × mini-swe-agent (Table 2)</small></div></div>
+    <div class="item"><div class="k">Strongest non-GPT pair</div><div class="v">42.5%<small>GLM-5.3 × mini-swe-agent</small></div></div>
+    <div class="item"><div class="k">Per-task best-score range</div><div class="v">52% – 100%<small>Pairs hardest at 52%, Outlier easiest at 100%</small></div></div>
+    <div class="item"><div class="k">Largest cost gap, same task &amp; model</div><div class="v">12.4×<small>On Outlier, RLM $7.23 vs mini-swe-agent $0.583</small></div></div>
+    <div class="item"><div class="k">Answers not growing with reasoning</div><div class="v">Kimi-K2.6 ≤ 1.5%<small>The only one of five models that stays near zero</small></div></div>
+    <div class="item"><div class="k">Per-instance budget</div><div class="v">3M tokens<small>Cumulative input + output across all model calls</small></div></div>
+  </div>
+
+  <div class="takeaway"><b>In one sentence:</b> the contribution is to move "long-context harness evaluation" from a single accuracy axis to a joint <em>accuracy + cost</em> axis, and to use four purpose-built tasks to drag each harness's failure mode into the open — concluding that no harness wins everywhere, and that extra inference compute is neither necessary nor sufficient.</div>
+</section>
+<!-- ===== S2 Background ===== -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Motivation</div>
+  <h2 class="sec">Background: what a harness is, and what older benchmarks miss</h2>
+
+  <h3>2.1 Defining "LM harness" first</h3>
+
+  <p>The paper's definition: <b>a harness is the control layer wrapped around a base model, responsible for managing its context, tools, and interaction sequence</b> (Huang et al., 2026). For long-context reasoning, the harness lets the model work through an input far larger than its window over multiple turns, using the results of earlier steps to steer later ones.</p>
+
+  <p>The paper evaluates four harness families with different emphases. Understanding how each one reaches the context is the prerequisite for reading everything else:</p>
+
+  <ul class="tight">
+    <li><b><abbr title="OpenCode: a coding-agent harness that reaches context through files and a shell">OpenCode</abbr></b> (Anomaly, 2026): a coding-agent harness that materialises context into files, so the model retrieves through shell and file operations and writes scripts to verify;</li>
+    <li><b><abbr title="mini-swe-agent: a lightweight variant of SWE-agent with the same file / shell access">mini-swe-agent</abbr></b> (Yang et al., 2024): the lightweight coding agent of the same family, with the same file and shell access but a leaner interaction loop;</li>
+    <li><b><abbr title="RLM = Recursive Language Models: expose the long prompt as a programmable object and process it recursively">RLM</abbr></b> (Zhang et al., 2025): exposes the long prompt as a <b>programmatically accessible object</b>, splits it into smaller pieces via recursive sub-model calls, and lets the main model aggregate the results;</li>
+    <li><b><abbr title="ReAct = Reasoning + Acting: an agent paradigm interleaving reasoning and actions">ReAct</abbr></b> (Yao et al., 2023): interleaves reasoning and acting; here its action space is extended with semantic search, batched nearest-neighbour retrieval, and document reading, using <span class="muted">BAAI/bge-m3</span> embeddings (Chen et al., 2024).</li>
+  </ul>
+
+  <p>The tension is that these mechanisms can raise accuracy by spending more model calls and re-reading context, but the extra processing also raises cost. So <b>judging their value requires measuring accuracy and compute spend together</b> — that sentence is the paper's motivation.</p>
+
+  <h3>2.2 Two structural gaps in older benchmarks</h3>
+
+  <p>The paper classifies and critiques existing long-context benchmarks; the argument is worth restating in full:</p>
+
+  <ul class="tight">
+    <li><b>LongBench v2 / HELMET</b> (Bai et al., 2025; Yen et al., 2025): broad coverage, but tasks are mostly "recall a little relevant information plus a few reasoning steps". They test evidence retrieval, not situations where an intermediate conclusion repeatedly changes what should be retrieved next, so they probe a harness's adaptive retrieval policy only weakly.</li>
+    <li><b>LongProc</b> (Ye et al., 2025): tests long procedural generation, but hands the model the detailed procedure and rewards faithful execution, which dilutes the strategy-selection component.</li>
+    <li><b>OOLONG-Synth</b> (Bertsch et al., 2025): requires aggregation over a lot of information, but permits one universal divide-and-conquer strategy — classify each record independently, then aggregate. That route never has to revise retrieval in light of intermediate findings.</li>
+  </ul>
+
+  <p>The conclusion: both directions impose substantial processing burden, but both <b>lack coverage of the setting where hard retrieval and strategy choice jointly determine accuracy and cost</b>. The authors therefore set their own design goal — tasks must couple diverse, adaptive retrieval with long-horizon reasoning, and must admit multiple solution routes with different costs.</p>
+
+  <p>Table 1 turns that argument into a checkable property matrix. Note the horizontal rule splitting it: the top five rows are task-level properties, the bottom two are system-level properties (whether a model–harness configuration is actually spread out on accuracy or cost). LongHarness is the only column with a ✓ in all seven rows.</p>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: comparison matrix of long-context benchmarks on properties relevant to harness evaluation">
+    <figcaption>
+      <b>Table 1:</b>Comparison of long-context benchmarks along properties relevant to evaluating LM harnesses. ✓: supported; ∼: partially supported; ×: not supported.
+      <span class="ex">Commentary: seven properties × five benchmark columns. Row by row — ① need for diverse adaptive retrieval: LongBenchV2 and HELMET are only partial, LongProc and Oolong are not supported, and only LongHarness is; ② semantically confusable evidence: only HELMET and this paper support it (LongBenchV2 does not at all, which explains why plain retrieval suffices there); ③ long-horizon reasoning steps: LongProc, Oolong, and this paper; ④ retrieval depends on prior steps (step-dependent retrieval): only LongProc and this paper; ⑤ multiple strategies with different costs: only this paper fully; ⑥⑦ the two system rows: all four existing benchmarks are × on accuracy under the SoTA configuration (i.e. inseparable), and only Oolong is partial on cost. Together that is the paper's case: LongHarness is the only suite that spreads configurations out on both axes at once.</span>
+          <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Summary:</b> this section converts "why build a new benchmark" into two testable propositions — (a) the tasks are strategy-sensitive (several solution routes with different costs), and (b) the systems are genuinely spread out (existing configurations show wide accuracy and cost distributions). Table 2 and Figures 3–4 are the evidence for (b).</div>
+</section>
+<!-- ===== S3 Four Tasks Overview ===== -->
+<section id="s3">
+  <div class="sec-no">03 · The Four Tasks</div>
+  <h2 class="sec">The four tasks: design intent in one figure</h2>
+
+  <p>The paper first states five <b>design criteria</b> (mirroring the properties of Table 1): retrieval must be diverse and adaptive; the context must contain semantically confusable evidence that has to be verified; solutions must take multiple reasoning steps in which intermediate findings steer later retrieval; and tasks must admit several strategies with different costs, so that selective search and reuse of intermediate results become cheaper alternatives to brute force.</p>
+
+  <p>The four tasks are four concrete realisations of those five criteria. Figure 2 sets them side by side, and every panel follows the same three-part structure — <b>Context</b> → <b>Query</b> → <b>Traces</b> (with correct and incorrect solutions contrasted) — above a strip sketching the pool of documents, programs, or memos. It is worth walking through all four panels now; the per-task breakdown later will map straight onto them.</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: examples from the four LongHarness tasks, each panel showing context, query, and correct versus incorrect traces">
+    <figcaption>
+      <b>Figure 2:</b>Examples from our benchmark. Top left: Constraint Solving Search combines evidence from documents. Top right: Equivalent Program Pair Search distinguishes equivalent programs from near matches. Bottom left: Program Execution Tracing requires reading prior outputs and matching code semantics. Bottom right: Outlier Memo Detection identifies a conflict using supporting memos.
+      <span class="ex">Commentary: each panel demonstrates one task and deliberately places the correct identification next to the incorrect one. Top left, Constraint Solving Search: the target person Maya Chen has three pieces of evidence scattered across independent documents D-041 (works the night shift), D-218 (regularly takes the bus), D-341 (eats fruit), while Leo's three look-alikes are all near misses (D-454 plans to take the bus next month, D-688's night shift has ended, D-099 is merely a watermelon-scented candle); the Query box also shows how many people satisfy each condition (12/76/104 out of 160). Top right, Equivalent Program Pair Search: cells 173 and 088 both test <code>x &gt;= target</code> and therefore match, cell 026 writes <code>x &gt; target</code> — one equals sign away, but behaviourally different — and cells 041/188 are close variants of a different problem. Bottom left, Program Execution Tracing: an eight-step query program where each step must retrieve the cell whose function is semantically equivalent and whose call used the same input; the correct trace uses cell 89's output 2 as the key for the next hop and finds cell 17, whereas the incorrect trace takes cell 52 (same output 3, different function), corrupting every downstream key. Bottom right, Outlier Memo Detection: the OUTLIER is M-502 (it places Algebra 101 on Friday at 2:00 p.m.) and can only be judged using two SUPPORT memos — M-660 (Ms. Lee teaches Algebra 101) and M-346 (Ms. Lee's class runs Monday at 9:00 a.m.); the DISTRACTOR M-059 is a deliberate near neighbour that applies the same sentence pattern to Biology 101.</span>
+          <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+
+  <p>Laid out side by side, the retrieval character of the four tasks is plainly complementary:</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Retrieval and reasoning structure of the four tasks (compiled from the paper's Section 3 and Appendices B.1–B.4)</caption>
+    <thead><tr><th>Task</th><th>Context size</th><th>Retrieval character</th><th>Answer form</th><th>Cheapest route</th></tr></thead>
+    <tbody>
+      <tr><td>Constraint Solving Search</td><td>~120K tokens / 160 people</td><td>Lexical retrieval (find entities) + semantic retrieval (e.g. "likes fruit" ↔ "watermelon")</td><td>Exactly 5 person IDs</td><td>Query the most selective condition first, then verify the remaining conditions only on the survivors</td></tr>
+      <tr><td>Equivalent Program Pair Search</td><td>~100K tokens / 200 programs</td><td>Group by purpose first, then eliminate mutants with distinguishing inputs</td><td>5 unordered program pairs</td><td>Shrink candidates by grouping, then differentially execute the closest-looking pairs</td></tr>
+      <tr><td>Program Execution Tracing</td><td>320 shuffled records (8 steps × 40-cell pool)</td><td>Step-dependent: the previous output determines the next retrieval key</td><td>8 cell IDs + the final result (JSON)</td><td>Reuse outputs already recorded in the context instead of recomputing them</td></tr>
+      <tr><td>Outlier Memo Detection</td><td>700 memos / 2,500 statements</td><td>Two-hop composition: a contradiction only becomes visible across memos</td><td>Exactly 15 memo IDs</td><td>Build a reusable relation table or graph on one pass, then check derived claims in bulk</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Note: this table is a quick-reference summary compiled by this page from the paper's main text and appendices; it is not a table from the paper. The paper's own tables are Tables 1, 2, 4, and 5.</p>
+
+  <div class="takeaway"><b>Summary:</b> all four tasks share one construction pipeline — private structured data → generate gold → controlled hard distractors → render and shuffle → rule-based verification (the unified principle in Appendix B, see <a href="#s8">Section 8</a>) — yet their retrieval forms differ: lexical, semantic, step-dependent, and cross-record compositional each get one task. That is precisely what "diverse retrieval strategies" in the title means.</div>
+</section>
+<!-- ===== S4 Task Deep Dive ===== -->
+<section id="s4">
+  <div class="sec-no">04 · Task Deep Dive</div>
+  <h2 class="sec">Task-by-task breakdown: pitfalls and cheaper routes</h2>
+
+  <h3>4.1 Constraint Solving Search</h3>
+
+  <p>Given a set of documents describing people, the agent must find <b>every person who satisfies all conditions in the query simultaneously</b>. Each instance holds about 120K tokens and about 160 people, with queries carrying 3–5 conditions (habits, current situations, relations to others). Exactly five people qualify, but their evidence is scattered across different documents and mixed in with "close but non-equivalent" counterexamples.</p>
+
+  <p>Go back to the top-left panel of Figure 2: Maya's night shift, commute habit, and fruit eating sit in three different passages, whereas Leo's "plans to take the bus next month" and "watermelon-scented candle" do not constitute the corresponding habits. The answer must name exactly those five IDs.</p>
+
+  <p>The paper plants a computable <b>strategy gap</b> here: during construction it <b>deliberately requires one condition satisfied by ≤10% of people (the selective condition) and another by ≥60% (the prevalent condition), without telling the solver which is which</b>. The efficient route therefore finds the condition with the fewest satisfying people, shrinks the candidate set, and then verifies the remaining conditions only on that set; the brute-force route checks all conditions against all 160 people, doing markedly more retrieval and reasoning. This is the first quantified instance of "same task, different cost".</p>
+
+  <div class="note"><b>Construction details (Appendix B.1, [organized]):</b> start from a typed world containing 160 people and related entities, sample 3–5 predicates and build support sets so that exactly five people fall in the intersection of all of them; for each predicate, add 2–4 people who satisfy every other predicate but fail this one. Failing predicates are expressed by "close but invalid facts" (e.g. "plans to take the bus" rather than "has a commute habit") rather than by omission. Facts receive stable IDs and are grouped into passages of 2–5 statements, then padded with unrelated background facts; after keeping every passage that carries decisive evidence, neutral passages fill the context to 120K–128K tokens and everything is shuffled. A private solver performs the set intersection/union and maps it to passages; a verifier independently recomputes the world, confirms that each near match fails exactly one predicate, and checks the sizes of the selective and prevalent support sets plus the survival of the cited facts after packing.</div>
+
+  <h3>4.2 Equivalent Program Pair Search</h3>
+
+  <p>Given a set of programs, the agent must find <b>every pair that produces the same output on the same legal inputs</b>. Each instance holds about 100K tokens and 200 Python programs adapted from the <span class="muted">APPS</span> dataset (Hendrycks et al., 2021). Problem statements and visible input–output examples are <b>removed</b>, and each correct implementation is surrounded by mutants that look like they solve a similar problem but behave differently.</p>
+
+  <p>That yields a counter-intuitive consequence: <b>the two genuinely matching programs may look less alike than a wrong candidate does</b>. Ranking by code similarity is therefore unreliable — Appendix B.4 goes as far as requiring that <b>every true pair rank behind at least 12 mutants by similarity</b>.</p>
+
+  <p>The top-right panel of Figure 2 makes this concrete: cells 173 and 088 both test <code>x &gt;= target</code> and are therefore equivalent; cell 026 drops the equals sign to <code>x &gt; target</code>, which behaves differently — feed it an input containing the target itself and the two diverge immediately. The efficient route is consequently two-stage: infer each program's purpose and group plausible matches, then use <b>distinguishing inputs</b> to eliminate behavioural variants within a group.</p>
+
+  <p>The answer must list the complete set of matching ID pairs, and <b>the number of pairs is not disclosed</b>. The paper is also candid about the label's scope: the answer key treats "both programs pass the original problem's tests" as a match, which is not a proof of equivalence over all possible inputs.</p>
+
+  <h3>4.3 Program Execution Tracing</h3>
+
+  <p>This task asks the agent to reconstruct the result of an eight-step query program from <b>320 shuffled records of earlier Python computations</b>. Each cell records its own ID, its function, an example call, and the output.</p>
+
+  <p>For each step of the query, the agent must find the cell whose function is semantically equivalent <b>and</b> whose recorded call used the required input. Because <b>the previous step's output is the next step's input</b>, retrieval is step-dependent: the exact numeric input narrows the search by literal matching, but the deliberately confusable functions may return the same output on the displayed example and differ on other inputs.</p>
+
+  <p>The bottom-left panel of Figure 2 contrasts correct and incorrect paths: the correct path uses cell 89's output 2 as a key to find cell 17, giving the result <code>[2, 3]</code>; the incorrect path takes cell 52 (whose output also happens to be 3, but whose function is something else), so the key becomes 3, the next retrieval is steered to cell 104, and the final result comes out wrong as <code>[2, 3, 4]</code>. The caption <span class="muted">Wrong downstream answer!</span> is there to stress that <b>a single mismatched cell rewrites every later search key</b>.</p>
+
+  <p>The answer comprises the eight selected cell IDs plus the exact final result (JSON). The efficient route uses each recovered output as the next search key, verifies the function match, and directly reuses the recorded result, thereby avoiding recomputation of work already present in the context — but that demands rigorous state tracking and step-by-step semantic verification.</p>
+
+  <div class="note"><b>Construction details (Appendix B.3, [organized]):</b> sample an eight-node computation graph, assign each node a typed transformation drawn from ten families (table and set operations, sequences and text, intervals, grids, paths, graph traversal, topological batching, and so on), and execute the graph to obtain each node's input and output. Build 20 cells per node: exactly one implements the transformation over its full input contract, while the other 19 are controlled perturbations of boundary handling, filtering, aggregation, or sorting — and a perturbation is kept only if it yields the same output on the displayed call yet differs on another contract probe. A second 20-cell pool is then built around the alternative input the solver would reach after an earlier mistake. The 8 × 40 = 320 cells are anonymised and shuffled, and the public context never marks which pool a cell came from.</div>
+
+  <h3>4.4 Outlier Memo Detection</h3>
+
+  <p>The agent must find memos <b>whose statements contradict a relation established elsewhere in the collection</b>. Each instance contains 700 labelled memos and 2,500 statements about people, organisations, objects, and their relations. Exactly 15 memos carry a conflicting statement, and <b>no contradiction is visible in isolation</b>.</p>
+
+  <p>Bottom-right panel of Figure 2: one memo says Ms. Lee teaches Algebra 101, another schedules her class for Monday at 9:00 a.m.; only together do they conflict with a third statement placing the course's instructor on Friday at 2:00 p.m. Because there is heavy paraphrase and plenty of "related but consistent" material, <b>topic similarity is not a sufficient criterion</b>. The answer must name exactly those 15 memo IDs.</p>
+
+  <p>The paper frames the strategy gap as "build one global structure" versus "repeat local retrieval": the efficient route reads the packet once, organises statements into a reusable relation table or graph, and then checks each derived claim by composing fact pairs; the inefficient route hunts for evidence separately for every suspect claim, which both re-reads the same memos and misses contradictions that only surface when several memos are combined.</p>
+
+  <div class="note"><b>Construction details (Appendix B.2, [organized]):</b> built from a typed relation graph. Two-hop rules compose edges \(R_1(a,b)\) and \(R_2(b,c)\) into the derived claim \(R_2 \circ R_1(a,c)\). The generator samples 450 base edges, computes 440 derived claims, then picks 15 and replaces the correct endpoint \(c\) with another entity \(c'\) of the same type. Because <b>the two base edges that establish the correct endpoint remain in the packet</b>, every corruption comes with a complete symbolic contradiction proof. Near-twin decoys reuse the same relation types, and a wrong endpoint may even be "correct" for another anchor or relation, which blocks shortcuts along entity names. The final packet holds 700 memos and exactly 2,500 atomic statements drawn from five business domains.</div>
+
+  <div class="takeaway"><b>Summary ([organized]):</b> viewed together, the authors' strategy is to give each retrieval form its own task, and to build into every task an <b>identifiable but unlabelled cheaper route</b> — selective conditions, grouping and pruning, reuse of intermediate outputs, and building a global relational structure. Efficiency is thus not a metric bolted on afterwards but a degree of freedom endogenous to the task design.</div>
+</section>
+<!-- ===== S5 Main Results ===== -->
+<section id="s5">
+  <div class="sec-no">05 · Main Results</div>
+  <h2 class="sec">Main results: a 68% ceiling and a 12.4× cost gap</h2>
+
+  <h3>5.1 Experimental setup</h3>
+
+  <p><b>Models and harnesses.</b> The evaluation covers five models: GPT-5.6-sol, Gemini 3.8 Flash, Qwen3.8-27B, GLM-5.3, and Kimi-K2.6 (OpenAI, 2026; Zeng et al., 2026; Qwen Team, 2026; Moonshot AI, 2026). Each model runs five configurations: direct long-context inference (<span class="muted">Direct</span>) as the baseline, plus four agentic harnesses — RLM, OpenCode, mini-swe-agent, and ReAct (Yao et al., 2023). On reasoning effort, GPT-5.6-sol / Gemini 3.8 Flash / GLM-5.3 use high, Qwen3.8-27B uses medium, and Kimi-K2.6 uses its reasoning-enabled mode.</p>
+
+  <p><b>Evaluation protocol.</b> Each instance gets a <b>3M-token budget</b>, counted as <b>cumulative input + output across all model calls</b>. Accuracy reported is task-specific <b>strict exact match</b>: Program Execution Tracing requires both the final result and the cited cells to be exact; Outlier Memo Detection requires the set of 15 memo IDs to be exact; Constraint Solving Search requires the person-ID set to be exact; Equivalent Program Pair Search requires the set of five unordered pairs to be exact.</p>
+
+  <div class="note"><b>Cost accounting:</b> the cost the paper reports is an <b>estimated per-instance cost</b> obtained by converting recorded token usage through API rates (rate card in <a href="#s8">Table 6</a>); rates are applied to each API call <em>before</em> averaging across instances. For the self-hosted Qwen runs the paper reports an "equivalent API cost". Appendix A (Table 4 in <a href="#s8">Section 8</a> of this page) gives mean input/output token counts.</div>
+
+  <h3>5.2 The benchmark is still hard</h3>
+
+  <p>Table 2 is the paper's centrepiece: 5 models × 5 configurations = 25 rows, each cell reporting accuracy (%) followed by USD cost per instance, with a final macro-average column (the arithmetic mean of the four task accuracies plus the mean of the per-task average costs).</p>
+
+  <figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: exact accuracy and estimated cost across the four suites for 25 model–harness combinations">
+    <figcaption>
+      <b>Table 2:</b>Exact accuracy and estimated cost across four suites. Each cell reports accuracy (%) followed by USD per-instance cost in parentheses; macro averages the four task accuracies and per-task mean costs.
+      <span class="ex">Commentary: the columns are Constraint (Constraint Solving Search) / Memos (Outlier Memo Detection) / Program (Program Execution Tracing) / Pairs (Equivalent Program Pair Search) / Macro avg. Three conclusions read straight off the table. <b>①</b> The best pair is GPT-5.6-sol × mini-swe-agent at 68.0% macro @ $0.816 — it takes 100% on Memos but only 42% on Constraint. <b>②</b> The strongest non-GPT pair is GLM-5.3 × mini-swe-agent at 42.5%, already near GPT-5.6-sol × OpenCode (40.5%) and × ReAct (43.0%). <b>③</b> Kimi-K2.6's five macro values are 0.0 / 0.5 / 1.5 / 0.5 / 0.0 — never above 1.5% — while its costs run high (RLM reaches $16.3 on Memos). Note also the Direct rows: GPT Direct gets 44% on Memos where mini-swe-agent gets 100%, but 58% on Constraint where mini-swe-agent gets only 42% — the same harness wins and loses depending on the task.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <p>Three points the paper stresses repeatedly follow directly from this table:</p>
+
+  <ul class="tight">
+    <li><b>It is hard.</b> The best configuration, GPT-5.6-sol × mini-swe-agent, reaches only 68.0%; the strongest non-GPT configuration (GLM-5.3 × mini-swe-agent) reaches 42.5%; Kimi-K2.6 never exceeds 1.5%.</li>
+    <li><b>Difficulty varies by task.</b> Per-task best scores fall from 100% on Outlier Memo Detection all the way to 52% on Equivalent Program Pair Search.</li>
+    <li><b>No configuration wins everywhere.</b> Not one configuration leads on all four tasks at once.</li>
+  </ul>
+
+  <h3>5.3 Similar accuracy can come with very different cost</h3>
+
+  <p>The paper offers a very clean contrast: on <b>Program Execution Tracing</b>, GPT-5.6-sol direct inference and OpenCode score 94% and 96% — apparently a tie; but the former uses 0.121M input tokens for $0.648 while the latter uses 1.29M input tokens for $1.37, roughly 10.7× the input and about 2.1× the cost ([estimated]: 1.29 ÷ 0.121 from Table 4). The same holds on <b>Constraint Solving Search</b>: direct inference 58% @ $0.690 versus OpenCode 56% @ $1.72 — two points <em>lower</em> accuracy at 2.5× the cost.</p>
+
+  <p>Figure 3 plots the 25 combinations of Table 2 on a plane of macro accuracy versus mean cost per instance (log axis). How to read it: <b>colour is the model, shape is the harness</b>, and each model's highest-accuracy configuration carries a callout. Its value is turning "which one should I pick?" into a visual judgement that needs no absolute threshold — the top-right is accurate-but-expensive, the top-left is accurate-and-cheap, and the top-left is almost exclusively occupied by GPT-5.6-sol.</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: scatter of macro accuracy against estimated cost across the four tasks">
+    <figcaption>
+      <b>Figure 3:</b>Macro-average accuracy and estimated cost across the four tasks (Table 2). Color denotes model; shape denotes harness. Callouts and larger markers mark each model's best accuracy.
+      <span class="ex">Commentary: the x-axis is mean cost per instance on a log scale (0.1–10 USD) and the y-axis is macro accuracy. The four callouts are each model's best point: GPT-5.6-sol × mini-swe-agent 68% @ $0.816 (highest accuracy, yet among the cheaper GPT points); GLM-5.3 × mini-swe-agent 42.5% @ $3.00; Qwen3.8-27B × OpenCode 38.5% @ $7.06; Gemini 3.8 Flash × mini-swe-agent 25% @ $0.550; Kimi-K2.6 × OpenCode 1.5% @ $5.65. Three shapes deserve attention. <b>①</b> GPT-5.6-sol's diamond (mini-swe-agent) sits clearly in the upper left — the only high-accuracy, moderate-cost cluster. <b>②</b> Qwen3.8-27B's triangle (OpenCode) and GLM-5.3's diamond both land in the $3–7 band but at roughly half GPT's accuracy, showing that "weaker model + heavier harness" buys some accuracy at a real price. <b>③</b> Kimi-K2.6's pink points sit flat on the 0–1.5% floor while spanning $0.5–6 — the clearest counterexample of paying without delivering. ReAct appears only where it was available.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <p>The paper adds two sharper counter-intuitive contrasts showing that <b>more inference is neither necessary nor sufficient</b>:</p>
+
+  <ul class="tight">
+    <li><b>On Pairs:</b> GPT-5.6-sol with RLM scores just 2% at $7.86, whereas direct inference is 44% @ $0.780 and ReAct is 52% @ $2.68. Spending nearly ten times as much drops accuracy to 1/22 of the direct baseline.</li>
+    <li><b>On Memos:</b> RLM reaches 92% at $7.23; mini-swe-agent reaches 100% at $0.583. The latter spends less than a twelfth as much and still gains 8 points.</li>
+  </ul>
+
+  <h3>5.4 Weaker models gain more from harnesses</h3>
+
+  <p>The paper observes a systematic pattern: the gain a model obtains from its best harness is <b>inversely related</b> to its direct-inference accuracy — the worse direct inference is, the more the harness helps.</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Per-model gain from "direct inference → best harness" (figures taken from the paper's Table 2 and Section 4.3)</caption>
+    <thead><tr><th>Model</th><th>Direct macro</th><th>Best harness configuration</th><th>Best macro</th><th>Gain</th></tr></thead>
+    <tbody>
+      <tr><td>Qwen3.8-27B</td><td>0.0%</td><td>OpenCode</td><td>38.5%</td><td><b>+38.5 pt</b></td></tr>
+      <tr><td>GLM-5.3</td><td>9.5%</td><td>mini-swe-agent</td><td>42.5%</td><td><b>+33.0 pt</b></td></tr>
+      <tr><td>Gemini 3.8 Flash</td><td>10.0%</td><td>mini-swe-agent</td><td>25.0%</td><td>+15.0 pt</td></tr>
+      <tr><td>GPT-5.6-sol</td><td>60.0%</td><td>mini-swe-agent</td><td>68.0%</td><td>+8.0 pt</td></tr>
+      <tr><td>Kimi-K2.6</td><td>0.0%</td><td>OpenCode</td><td>1.5%</td><td>+1.5 pt</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Note: gains are this page's subtraction of the paper's two figures ([estimated]). Although Kimi-K2.6 starts from 0% direct, it gains essentially nothing — a conspicuous exception to the inverse-correlation pattern, and the paper's own text does not list it among the beneficiaries either.</p>
+
+  <p>From this the paper draws a conclusion with real bite for model leaderboards: <b>harnesses substantially narrow the gap between model families</b>. GLM-5.3 × mini-swe-agent (42.5%) and Qwen3.8-27B × OpenCode (38.5%) are already in the same band as GPT-5.6-sol × OpenCode (40.5%) and × ReAct (43.0%), even though their direct accuracies (9.5% / 0%) sit far below GPT's 60%.</p>
+
+  <div class="takeaway"><b>Summary:</b> three sentences at the results layer — (a) the ceiling is only 68%, so the tasks are far from solved; (b) at equal accuracy, cost can differ by an order of magnitude, so accuracy-only evaluation is informationally incomplete; (c) the harness acts as a compensator for the model, and weaker models benefit more, which makes conclusions drawn from model names alone misleading.</div>
+</section>
+<!-- ===== S6 Harness Mechanisms ===== -->
+<section id="s6">
+  <div class="sec-no">06 · Harness Mechanisms</div>
+  <h2 class="sec">Mechanism attribution: why each harness wins or loses</h2>
+
+  <p>The main table says who wins and who loses; this section says why. The paper's unifying lens is: <b>a harness spends extra model calls to reduce the amount of context that must be handled at each step; the payoff depends on how much those calls actually simplify the remaining work</b>.</p>
+
+  <h3>6.1 How to read the change plots: Figure 4</h3>
+
+  <p>Figure 4 is the second densest figure in the paper: a 2 × 3 grid of six panels, with Constraint Solving Search, Equivalent Program Pair Search, and OOLONG-Synth on the top row, and Program Execution Tracing, Outlier Memo Detection, and LongBench-v2 on the bottom row. In every panel the x-axis is the <b>cost multiple relative to direct inference</b> (log scale ½× / 1× / 4× / 16×) and the y-axis is the <b>accuracy change relative to direct inference, in points</b>.</p>
+
+  <p>The key to reading it is the background shading: the intersection of the 1× line and the 0 line is the direct-inference reference point; the <b>green region means more accurate and cheaper</b>, the <b>pink region means worse and more expensive</b>. A point moving toward the upper left is good; toward the lower right, bad.</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: across six panels, accuracy and cost changes of each harness relative to direct inference">
+    <figcaption>
+      <b>Figure 4:</b>Harness effects relative to direct inference on OOLONG-Synth, LongBench-v2, and our suites. External benchmarks use GPT-5.6-sol. The reference is zero accuracy change and 1× cost.
+      <span class="ex">Commentary: each panel marks its most representative point. The external benchmarks (OOLONG-Synth and LongBench-v2, top-right and bottom-right) share a remarkably consistent shape: GPT × mini-swe-agent buys higher accuracy at lower cost — OOLONG 64% → 86% at 0.32× cost, LongBench-v2 62% → 68% at 0.36× cost — i.e. uniformly positive. Across the paper's four tasks the picture splits: the big win is GPT × mini-swe-agent lifting Memos from 44% to 100% at only 0.50× cost (bottom middle), and the big loss is GPT × RLM crashing Pairs from 44% to 2% while cost rises to 10.08× (top middle); on Constraint, GPT × mini-swe-agent goes 58% → 42% at 0.46× cost (top left) — cheaper, but less accurate. The most dramatic point on Program Execution Tracing is Qwen × OpenCode: 0% → 92% at 23.66× cost, the one combination on the top-left panel that fully rescues a weak model's zero, at nearly 24× the price. Together the four in-house panels cover all four outcome classes — better-and-cheaper, better-and-pricier, worse-and-cheaper, worse-and-pricier — while the two external benchmarks fall into only one of them.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.2 File-and-shell harnesses: OpenCode and mini-swe-agent</h3>
+
+  <p>File and shell access supports both <b>targeted retrieval</b> and <b>scripted verification</b>, and those two pay off very differently. The paper gives one example in each direction:</p>
+
+  <ul class="tight">
+    <li><b>On Program Execution Tracing, targeted retrieval buys little.</b> OpenCode's approach is to take each step's recorded output, search for the cell that uses that value as input, and verify which one implements the next query step. For GPT-5.6-sol this moves accuracy from 94% to 96% — a small gain against an already strong direct baseline, while cost rises from $0.648 to $1.37.</li>
+    <li><b>On Outlier Memo Detection, scripted verification raises accuracy and cuts cost at once.</b> mini-swe-agent collects facts into a table and then uses local scripts to compose and check claims, reducing how often the model re-reads. With the same model it reaches 100% @ $0.583, versus 44% @ $1.17 for direct inference — <b>both more accurate and cheaper</b>. OpenCode, by contrast, tends to re-read the packet or to audit overlapping memos with separate model calls, reaching only 10% @ $3.11.</li>
+  </ul>
+
+  <p>The paper's generalisation: targeted retrieval produced only a small accuracy gain on execution tracing, whereas scripted verification improved both accuracy and cost on memo detection — <b>the difference being that the latter sediments intermediate results into a reusable artefact</b>.</p>
+
+  <h3>6.3 Programmatic decomposition: RLM</h3>
+
+  <p>RLM's mechanism is to filter the long prompt into smaller fragments, process them through additional sub-model calls, and let the main model aggregate the outcomes (Zhang et al., 2025).</p>
+
+  <ul class="tight">
+    <li><b>On Memos it works, but expensively:</b> it recovers 92% of the outliers at $7.23, whereas mini-swe-agent reaches 100% @ $0.583 with a local program inspecting the packet.</li>
+    <li><b>On Pairs it fails characteristically:</b> RLM uses sub-calls to infer each program's purpose and form broad problem families. That is useful as a first filter, but this benchmark packs each family with many behaviourally different mutants, so an efficient solution must prune with distinguishing inputs before verifying. RLM spends most of its recursion on the initial grouping, and <b>too many candidates remain when it reaches the final comparison</b> — 2% @ $7.86 against 44% @ $0.780 for direct inference.</li>
+  </ul>
+
+  <p>The paper's diagnosis is strikingly compact: <b>decomposition reduced the context per call but did not sufficiently shrink the final decision space</b>. That sentence is essentially the core argument for why long-context harnesses cannot rely on chunking alone.</p>
+
+  <h3>6.4 Vector retrieval: ReAct</h3>
+
+  <p>The paper offers a criterion: <b>semantic retrieval is most useful when the retrieved item is itself a credible comparison candidate</b>.</p>
+
+  <ul class="tight">
+    <li><b>It holds on Pairs.</b> Using one program as a query surfaces implementations that look stylistically different but plainly share a purpose, turning a search over 200 programs into a much smaller neighbourhood. The model still has to reject neighbouring mutants, but this candidate list lifts GPT-5.6-sol from 44% @ $0.780 to 52% @ $2.68.</li>
+    <li><b>It does not hold on Memos.</b> That task cannot be solved by judging each memo in isolation — a wrong memo is only exposed by combining the facts of two other memos. Similarity search tends to return memos that are "related but insufficient to complete the evidence chain" and never checks each claim. ReAct therefore reaches only 6% @ $2.77, below the 44% @ $1.17 of direct inference.</li>
+  </ul>
+
+  <p>The way the paper closes this section is worth copying: <b>the value of extra inference depends on how it organises the work that follows</b>. Targeted search, a reusable fact table, and a smaller candidate set can all support efficient verification; repeated reading and broad candidate lists only add cost while leaving the core reasoning undecided.</p>
+
+  <div class="takeaway"><b>Summary ([organized]):</b> the four mechanisms line up along one question — what did each do to the decision space? mini-swe-agent compressed the decision space into a script on Memos, hence accurate and cheap; ReAct compressed the candidate neighbourhood on Pairs, hence a small win; OpenCode compressed very little on execution tracing, hence 2 points for double the cost; RLM compressed per-call context but enlarged the final decision space on Pairs, hence a heavy loss. That criterion is far more actionable than "is this harness good?".</div>
+</section>
+<!-- ===== S7 Comparison ===== -->
+<section id="s7">
+  <div class="sec-no">07 · Comparison</div>
+  <h2 class="sec">Head-to-head: why the old benchmarks cannot separate harnesses</h2>
+
+  <p>To show that "the new suite is more discriminative" is not a self-serving claim, the paper runs subsets of two existing benchmarks on the same backbone (GPT-5.6-sol): 50 examples from the 128K condition of OOLONG-Synth (Bertsch et al., 2025), and 50 examples from LongBench-v2 in the 90K–128K token range (Bai et al., 2025).</p>
+
+  <p>The subsets are constructed as follows (Appendix B.5, [organized]): for OOLONG-Synth, two disjoint 25-example queues are drawn with a fixed random seed from the 400 test examples of the official <code>context_len=131,072</code> condition and spread as evenly as possible across the counting / timeline / user task groups, yielding 17 counting, 16 timeline, and 17 user examples, with each queue covering all eight source datasets and all 16 context-window IDs; for LongBench-v2, the full zero-shot prompt is tokenised with the Qwen3.8-27B tokenizer and the 75 examples in the 90K–128K token band are kept (42 hard + 33 easy), with all hard examples retained plus eight deterministically chosen easy ones, giving 50 examples that cover all six eligible domains and 13 eligible subdomains, with answer positions A–D counted at 12/12/13/13 and prompt lengths from 90,049 to 127,548 tokens (mean 108,808). The paper states explicitly that this is a hard-weighted, length-controlled subset and is <b>not intended to reproduce the full benchmark's distribution</b>.</p>
+
+  <p>The result is the story told jointly by Table 3 and the right-hand column of Figure 4: on OOLONG-Synth, <b>every</b> tested agentic harness beats direct inference, with accuracy rising from 64% to between 70% and 86%; on LongBench-v2, all five configurations bunch into a narrow 60%–68% band. In other words, these benchmarks either say "uniformly positive" or barely distinguish harnesses at all.</p>
+
+  <figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: GPT-5.6-sol harness performance on two existing long-context benchmarks">
+    <figcaption>
+      <b>Table 3:</b>GPT-5.6-sol on existing long-context benchmarks. Each cell reports accuracy and average USD per instance in parentheses.
+      <span class="ex">Commentary: five harness rows × two benchmark columns. On OOLONG-Synth: Direct 64% ($0.686), RLM 78% ($3.70), OpenCode 74% ($2.08), mini-swe-agent 86% ($0.217), ReAct 70% ($0.751) — all five configurations beat direct inference, and the best one (mini-swe-agent) is also the cheapest, giving a monotone picture in which harnesses uniformly help. On LongBench-v2: 62% / 62% / 60% / 68% / 68% — a range of eight points across five rows, with harnesses barely distinguishable. Set those two columns against the paper's four tasks in Table 2 and the difference is plain: on this suite GPT-5.6-sol's macro accuracy runs from 40.5% (OpenCode) to 68.0% (mini-swe-agent), and the same harness shows up in both the winning and the losing positions.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+
+  <p>The paper lands this section on cost: <b>under the same 128K-class context budget, mini-swe-agent scores 68% @ $0.816 on this suite, the same 68% for only $0.190 on LongBench-v2, and 86% @ $0.217 on OOLONG-Synth</b>. It also makes a strict accounting disclaimer — "exact success" means different things across the three benchmarks, so these percentages <b>cannot</b> be treated as normalised difficulty measures. But even comparing only within a benchmark, the lower ceiling and higher cost on this suite show there is ample room left for future harnesses on both the effectiveness and the efficiency side.</p>
+
+  <div class="takeaway"><b>Summary:</b> this section is the linchpin experiment — it turns "our benchmark is more discriminative" from a design claim into a direct contrast with two external benchmarks: the accuracy–cost region those benchmarks cover is a single one, while the four tasks here cover all four classes (better-and-cheaper / better-and-pricier / worse-and-cheaper / worse-and-pricier).</div>
+</section>
+<!-- ===== S8 Appendix: Construction and Cost ===== -->
+<section id="s8">
+  <div class="sec-no">08 · Appendix</div>
+  <h2 class="sec">Construction method and cost accounting (Appendices A/B/C)</h2>
+
+  <h3>8.1 The unified construction principle</h3>
+
+  <p>Appendix B opens with the <b>five-step construction pipeline</b> shared by all four tasks; it is the key to why this benchmark's answers are deterministic:</p>
+
+  <ul class="tight">
+    <li><b>① Build the underlying structured data first</b> — a predicate support set for constraint solving, a typed relation graph for outlier detection, a computation graph for execution tracing, an executable program family for equivalence pairing. These hidden records <b>fix the answer before the public context is ever written</b>.</li>
+    <li><b>② Derive the gold answer and its supporting evidence with a task-specific solver or execution engine.</b></li>
+    <li><b>③ Manufacture hard distractors through controlled modifications of the records.</b></li>
+    <li><b>④ Render every item into its public form and shuffle.</b></li>
+    <li><b>⑤ Recompute the answer from the same records with deterministic rule-based checks</b>, verifying that each required item and each distractor plays its intended role.</li>
+  </ul>
+
+  <p>Table 5 lists, per task, the trio of "private specification / controlled distractors / how gold is derived". It earns a look of its own because it shows that the public context <b>exposes only the rendered items, never their role or provenance</b> — a solver cannot tell from the format which item is a SUPPORT and which is a DISTRACTOR.</p>
+
+  <figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: the underlying structures used to construct the four tasks">
+    <figcaption>
+      <b>Table 5:</b>Underlying structures used to construct the four tasks. Public contexts expose only the rendered items, not their roles or provenance.
+      <span class="ex">Commentary: four rows, one per task. For Constraint Solving Search the private specification is a "typed fact world + predicate support sets", the controlled distractors are "people satisfying every condition but one", and gold comes from "set intersection plus a fact-to-passage mapping". For Outlier Memo Detection it is a "typed relation graph + composition rules", distractors are "endpoint substitutions and near-twin claims", and gold comes from a "graph composition proof". For Program Execution Tracing it is a "computation graph + typed inputs + function contracts", distractors are "same-output functions and alternative paths", and gold comes from "execution and contract probes". For Equivalent Program Pair Search it is an "executable program family + test signatures", distractors are "behaviour-changing AST mutations", and gold comes from "differential execution". What the four rows share is that no distractor is random noise: each is <b>targeted</b>, approaching the correct answer along some specific dimension.</span>
+          <span class="pgref">Report p.15</span>
+    </figcaption>
+  </figure>
+
+  <h3>8.2 The detailed token and cost ledger</h3>
+
+  <p>Table 4 is Appendix A: it gives, for all 25 configurations on the four tasks, <b>accuracy (a) and mean input/output token counts with cost (b)</b>. It is the expanded form of Table 2 — Table 2 reports only cost, while Table 4 splits cost into input and output, which makes "where does the cost difference come from?" answerable.</p>
+
+  <figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: detailed accuracy (a) and mean input/output tokens and cost (b) on the four tasks">
+    <figcaption>
+      <b>Table 4:</b>Detailed accuracy and efficiency on Constraint Solving Search (Constraint), Outlier Memo Detection (Memos), Program Execution Tracing (Program), and Equivalent Program Pair Search (Pairs).
+      <span class="ex">Commentary: the upper half (a) is the accuracy matrix, matching the percentages of Table 2; the lower half (b) gives Input / Output (in millions of tokens) and Cost (USD) per task. A few cells worth checking one by one. <b>①</b> GPT-5.6-sol Direct on Program uses 0.121M input / 0.0026M output for $0.648, while OpenCode uses 1.29M / 0.0045M for $1.37 — input tokens rise about 10.7× ([estimated]: 1.29 ÷ 0.121) while cost rises only about 2.1×, because the billing tiers and caching each configuration hits differ. <b>②</b> mini-swe-agent on Memos reaches 100% with only 0.367M input / 0.0133M output — the best accuracy-per-dollar cell in the entire GPT row. <b>③</b> RLM on Pairs uses 0.712M input / 0.274M output for $7.86, with output tokens clearly inflated, consistent with the mechanism story that recursive sub-calls burn too much on the initial grouping. <b>④</b> Kimi-K2.6 with RLM on Memos reaches 2.21M input / 1.04M output for $16.3 — the most expensive cell in the whole table, at 0% accuracy. The table note explains that the Program column uses a format-tolerant answer-and-citation rescore, with the original strict-format scores retained in the task reports.</span>
+          <span class="pgref">Report p.14</span>
+    </figcaption>
+  </figure>
+
+  <h3>8.3 API rates: how the dollar figures are produced</h3>
+
+  <p>Table 6 lists the rates used to convert recorded token usage into the costs the paper reports. The paper notes specifically that rates are applied to each API call <b>before</b> averaging across instances, and that GPT-5.6-sol's long-context tier takes effect when <b>a single request exceeds 272K input tokens</b>.</p>
+
+  <figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: API rates used to convert token usage into cost">
+    <figcaption>
+      <b>Table 6:</b>API rates in USD per million tokens. A dash indicates that we do not apply a separate rate for that token category.
+      <span class="ex">Commentary: six model/tier rows × four billing categories (Input / Cache read / Cache write / Output). Three things matter most here. <b>①</b> GPT-5.6-sol has short and long tiers: the short tier is Input $4.00 / Output $20.00 and the long tier doubles to $8.00 / $30.00 (triggered above 272K input tokens) — which is exactly why long-context harnesses get expensive non-linearly. <b>②</b> Qwen3.8-27B and Gemini 3.8 Flash have no cache-write rate (shown as a dash), meaning that category is not billed separately. <b>③</b> The Input : Output price ratios differ widely across models (GPT 4 : 20, Gemini 0.75 : 3.75, Qwen 2.48 : 7.46), so an "output-inflating" harness such as RLM incurs a different cost penalty depending on the model. The table note states that GPT rates follow OpenAI's pricing page, Gemini follows Google's pricing page, and GLM-5.3 / Qwen3.8-27B / Kimi-K2.6 use rates listed by Tinker; self-hosted Qwen runs report an equivalent API cost with all input billed at the input rate.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>One easily missed accounting detail:</b> in the note to Table 4 the paper states that the Program Execution Tracing column uses a format-tolerant answer-and-citation rescore, with the original strict-format scores retained in the task reports. In other words, that column has already been through one round of format leniency — a reminder <b>not to read Table 4's Program column interchangeably with the strict accounting of the other three tasks</b>.</div>
+
+  <div class="takeaway"><b>Summary:</b> the three appendix sections each settle one reproducibility question: B answers "how is the data guaranteed to have a single determinate answer", A answers "does the cost difference come from input or output", and C answers "at what price list were the dollar figures converted". Stacked together, every accuracy and dollar figure in the paper traces back to a constructed record or a rate card.</div>
+</section>
+<!-- ===== S9 Glossary ===== -->
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Come back here whenever an abbreviation trips you up; abbreviations in the text also carry hover definitions.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Reading glossary (abbreviations underlined with a dotted line in the text show their definition on hover)</caption>
+    <thead><tr><th>Abbreviation / term</th><th>Full form</th><th>One-line explanation</th></tr></thead>
+    <tbody>
+      <tr><td>LM harness</td><td>Language-Model Harness</td><td>The control layer wrapped around a base model that manages its context, tools, and interaction sequence; the object under test in this paper.</td></tr>
+      <tr><td>Direct</td><td>Direct long-context inference</td><td>The baseline configuration with no multi-turn tool interaction: the long context is fed to the model in one shot.</td></tr>
+      <tr><td>RLM</td><td>Recursive Language Models</td><td>Treats the long prompt as a programmatically accessible object, processes chunks via recursive sub-model calls, and lets the main model aggregate (Zhang et al., 2025).</td></tr>
+      <tr><td>OpenCode</td><td>OpenCode coding agent</td><td>A coding-agent harness that lets the model retrieve context through files and a shell and write scripts to verify (Anomaly, 2026).</td></tr>
+      <tr><td>mini-swe-agent</td><td>minimal SWE-agent</td><td>A lightweight software-engineering agent harness with the same file/shell access but a leaner interaction loop (Yang et al., 2024).</td></tr>
+      <tr><td>ReAct</td><td>Reasoning + Acting</td><td>An agent paradigm interleaving reasoning and action; here it is equipped with semantic search, batched nearest-neighbour retrieval, and document reading (Yao et al., 2023).</td></tr>
+      <tr><td>bge-m3</td><td>BAAI General Embedding M3</td><td>The embedding model used by this paper's ReAct configuration (Chen et al., 2024).</td></tr>
+      <tr><td>Macro avg.</td><td>Macro average</td><td>The arithmetic mean of the four task accuracies; on the cost side, the mean of the per-task average costs.</td></tr>
+      <tr><td>Strict accuracy</td><td>Strict / exact-match accuracy</td><td>Task-specific exact match: the ID set or the set of program pairs must agree exactly, with no partial credit.</td></tr>
+      <tr><td>Step-dependent retrieval</td><td>Step-dependent retrieval</td><td>The retrieval target is set by the intermediate result of a previous step; the last output is the next search key.</td></tr>
+      <tr><td>Mutant</td><td>Behavior-changing mutant</td><td>A program variant that looks similar but behaves differently on some inputs, decoupling "looks alike" from "behaves equivalently".</td></tr>
+      <tr><td>Near-match</td><td>Near-match / near-twin</td><td>A person satisfying every condition but one, or a near-identical claim, both used to induce wrong matches.</td></tr>
+      <tr><td>OOLONG-Synth</td><td>Oolong Synth</td><td>An existing long-context benchmark requiring aggregation over many records; it permits a divide-and-conquer strategy (Bertsch et al., 2025).</td></tr>
+      <tr><td>LongBench-v2</td><td>LongBench v2</td><td>An existing benchmark covering realistic long-context multi-task settings (Bai et al., 2025).</td></tr>
+      <tr><td>APPS</td><td>Automated Programming Progress Standard</td><td>The source dataset of coding problems this paper adapts for its equivalent-program-pair task (Hendrycks et al., 2021).</td></tr>
+      <tr><td>3M budget</td><td>3M-token budget</td><td>The cap on cumulative input + output tokens per instance, counted across all model calls.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+<!-- ===== S10 Commentary ===== -->
+<section id="s10">
+  <div class="sec-no">10 · Commentary</div>
+  <h2 class="sec">Commentary: contributions, limits, and what is worth measuring next</h2>
+
+  <h3>10.1 What this paper gets right</h3>
+
+  <ul class="tight">
+    <li><b>It promotes efficiency from a side metric to a first-class evaluation axis.</b> The core evidence (the 12.4× cost gap, and 94% versus 96% at 10.7× the input tokens) shows that in long-context settings an accuracy-only evaluation systematically conceals the gap between harnesses. The point is validated across four tasks and 25 configurations in Section 4, not by a single anecdote.</li>
+    <li><b>The tasks are strategy-sensitive rather than strategy-agnostic.</b> Every task embeds an identifiable but unlabelled cheaper route (selective conditions, grouping and pruning, reuse of intermediate outputs, building a global relational structure). That makes efficiency an endogenous degree of freedom of the task design rather than a metric added afterwards — a technically harder achievement than simply making contexts longer.</li>
+    <li><b>Answer determinism comes from construction, not from human annotation.</b> Appendix B's pipeline — private structured data → generate gold → controlled distractors → render and shuffle → rule-based verification — fixes gold before the public context is written, and allows the answer to be recomputed by rules. That makes the evaluation reproducible and the role of each distractor verifiable.</li>
+    <li><b>The hard distractors are targeted rather than random noise.</b> This is the most fundamental difference from long-context benchmarks that merely stuff irrelevant text: failing predicates are expressed as "close but invalid facts"; mutants must match on the displayed call yet differ on a contract probe; true pairs are required to rank behind at least 12 mutants by similarity; and a wrong endpoint may be correct for another anchor. Those constraints kill the shortcut through surface similarity.</li>
+  </ul>
+
+  <h3>10.2 Technical lineage</h3>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Where each component comes from (compiled from the paper's inline citations; not a table from the paper)</caption>
+    <thead><tr><th>Component</th><th>Upstream as cited by the paper</th><th>What this generation changes / integrates</th></tr></thead>
+    <tbody>
+      <tr><td>Definition of a harness</td><td>Memoharness (Huang et al., 2026)</td><td>Keeps the "control layer outside the model" definition, but widens the object of evaluation from a single harness to the model × harness pair</td></tr>
+      <tr><td>RLM harness</td><td>Recursive Language Models (Zhang et al., 2025)</td><td>Used directly as one of the four harnesses under test; the paper additionally diagnoses its failure mechanism on Pairs (compresses per-call context, not the final decision space)</td></tr>
+      <tr><td>OpenCode harness</td><td>OpenCode (Anomaly, 2026), v1.18.21</td><td>Enters the evaluation as the representative of file/shell harnesses</td></tr>
+      <tr><td>mini-swe-agent / SWE-agent</td><td>SWE-agent (Yang et al., 2024)</td><td>The lightweight variant is evaluated; it becomes the highest accuracy-per-dollar configuration in the whole table on Memos</td></tr>
+      <tr><td>ReAct harness</td><td>ReAct (Yao et al., 2023)</td><td>Custom tool set: semantic search, batched nearest-neighbour retrieval, document reading</td></tr>
+      <tr><td>Embedding model</td><td>M3-embedding / BAAI/bge-m3 (Chen et al., 2024)</td><td>Powers ReAct's semantic retrieval channel</td></tr>
+      <tr><td>Program source</td><td>APPS (Hendrycks et al., 2021)</td><td>Only stdin-style problems are used; each problem keeps four structurally different correct solutions, which are then AST-mutated into mutants; the final evaluation draws on 76 retained families</td></tr>
+      <tr><td>Task inspiration: entity-set retrieval</td><td>QUEST (Malaviya et al., 2023), BrowseComp (Wei et al., 2025b)</td><td>Constraint Solving Search requires finding <b>all</b> entities satisfying scattered conditions, and the filtering order affects cost (the former retrieves entities defined by implicit set operations; the latter finds a single fact)</td></tr>
+      <tr><td>Task inspiration: contradiction retrieval</td><td>Logic Haystacks (Sileo, 2026), MAGIC (Lee et al., 2025)</td><td>Outlier Memo Detection requires finding all conflicts by <b>composing evidence across records</b> (the former retrieves evidence for a specified contradiction; the latter judges a given pair of contexts)</td></tr>
+      <tr><td>Task inspiration: program equivalence</td><td>EquiBench (Wei et al., 2025a), SeqCoBench (Maveli et al., 2025)</td><td>Equivalent Program Pair Search must <b>discover all matching pairs</b> and reject mutants that are similar in code but different in behaviour (the first two only classify given pairs)</td></tr>
+      <tr><td>Task inspiration: code execution traces</td><td>CRUXEval (Gu et al., 2024), RepoReasoner (Wang et al., 2026)</td><td>Program Execution Tracing retrieves semantically equivalent functions and reuses recorded outputs as later inputs to follow dependent computation (the former predicts input/output of short standalone functions; the latter traces across repository files)</td></tr>
+      <tr><td>Comparison benchmark: OOLONG-Synth</td><td>Oolong (Bertsch et al., 2025)</td><td>50 examples from the <code>context_len=131,072</code> condition (two disjoint 25-example queues) serve as the control</td></tr>
+      <tr><td>Comparison benchmark: LongBench-v2</td><td>LongBench v2 (Bai et al., 2025)</td><td>The Qwen3.8-27B tokenizer selects 50 examples in the 90K–128K token band (42 hard + 8 easy), length-controlled</td></tr>
+      <tr><td>Efficiency-aware evaluation perspective</td><td>MLAgentBench (Huang et al., 2024), AgencyBench (Li et al., 2026), Holistic Agent Leaderboard (Kapoor et al., 2026)</td><td>Brings the accuracy–cost Pareto view into long-context harness evaluation and records token usage and cost side by side</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Citations follow the paper's own inline attributions; this page has not checked the reference entries one by one.</p>
+
+  <h3>10.3 Limitations the paper states itself</h3>
+
+  <p>The paper proactively declares the boundaries of its answer keys in two places, and both are worth remembering verbatim:</p>
+
+  <ul class="tight">
+    <li><b>The equivalence-pair labels are "operational equivalence".</b> The answer key treats "both programs pass the original problem's tests" as a match, and the paper states explicitly that this <b>does not</b> constitute a proof of equivalence over all possible inputs; similarly, execution-tracing verification is behaviour verification against explicit input contracts, not a proof of equivalence over arbitrary Python objects.</li>
+    <li><b>Cross-benchmark percentages cannot be normalised into difficulty.</b> Section 4.5 states clearly that the three benchmarks define "exact success" differently, so figures like 68% / 68% / 86% are <b>not</b> task-normalised difficulty measures and support only within-benchmark comparison. It also notes that the LongBench-v2 subset is hard-weighted and length-controlled and is not intended to reproduce the full benchmark's distribution.</li>
+  </ul>
+
+  <h3>10.4 Not disclosed, worth testing next</h3>
+
+  <ul class="tight">
+    <li><b>Variance and distribution of per-instance cost.</b> The paper reports <b>mean</b> cost per instance and mean input/output tokens; no standard deviation, percentile, or share of over-budget instances was found in this reading. Under a 3M-token budget, an average of $7.86 could be driven by a few instances that blow the budget, or could be broadly expensive — and those two pictures imply very different harness-selection advice. Worth measuring: the cost distribution and the budget-exhaustion rate.</li>
+    <li><b>Instance counts and statistical uncertainty.</b> The main text and appendices give the construction of the subsets (e.g. 50 OOLONG examples, 50 LongBench-v2 examples), but this page did not find disclosed instance counts for the four LongHarness tasks themselves, nor confidence intervals or run-to-run variance. On cells near saturation (100% and 92%) and near the floor (0% and 1.5%), the instance count directly determines the strength of the conclusion. Worth measuring: N per task, variance across repeated runs, and whether accuracy differences are significant.</li>
+    <li><b>Sensitivity of cost to harness interaction limits.</b> Table 4 shows cost is driven mainly by input tokens (e.g. OpenCode uses 1.2M–2.8M input tokens on several tasks), but the paper does not disclose whether maximum turn/step limits, retry policies, and truncation policies are held constant across harnesses. If harnesses have different "patience budgets", part of the cost gap is configuration rather than mechanism. Worth measuring: cost–accuracy curves under a fixed interaction limit.</li>
+    <li><b>Effect of README and prompt wording on results.</b> The paper does not report prompt templates, tool-description wording, or whether any per-task instruction tuning was applied — yet a swing like mini-swe-agent's from 100% on one task to 42% on another in Table 2 is plausibly sensitive to instruction wording. Worth measuring: robustness under instruction perturbation.</li>
+    <li><b>Asymmetric harness coverage against existing benchmarks.</b> The comparison in Table 3 uses a single backbone, GPT-5.6-sol (the paper states the external benchmarks use GPT-5.6-sol), whereas this suite covers five models. So the claim "old benchmarks cannot separate harnesses" has so far been verified only within one model family; whether they saturate equally for weak models is not disclosed. Worth measuring: rerunning those two comparison benchmarks across multiple backbones.</li>
+  </ul>
+
+  <div class="takeaway"><b>Overall assessment:</b> this is an evaluation-methodology paper. Its contribution is not a new algorithm but a redesign of the evaluation <b>accounting</b> — construction guarantees determinate answers, controlled distractors guarantee hard retrieval, built-in multiple strategies make efficiency measurable, and a cost column makes efficiency readable. Its strongest evidence is not "the best is only 68%" (that only shows the tasks are hard) but the 12.4× cost gap on the same model and task, and counterexamples like "RLM 2% @ $7.86 versus Direct 44% @ $0.780" — which directly falsify the implicit assumption that more inference means better. For anyone doing inference serving or agent engineering, the most practical takeaway is the contrast in Section 6.2: within agentic harnesses, sedimenting intermediate results into a reusable scripted artefact (mini-swe-agent on Memos) versus repeatedly re-reading the context (OpenCode on the same task) yields one configuration that is both accurate and cheap and another that is neither.</div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    This page is a hand-written deep-read of <i>LongHarness Bench: Stress-Testing Language Model Harnesses for Long-Context Reasoning</i> (arXiv:2609.38137). All 4 figures and 6 tables are extracted from the paper's PDF at 300 DPI and displayed with proportional scaling (nothing cropped or redrawn); tables are shown as original images so that numbers and layout stay undistorted.<br>
+    Paper: arXiv:2609.38137 · Project page: <a href="https://stringnlplab.github.io/longharness/">stringnlplab.github.io/longharness</a><br>
+    <span style="opacity:.75">Dark mode supported · Click any image for the original · Print friendly</span>
+  </div>
+</footer>
+
+<!-- KaTeX wiring: the delimiters list below is deliberately the double-dollar pair (display) plus the
+     backslash-paren pair (inline). Never add a bare dollar-sign inline delimiter here — the prose is
+     full of dollar amounts and they would be swallowed as formulas. See the MAINTAINER NOTE in <head>. -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // Dark mode: remember the preference, default to the system setting
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox: click an image to view the original
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // back to top
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+
+</body>
+</html>

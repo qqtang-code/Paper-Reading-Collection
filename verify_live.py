@@ -32,6 +32,8 @@ PAGES = [
     "/efficient-inference/kite/en.html",
     "/benchmarks/mmlongembed/",
     "/benchmarks/mmlongembed/en.html",
+    "/benchmarks/longharness/",
+    "/benchmarks/longharness/en.html",
 ]
 # moved pages keep old URLs alive via redirect stubs
 REDIRECTS = [

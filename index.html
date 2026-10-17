@@ -151,8 +151,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(七篇旗舰论文为完整英译,其余五篇为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the seven flagship papers, quick-read editions for the other five).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(八篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the eight flagship papers, quick-read editions for the other six).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -163,8 +163,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>11</b> 篇</span><span class="i18n-en"><b>11</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>81</b> 图 + <b>102</b> 表</span><span class="i18n-en"><b>81</b> figures + <b>102</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>14</b> 篇</span><span class="i18n-en"><b>14</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>110</b> 图 + <b>103</b> 表</span><span class="i18n-en"><b>110</b> figures + <b>103</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -176,12 +176,12 @@
 <section id="matrix">
   <div class="sec-no">How to read the collection</div>
   <h2 class="sec">
-    <span class="i18n-zh">机制对照:12 篇论文的分工图</span>
-    <span class="i18n-en">Mechanism matrix: how the eleven papers divide the work</span>
+    <span class="i18n-zh">机制对照:14 篇论文的分工图</span>
+    <span class="i18n-en">Mechanism matrix: how the fourteen papers divide the work</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑥)、模型权重与系统栈(⑦–⑩)、度量而非优化(⑪)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
-    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑥), the model weights and the system stack (⑦–⑩), or measurement rather than optimization (⑪). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
+    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑥)、模型权重与系统栈(⑦–⑩)、度量而非优化(⑪–⑫)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
+    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑥), the model weights and the system stack (⑦–⑩), or measurement rather than optimization (⑪–⑫). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
   </p>
   <div class="matrix-wrap">
   <table class="matrix">
@@ -299,6 +299,14 @@
         <td><span class="i18n-zh">基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型</span><span class="i18n-en">Benchmark construction: 4 tasks / 8 datasets / 8,460 queries / 11 models</span></td>
         <td><span class="i18n-zh">需要(训练与评测协议)</span><span class="i18n-en">Yes (training and evaluation protocols)</span></td>
         <td><span class="i18n-zh">现役模型靠表面特征匹配"作弊";细粒度保持随长度衰退</span><span class="i18n-en">Current models "cheat" via surface matching; fine-grained retention decays with length</span></td>
+      </tr>
+      <tr>
+        <td class="num">14</td>
+        <td class="pap"><a href="benchmarks/longharness/">LongHarness Bench</a></td>
+        <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
+        <td><span class="i18n-zh">基准构建:4 任务 × 5 模型 × 5 配置,同时测准确率与成本</span><span class="i18n-en">Benchmark construction: 4 tasks × 5 models × 5 configurations, measuring accuracy and cost together</span></td>
+        <td><span class="i18n-zh">不需要(评测既有模型–harness 组合)</span><span class="i18n-en">No (evaluates existing model–harness combinations)</span></td>
+        <td><span class="i18n-zh">最佳仅 68%;同等准确率成本差 12.4×;多推理既不必要也不充分</span><span class="i18n-en">Best only 68%; equally accurate systems differ 12.4× in cost; more inference is neither necessary nor sufficient</span></td>
       </tr>
     </tbody>
   </table>
@@ -495,8 +503,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">KV Cache 压缩 · MoE · 多模态 · 长上下文</span><span class="i18n-en">KV Cache Compression · MoE · Multimodal · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">⑦ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">552B 多模态 MoE 高效推理技术报告</span></a>
-        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">⑦ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Technical Report · 552B Multimodal MoE</span></a>
+        <a class="i18n-zh" href="efficient-inference/deepseek-v41-flash/">⑨ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">552B 多模态 MoE 高效推理技术报告</span></a>
+        <a class="i18n-en" href="efficient-inference/deepseek-v41-flash/en.html">⑨ DeepSeek-V4.1-Flash<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Technical Report · 552B Multimodal MoE</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">DeepSeek-V4.1-Flash 技术报告:552B 多模态 MoE 用 Causal Encoder-Decoder 让 prefill 只激活 8B;CSA2 跨层 KV 复用 + FP4 量化把全局 KV Cache 压到<b>每 token 890 字节</b>(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代 1/8——性能反超更大的 V4-Flash:DeepSWE v1.1 <b>74.2</b>、Codeforces <b>3471</b>。</span>
@@ -515,8 +523,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">量化 · NVFP4 · 温度缩放</span><span class="i18n-en">Quantization · NVFP4 · Temperature Scaling</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/reset/">⑧ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Accurate Latency-Critical NVFP4 Reasoning</span></a>
-        <a class="i18n-en" href="efficient-inference/reset/en.html">⑧ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Step-Aware Temperature Scaling for NVFP4 Reasoning</span></a>
+        <a class="i18n-zh" href="efficient-inference/reset/">⑩ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Accurate Latency-Critical NVFP4 Reasoning</span></a>
+        <a class="i18n-en" href="efficient-inference/reset/en.html">⑩ ReSET<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Step-Aware Temperature Scaling for NVFP4 Reasoning</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">NVFP4 低精度推理在延迟敏感场景的精度救星:<b>步骤感知温度缩放</b>按解码步骤动态调整 softmax 温度,不牺牲延迟地恢复量化精度。</span>
@@ -535,8 +543,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">MoE · 边缘部署 · 带宽自适应</span><span class="i18n-en">MoE · Edge Deployment · Bandwidth-Adaptive</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/freetoken/">⑨ FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">边缘原生的 MoE 服务系统</span></a>
-        <a class="i18n-en" href="efficient-inference/freetoken/en.html">⑨ FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Edge-Native MoE Serving with Bandwidth-Adaptive Execution</span></a>
+        <a class="i18n-zh" href="efficient-inference/freetoken/">⑪ FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">边缘原生的 MoE 服务系统</span></a>
+        <a class="i18n-en" href="efficient-inference/freetoken/en.html">⑪ FreeToken<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Edge-Native MoE Serving with Bandwidth-Adaptive Execution</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">把个人电脑变成统一的弹性推理平台:带宽自适应执行让 <b>8GB 笔记本跑 35B</b>、台式机跑 284B、单张工作站 GPU 跑 <b>753B GLM-5.2</b>,快到能支撑真实 agent 负载。</span>
@@ -555,8 +563,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">架构扩展 · KV 复用 · Prefill/Decode 成本分离 · MoE</span><span class="i18n-en">Architecture Scaling · KV Reuse · Prefill/Decode Split · MoE</span></span>
       <h3>
-        <a class="i18n-zh" href="efficient-inference/kite/">⑩ KITE / SST<br><span style="font-size:14px; font-weight:600; color:var(--muted)">把新容量只加在"不产生 KV"的一侧</span></a>
-        <a class="i18n-en" href="efficient-inference/kite/en.html">⑩ KITE / SST<br><span style="font-size:14px; font-weight:600; color:var(--muted)">KV-Invariant Transformer Expansion</span></a>
+        <a class="i18n-zh" href="efficient-inference/kite/">⑫ KITE / SST<br><span style="font-size:14px; font-weight:600; color:var(--muted)">把新容量只加在"不产生 KV"的一侧</span></a>
+        <a class="i18n-en" href="efficient-inference/kite/en.html">⑫ KITE / SST<br><span style="font-size:14px; font-weight:600; color:var(--muted)">KV-Invariant Transformer Expansion</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">StepFun 的扩容范式:训练期把新容量<b>只加在只读 KV 的 Decoder 塔</b>上——33.8B 源模型扩成 <b>67B MoE</b>(decode 激活 2.15B,prefill 只要 <b>1.12B</b>,比 47B 基线的 1.48B 还少)。累计训练算力对齐 47B/63B 经典 Transformer 的条件下训练损失最低(<b>1.5900</b> vs 1.6006/1.5921)、七项下游全部第一;75:25 成本代理比 47B 低 <b>6.7%</b>、比 63B 低 <b>31.6%</b>,且 prefill 占比越高越划算。全文只押一条约束:未来 KV 的产生不得依赖 Decoder 的历史状态。</span>
@@ -588,10 +596,30 @@
   <div class="cards">
 
     <div class="pcard">
+      <span class="cat"><span class="i18n-zh">Agent Harness · 长上下文推理 · 准确率–成本权衡</span><span class="i18n-en">Agent Harness · Long-Context Reasoning · Accuracy–Cost Trade-offs</span></span>
+      <h3>
+        <a class="i18n-zh" href="benchmarks/longharness/">⑭ LongHarness Bench<br><span style="font-size:14px; font-weight:600; color:var(--muted)">压力测试长上下文推理的语言模型 harness</span></a>
+        <a class="i18n-en" href="benchmarks/longharness/en.html">⑭ LongHarness Bench<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Stress-Testing Language Model Harnesses for Long-Context Reasoning</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">第一个把 <b>harness 本身</b>当评测对象的基准:<b>4 个信息密集任务 × 5 模型 × 5 配置</b>,同时测准确率与成本。最好的配置只到 <b>68%</b>;同等准确率成本可差 <b>12.4 倍</b>;「多推理」既不必要也不充分(RLM 92% 要 $7.23,mini-swe-agent 100% 只要 $0.583)。</span>
+        <span class="i18n-en">The first benchmark that evaluates <b>harnesses themselves</b>: <b>4 information-dense tasks × 5 models × 5 configurations</b>, measuring accuracy and cost together. The best reaches only <b>68%</b>; equally accurate systems can differ <b>12.4×</b> in cost; and more inference is neither necessary nor sufficient (RLM 92% at $7.23 vs mini-swe-agent 100% at $0.583).</span>
+      </p>
+      <div class="meta">
+        <span>2026-09</span><span><span class="i18n-zh">4 图 6 表</span><span class="i18n-en">4 figures · 6 tables</span></span><span><a href="https://arxiv.org/abs/2609.38137">arXiv:2609.38137</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN edition</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="benchmarks/longharness/">开始阅读 →</a>
+        <a class="i18n-en" href="benchmarks/longharness/en.html">Read in English →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
       <span class="cat"><span class="i18n-zh">多模态 · 嵌入模型 · 长上下文</span><span class="i18n-en">Multimodal · Embeddings · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑪ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
-        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑪ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
+        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑬ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
+        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑬ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">首个专门评测多模态嵌入模型长上下文能力的基准:<b>4 个检索任务、8 个数据集、8,460 个查询、11 个模型</b>。核心发现:现役模型靠表面特征匹配"作弊",细粒度信息保持随长度衰退——"窗口大"≠"读得懂"。</span>
