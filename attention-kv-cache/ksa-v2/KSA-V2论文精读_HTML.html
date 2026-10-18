@@ -215,8 +215,8 @@
     <li><a href="#s3">上游 KSA 回顾:<abbr title="Summary token:每个 chunk 后追加的聚合 token">Summary token</abbr> 怎么工作</a></li>
     <li><a href="#s4">两个瓶颈:Summary 被"用少了"</a></li>
     <li><a href="#s5">核心洞察:一套 Summary,演两个角色</a></li>
-    <li><a href="#s6">三条贡献与本文结构</a></li>
-    <li><a href="#s7">实验结论速览(含论文口径不一致处)</a></li>
+    <li><a href="#s6">架构总览与整体收益(含论文口径不一致处)</a></li>
+    <li><a href="#s7">三条贡献与本文的结构</a></li>
     <li><a href="#s8">记号与整体布局</a></li>
     <li><a href="#s9">C-KSA:Summary KV 的二级压缩</a></li>
     <li><a href="#s10">Attention-mass correction</a></li>
@@ -253,7 +253,9 @@
 
   <p>图 1 是全文的"成绩单":左边是能力,右边是成本。先看左边——横轴是六个序列长度(4K→128K)的 RULER 准确率,蓝色 <b>Full</b> 是稠密注意力、<b>Hybrid KSA</b> 是父模型、最右的 <b>C-KSA+S-KSA (Ours)</b> 是本文模型。三者都画满了六条竖线,可以直接看出:本文模型在 4K/8K/16K 甚至反超父模型,在 32K–128K 只差不到 1 个点,而 Full 在 128K 时已经崩到 48.75%。右边两个小图讲成本:单 token 的矩阵 <abbr title="FLOPs:浮点运算次数">FLOPs</abbr>,以及相对 Full 的倍数。</p>
 
-<p>图 1 是全文的"成绩单":左边是能力,右边是成本。左边横轴是六个序列长度的 RULER 准确率,蓝色 <b>Full</b> 是稠密注意力、<b>Hybrid KSA</b> 是父模型、最右的 <b>C-KSA+S-KSA (Ours)</b> 是本文模型;右边两个小图讲成本:单 token 的矩阵 FLOPs,以及相对 Full 的倍数。<b>这张图的完整解读与论文自身口径的一处不一致,见第 7 节。</b></p>
+<figure class="fig"><img src="figs/fig1.png" alt="Left: long-context and general capabilities; Right: per-token FLOPs and cache size"><figcaption><b>Figure 1:</b> Left: long-context and general capabilities of 1.9B C-KSA+S-KSA and the reference models reported in KSA. Right: per token inference <abbr title="FLOPs:浮点运算次数">FLOPs</abbr> and cache size (1GiB = 2<sup>30</sup> bytes). <span class="zh">左图回答"能力有没有掉"：横轴六档 <abbr title="RULER:长上下文检索评测套件(4K–128K)">RULER</abbr> 长度 + Mean + 九个通用能力 benchmark，C-KSA+S-KSA 的 RULER mean 72.4 与 Hybrid KSA 的 72.6 基本持平，同时远高于 Full 的 67.6；通用能力也大体齐平。右图回答"省了多少"：曲线随序列长度张开，两条标注分别挂在 FLOPs 面板与 cache 面板上。<b>两张图连起来读才是论文的主张：省下来的钱不是拿能力换的。</b>图中标注的倍数与其口径见下方说明——正文口径与图内标注并不完全一致，这一点对复现很重要。</span>      <span class="pgref">报告 p.1</span>
+    </figcaption></figure>
+
   <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
 
   <div class="note"><b>读数约定:</b>本页全部数字以论文原文为准;凡由本页依据论文配置整理、归纳或换算的内容,均以「<b>整理</b>」「<b>推算</b>」显式标注,便于与论文口径区分。记号沿用论文:$k_s$ 为 Summary 的文本 chunk 大小,$k_m$ 为一个 Meta 条目聚合多少个 Summary,$b$ 为路由块大小,$W$ 为局部窗口覆盖的 chunk 数,$K$ 为稀疏层的远端 token 预算,$N$ 为文本长度。</div>
@@ -367,10 +369,8 @@
 
 <p>论文给出的整体结论可以浓缩成一句：<b>在 1.9B（<abbr title="MHA:Multi-Head Attention,每头独立 Q/K/V">MHA</abbr>）与 128K 序列规模下，常驻 cache 降低 40.4%，prefill 吞吐 1.51&times;，decode 吞吐 1.27&times;</b>（相对 Hybrid KSA）；相对 Full 则是 cache 降低 73.7%、prefill 吞吐 2.16&times;。</p>
 
-<p>更细的一层拆解在 Figure 1 里。它有两个面板，回答的是两个不同的问题，不要混看。</p>
+<p>更细的一层拆解见<a href="#s1">第 1 节的图 1</a>。它有两个面板，回答的是两个不同的问题，不要混看；下面这段口径说明，就是对着那张图里的标注写的。</p>
 
-<figure class="fig"><img src="figs/fig1.png" alt="Left: long-context and general capabilities; Right: per-token FLOPs and cache size"><figcaption><b>Figure 1:</b> Left: long-context and general capabilities of 1.9B C-KSA+S-KSA and the reference models reported in KSA. Right: per token inference <abbr title="FLOPs:浮点运算次数">FLOPs</abbr> and cache size (1GiB = 2<sup>30</sup> bytes). <span class="zh">左图回答"能力有没有掉"：横轴六档 <abbr title="RULER:长上下文检索评测套件(4K–128K)">RULER</abbr> 长度 + Mean + 九个通用能力 benchmark，C-KSA+S-KSA 的 RULER mean 72.4 与 Hybrid KSA 的 72.6 基本持平，同时远高于 Full 的 67.6；通用能力也大体齐平。右图回答"省了多少"：曲线随序列长度张开，两条标注分别挂在 FLOPs 面板与 cache 面板上。<b>两张图连起来读才是论文的主张：省下来的钱不是拿能力换的。</b>图中标注的倍数与其口径见下方说明——正文口径与图内标注并不完全一致，这一点对复现很重要。</span>      <span class="pgref">报告 p.1</span>
-    </figcaption></figure>
 
 <div class="note">
 <b>右图倍数：正文口径与图内标注不一致，引用时务必注明来源。</b><br>
