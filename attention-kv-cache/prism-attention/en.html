@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+(function(){
+  var lang = null;
+  try{ lang = localStorage.getItem('pr-lang'); }catch(e){}
+  if (lang !== 'zh' && lang !== 'en') {
+    lang = String(navigator.language || navigator.userLanguage || 'en').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+  }
+  /* This file is the English edition, so the document language is pinned to 'en'.
+     The stored preference is only read so that the two editions stay in sync; the
+     toggle in the top bar writes 'zh' before it navigates to index.html. */
+  document.documentElement.lang = 'en';
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="English deep-read of Prism Attention (arXiv:2610.22985): proposal-refined cross-layer index sharing, INT2 quantized proposal construction, and a 3.36x end-to-end decoding speedup at 128K context.">
+<meta name="keywords" content="paper reading, Prism Attention, sparse attention, cross-layer index sharing, KV cache, long-context decoding, INT2 quantization, SGLang">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Prism Attention · Paper Reading">
+<meta property="og:description" content="Proposal-refined index sharing for efficient LLM inference — a full English deep-read with all 26 exhibits embedded at 300 DPI.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/prism-attention/en.html">
+<meta property="og:site_name" content="Paper Reading Collection">
+<meta property="og:locale" content="en_US">
+<link rel="canonical" href="https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/prism-attention/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<title>Prism Attention · Paper Reading</title>
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  /* 阅读进度条:贴在顶栏底边,纯 CSS transform 驱动 */
+  .topbar .progress{position:absolute; left:0; bottom:-1px; height:2px; width:100%;
+                    background:var(--accent); transform:scaleX(0); transform-origin:0 50%;
+                    opacity:.9; pointer-events:none}
+  @media print{.topbar .progress{display:none!important}}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  /* 窄屏:桌面章节链接隐藏,改用可横向滚动的章节条(不占高度、无需 JS 抽屉) */
+  .topbar .linkbar{display:none}
+  @media (max-width:860px){
+    .topbar a.jump{display:none}
+    .topbar .inner{flex-wrap:wrap; gap:8px 10px; padding:9px 18px 8px}
+    .topbar .links{gap:8px}
+    .topbar .linkbar{display:flex; order:3; width:100%; gap:8px; overflow-x:auto;
+                     scrollbar-width:none; -ms-overflow-style:none; padding:2px 0 3px;
+                     margin:0; -webkit-overflow-scrolling:touch}
+    .topbar .linkbar::-webkit-scrollbar{display:none}
+    .topbar .linkbar a{flex:0 0 auto; font-size:12.5px; color:var(--muted); text-decoration:none;
+                       white-space:nowrap; padding:4px 11px; border:1px solid var(--border);
+                       border-radius:999px; background:var(--card)}
+    .topbar .linkbar a:hover,.topbar .linkbar a:focus-visible{color:var(--accent); border-color:var(--accent)}
+  }
+  @media print{.topbar .linkbar{display:none!important}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  section[id],h2.sec,h3[id],figure.fig{scroll-margin-top:78px}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:0; padding:9px 2px 0; border-top:1px solid var(--border);
+                        font-size:13px; line-height:1.72; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink); font-weight:600}
+  /* 中文解读是图注主体:给足字号与对比度,英文原句降为次要信息 */
+  figure.fig figcaption .zh{display:block; margin-top:5px; color:#333c4b; font-size:14px}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#cdd5e3}
+  /* en.html:英文解读 .ex 沿用 .zh 的层级与字号 */
+  figure.fig figcaption .ex{display:block; margin-top:5px; color:#333c4b; font-size:14px}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#cdd5e3}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; font-size:11.5px; color:var(--muted); opacity:.8}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lang-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶栏:章节跳转 + 语言/主题开关 -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">Prism Attention<span>· reading</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Glance</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Observations</a>
+      <a class="jump" href="#s4">Method</a>
+      <a class="jump" href="#s5">Accuracy</a>
+      <a class="jump" href="#s6">Systems</a>
+      <a class="jump" href="#s7">Appendix</a>
+      <a class="jump" href="#s8">Discussion</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌓</button>
+    </div>
+    <!-- 窄屏章节条:内容与 .links 的 .jump 保持一致 -->
+    <div class="linkbar" aria-label="Section navigation">
+      <a href="#s1">Glance</a>
+      <a href="#s2">Background</a>
+      <a href="#s3">Observations</a>
+      <a href="#s4">Method</a>
+      <a href="#s5">Accuracy</a>
+      <a href="#s6">Systems</a>
+      <a href="#s7">Appendix</a>
+      <a href="#s8">Discussion</a>
+      <a href="#s9">Glossary</a>
+    </div>
+  </div>
+  <div class="progress" id="readProgress" aria-hidden="true"></div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · arXiv:2610.22985v1 · NeurIPS 2026</div>
+    <h1>Prism Attention: Proposal-Refined Index Sharing Mechanism for Efficient LLM Inference</h1>
+    <div class="subtitle">Token-level sparse attention has an unadvertised cost: before you can attend to 2,048 of 128K keys you have to find them, and every layer pays for that search. Prism keeps one layer in four doing the search — but exports an over-sized candidate pool instead of a frozen top-κ list, and lets the three layers in between re-rank that pool for 0.011 ms apiece.</div>
+    <div class="meta">
+      <span>Authors: Zhenxu Tian, Kebin Liu, Zhengwu Yang, Yi Su, Qingqing Dang, Yanlin Sha, Kaipeng Deng, Dianhai Yu, Yanjun Ma, Juntao Li, Min Zhang</span>
+      <span>Affiliations: Soochow University · Baidu Inc.</span>
+      <span>Paper: <a href="https://arxiv.org/abs/2610.22985">arXiv:2610.22985</a></span>
+      <span>Source: 20 pages, appendices A–F</span>
+    </div>
+    <div style="margin-top:18px">
+      <span class="pill">token-level sparse attention</span>
+      <span class="pill">cross-layer index reuse</span>
+      <span class="pill">proposal / refined two-stage</span>
+      <span class="pill">INT2 quantized scoring</span>
+      <span class="pill">long-context decoding</span>
+      <span class="pill">SGLang + Triton kernels</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Reading map</h2>
+  <ol>
+    <li><a href="#s1">At a glance</a> — box score, conventions, three claims</li>
+    <li><a href="#s2">Background</a> — why the <em>index</em> is the expensive part</li>
+    <li><a href="#s3">Observations</a> — Fig 1–3: drift is real, local, and recoverable</li>
+    <li><a href="#s4">Method</a> — Fig 4, Eqs (1)–(9), Algorithm 1</li>
+    <li><a href="#s5">Accuracy</a> — Tables 1–3, Fig 5, Fig 8</li>
+    <li><a href="#s6">Systems</a> — Fig 6–7, Fig 14, Tables 6–8</li>
+    <li><a href="#s7">Appendix analyses</a> — Fig 9–13, Tables 4–5, 9–11</li>
+    <li><a href="#s8">Discussion</a> — what it saves, what it does not say</li>
+    <li><a href="#s9">Glossary</a> — symbols and abbreviations</li>
+  </ol>
+</nav>
+
+<p class="zoom-hint">💡 Click any image to open the full 300&nbsp;DPI original; click again or press Esc to close.</p>
+
+<!-- ============================ s1 ============================ -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">At a glance</h2>
+
+  <p class="lead">The paper opens with a cost that is easy to forget. Token-level sparse attention tells you that only a couple of thousand of the 128,000 keys in the cache deserve a full dot product — but it does not tell you <em>which</em> two thousand, and finding out means scoring the whole cache. Prism Attention is an argument about that discovery step and about how often it must be paid for: build a deliberately over-sized candidate pool at one layer in four, then let each of the three layers in between re-rank that pool instead of inheriting a frozen list. Everything else in the paper — the INT2 key cache, the Triton kernels, the SGLang measurements — exists to make that idea cheap enough to be worth having.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">End-to-end decode · 128K · <abbr title="batch size">BSZ</abbr>=16</div><div class="v">3.36×<small>15.03 ms → 4.47 ms vs FlashAttention, Qwen3-4B in SGLang</small></div></div>
+    <div class="item"><div class="k">Reasoning average (AIME24/25, GPQA, MATH500)</div><div class="v">71.43 / 73.83<small>Qwen3-4B / Qwen3-8B; full attention is 71.95 / 74.33</small></div></div>
+    <div class="item"><div class="k">LongBench average</div><div class="v">54.98 / 54.97<small>Qwen3-4B / Qwen3-8B; full attention is 55.07 / 54.58</small></div></div>
+    <div class="item"><div class="k">Index refinement, per layer</div><div class="v">0.011 ms<small>essentially flat from 8K to 128K context</small></div></div>
+    <div class="item"><div class="k">Main operating point</div><div class="v">κ = 2048, ρ = 4<small>an 8,192-token candidate pool; 1 proposal layer per 3 refined layers</small></div></div>
+    <div class="item"><div class="k">Extra latency vs IndexCache-g4</div><div class="v">15.7% → 8.0% → 0.7%<small>at 16K / 64K / 128K, BSZ=16</small></div></div>
+  </div>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page is the paper's own unless it carries a tag. Anything this page organizes, compares or recomputes is marked <b>[organized]</b> — a count or grouping read directly off the paper's tables, pattern strings or plots — or <b>[estimated]</b> — arithmetic performed on paper numbers, with the arithmetic shown inline so you can check it. Symbols follow the paper: $L_t$ is the context length at decoding step $t$, $N$ the number of transformer layers, $\kappa$ the sparse budget, $\rho$ the proposal expansion factor, $n=\rho\kappa$ the candidate-pool size, and $F$ / $S$ denote proposal (anchor) and refined (shared) layers. The paper quotes no monetary figures, so a single dollar sign is used freely as the inline-math delimiter throughout.</div>
+
+  <h3>The three claims</h3>
+  <p>The introduction states its contributions as a chain in which each link is a different kind of object — an observation, a mechanism, and an implementation trick. Keeping them apart matters when reading the experiments, because the ablations in Section 5 test them separately.</p>
+  <ul class="tight">
+    <li><b>An observation.</b> Re-read from the point of view of attention dynamics, the shift of salient tokens across depth is <em>highly localized</em>. The exact top-κ sets differ layer to layer, but the disagreement concentrates at the boundary of the previously selected region rather than spreading over the context. This is the diagnosis of why rigid index sharing loses accuracy (Section 3, Figures 1–3).</li>
+    <li><b>A mechanism.</b> Prism replaces static support sharing with coarse-to-fine selection: a proposal layer exports an expanded pool $C^{F}_{t}$ of $n=\rho\kappa$ candidates, and each refined layer re-scores only inside that pool to pick its own top-κ (Section 4.1, Equations 3–6).</li>
+    <li><b>Two cost-side components.</b> Dynamic Index Refinement makes the per-refined-layer re-selection nearly free and length-independent; Quantized Proposal Generation compresses the key cache used for proposal scoring to INT2, so the one operation that still touches the full context streams a quarter of a byte per element instead of two (Section 4.2, Equations 7–9).</li>
+  </ul>
+
+  <p>Read in that order, the paper is a rarity in the sparse-attention literature: the method is essentially the observation, restated as an algorithm. There is no new training objective, no architectural surgery and no learned router — the only offline step, the proposal/refined partition, is inherited wholesale from IndexCache (Bai et al., 2026) and explicitly frozen after calibration.</p>
+
+  <div class="takeaway"><b>The bet in one sentence:</b> if inter-layer index drift is a boundary effect rather than a reorganisation of attention, then a 4× candidate pool plus a 0.011 ms local re-rank buys back most of the accuracy static reuse throws away. Section 3 supplies the premise; Sections 5–7 test the conclusion on two Qwen3 models, three architectures and GLM-5.2.</div>
+</section>
+
+<!-- ============================ s2 ============================ -->
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">Background: the index tax of token-level sparsity</h2>
+
+  <p>Autoregressive decoding is not arithmetic-bound, it is cache-bound: at every step the new token must look at every key and value produced so far — the <abbr title="Key–Value cache: the per-layer store of past keys and values read at every decoding step">KV</abbr> cache — and that cache grows with the conversation. Sparse attention attacks this by attending to a small subset, but the subset has to be chosen, and the choosing is a second pass over the same cache. The paper's framing — repeated in its abstract, its introduction and its conclusion — is that this second pass is what has kept token-level sparsity from paying off in practice.</p>
+
+  <h3>Two terms, one of which does not shrink</h3>
+  <p>Write the per-step, per-layer cost of a token-sparse decoder as two terms. The attention itself is cheap: κ dot products of length d. The selection is not: to know which κ, you score the query against all $L_t$ cached keys. At the paper's main operating point — κ = 2048 against a 128K cache — the attention term is about 1.56% of what a dense pass would do, while the selection term is still 100% of it <b>[estimated]</b>: 2048 / 131072 = 1.56%.</p>
+
+  <p>Multiply by depth and the asymmetry gets worse before it gets better. With 36 layers and no sharing, a decoding step pays 36 full-cache scoring passes to build indices and 36 sparse passes to use them. The paper's remedy divides the first number by the sharing ratio: the group-4 partition of Table 4 is <code>FSSSSSSFFSSSSFSFSFFSSSSSSSFSSSSSSSSF</code>, i.e. 9 proposal layers and 27 refined ones <b>[organized]</b>, so on average a layer pays for a 32,768-token scoring pass while attending to 2,048 tokens — a residual ratio of 16× <b>[estimated]</b>: 131072 / 4 = 32768, then 32768 / 2048 = 16.</p>
+
+  <p>That residual 16× explains the second half of the method. A scoring pass is not FLOP-bound; it streams keys, so its cost tracks bytes rather than elements. Dropping the key used for <em>scoring</em> from BF16 to 2 bits divides that stream by eight <b>[estimated]</b>: 16 bits / 2 bits = 8. This is the difference between a proposal layer that is 2.07× faster than FlashAttention at 128K and one that is not (Section 6). Note the qualifier: the quantized copy is only ever used to rank candidates. The attention itself still runs on the BF16 cache, so no accuracy is traded at the softmax.</p>
+
+  <div class="note"><b>Terminology, fixed here for the rest of the page.</b> <em>Index construction</em> is the score-everything-and-take-top-κ pass that selects tokens. <em>Index reuse</em> is copying an already-built index set into another layer. <em>Index refinement</em> is Prism's third option: re-scoring a restricted candidate set. The first is expensive and fresh, the second is free and stale, the third is cheap and nearly fresh — and the whole paper is an argument that the third point on that line is the one worth sitting at.</div>
+
+  <h3>Where the paper puts its neighbours</h3>
+  <p>Section 2 sorts the literature into two paradigms — block-level and token-level — and then, separately, into work on <em>reusing</em> whatever the first two produce. The grouping below is this page's, but every method named in it is cited in the paper's own related-work paragraphs; the labels in the middle column are the paper's inline citations, not a re-reading of its bibliography.</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>How the paper divides the sparse-attention literature (grouped by this page; the citations follow the paper's own inline labels and were not re-checked against its reference list)</caption>
+    <thead><tr><th>Family</th><th>Representative work, as the paper cites it</th><th>What it buys — and what it still pays for</th></tr></thead>
+    <tbody>
+      <tr><td>Block-level, prefill-oriented</td><td>MInference 1.0 (Jiang et al., 2024); FlexPrefill (Lai et al., 2025); XAttention (Xu et al., 2025); SeerAttention (Gao et al., 2024); SpargeAttention (Zhang et al., 2025)</td><td>Filters critical blocks to accelerate the compute-heavy prefill phase. Granularity is a block, so a salient token in an unimportant block is still discarded.</td></tr>
+      <tr><td>Block-level, decode-oriented</td><td>Quest (Tang et al., 2024); Rectified Sparse Attention (Sun et al., 2025); LServe (Yang et al., 2025); SeerAttention-R (Gao et al., 2025)</td><td>Attacks the KV-cache bandwidth bottleneck of decoding by loading fewer pages or blocks. Prism shares Quest's premise — score cheaply, then load — but keeps token granularity.</td></tr>
+      <tr><td>Block-level, trained end-to-end</td><td>Native Sparse Attention (Yuan et al., 2025); MoBA (Lu et al., 2025); MiniCPM4 (MiniCPM Team et al., 2025); InfLLM-v2 (Zhao et al., 2025)</td><td>Trains the sparsity pattern so both phases speed up and the block-level accuracy loss is mitigated. Requires a training budget Prism deliberately avoids.</td></tr>
+      <tr><td>Token-level</td><td>DeepSeek Sparse Attention, or <abbr title="DeepSeek Sparse Attention">DSA</abbr> (Liu et al., 2025); GLM-5 (Zeng et al., 2026)</td><td>Finer granularity keeps context that rigid block boundaries would discard — the paradigm Prism builds on. Pays a full-context scoring pass per layer to choose, which is exactly the cost Prism attacks.</td></tr>
+      <tr><td>Cross-layer index sharing</td><td>TidalDecode (Yang et al., 2024); LessIsMore (Yang et al., 2025); OmniKV (Hao et al., 2025); Kascade (Deshmukh et al., 2025); HyLRA (Ai et al., 2026); IndexCache, or <abbr title="IndexCache">IDC</abbr> (Bai et al., 2026)</td><td>Removes the redundancy of rebuilding indices at every layer by propagating them from anchor layers. Assumes attention patterns are depth-invariant — the assumption Figures 1–3 are built to break.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The trade-off the paper says nobody has escaped</h3>
+  <p>Section 2.2 closes with the sentence that motivates everything after it: existing sharing methods "remain constrained by a trade-off between anchor-layer cost and reuse-layer accuracy." More anchors mean fresher support and more index construction; more reuse means cheaper steps and staler indices. The contributions of the field it reviews — Kascade and HyLRA casting anchor placement as dynamic programming, IndexCache searching greedily for placements robust to error propagation — all push on <em>which</em> layers are anchors. Prism's move is orthogonal and, in retrospect, obvious: leave the placement alone and change the payload.</p>
+
+  <p class="muted">A disambiguation worth recording: reference [29] in the paper's own bibliography is also called "Prism" — spectral-aware block-sparse attention. The subject of this page is arXiv:2610.22985, the proposal-refined index-sharing paper; the name collision is unrelated work.</p>
+
+  <div class="takeaway"><b>Takeaway:</b> the interesting quantity is not the sparsity ratio κ/L but the ratio between the cost of finding κ tokens and the cost of using them — and sharing addresses the first only by a factor equal to the reuse ratio, which is why a quantizer has to enter the picture before the account balance turns positive.</div>
+</section>
+
+<!-- ============================ s3 ============================ -->
+<section id="s3">
+  <div class="sec-no">03 · Observations</div>
+  <h2 class="sec">Observations: the drift is local</h2>
+
+  <p>Section 3 proposes nothing; it measures, and it measures in a deliberate order. Each of the three exhibits removes one alternative explanation for the previous one, which is why they are worth reading together rather than as three separate plots.</p>
+
+  <h3>Step 1 — overlap decays with layer distance (Figure 1)</h3>
+  <p>Two layers share an index set to the extent that their top-κ token sets intersect. Figure 1 measures that overlap for every pair of layers separated by an offset of 0–7, on Qwen3-4B, for three datasets and two context lengths, averaged over 32 heads, 32 consecutive decoding steps and 10 samples per dataset (the full protocol is in Appendix A). The y-axis is broken: offset 0 reads 1.00 because a layer compared with itself shares every index, and the axis then restarts at 0.20 for the comparisons that actually mean something.</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: cross-layer index overlap ratio versus layer offset for 1K and 8K contexts on three datasets">
+    <figcaption>
+      <b>Figure 1:</b> Cross-layer overlap ratio across varying distances of different layer offset.
+      <span class="ex">Every real comparison lands far below 1.0 and keeps falling. At offset 1 — the very next layer — the three 1K curves (solid) drop to roughly 0.36–0.41, and the three 8K curves (dashed) to roughly 0.26–0.36. By offset 7 the solid curves sit at about 0.33–0.37 and the dashed ones at about 0.21–0.26. Two readings matter for the design. First, the decay is steepest in the first step and then slow and monotone: there is no distance at which reuse "stabilises". Second, the dashed 8K curves lie below their 1K counterparts at every offset, so the same layer distance buys less overlap exactly when the context is long — the regime sparse decoding exists for. A proposal layer's top-κ is therefore wrong for at least half of the layers that inherit from it, and increasingly so as serving scales.</span>
+          <span class="pgref">Report p.1</span>
+    </figcaption>
+  </figure>
+
+  <p>This is the diagnosis of static reuse, but on its own it is also an argument <em>against</em> Prism: if the sets disagree that much, sharing anything looks hopeless. The figure therefore sets up the question that the next panel answers — whether the disagreement is structured.</p>
+
+  <h3>Step 2 — the disagreement has a shape (Figure 2)</h3>
+  <p>Figure 2 takes each refined layer's own top-128 indices and asks where they would have ranked in the proposal layer's scores. Three regions: inside the proposal's top-128 (green), ranks 128–511 (orange), and outside the top-512 altogether (red). The orange band is precisely the extra room a ρ = 4 pool would provide, so the plot is a direct test of whether expansion can capture the drift.</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: three-way distribution of refined-layer top-128 indices by rank in the proposal layer, per proposal layer and for all adjacent pairs">
+    <figcaption>
+      <b>Figure 2:</b> Localized evolution of sparse indices across layers within proposal regions. For each target (refined) layer, we categorize its own top-128 sparse indices according to their ranks in the corresponding reference (proposal) layer: "Prop. Top-128", "Prop. Top-128∼512", and "Outside Prop. Top-512" denote the ratios of target-layer top-128 indices falling in the reference-layer top-128 set, ranks 128∼511, and outside the top-512 set, respectively. The above two panels share the same legend. (a) tracks this distribution from proposal layers $L_0$, $L_9$, $L_{18}$, and $L_{27}$ to their subsequent refined layers, showing that a slightly expanded proposal pool ($\rho = 4$, i.e., 4× the base size) consistently captures a significant majority of layer-wise sparse-index variations. (b) measures, for each adjacent pair $L_{\ell} \rightarrow L_{\ell+1}$, how the top-128 indices of $L_{\ell+1}$ fall into the proposal regions of $L_{\ell}$. This demonstrates that adjacent-layer shifts are heavily concentrated within the expanded proposal window, significantly reducing the risk of missing salient tokens while avoiding the prohibitive cost of full-context search.
+      <span class="ex">Panel (a) traces four proposal layers forward. The green band — what rigid reuse would hand over — is a minority everywhere, roughly a fifth to a third of the refined layer's support, and it thins with distance from L0 / L9 / L18 / L27. The orange band, the part that only exists because the pool was expanded to 512, contributes another fifth or so and stays visible all the way to the panel's right edge. What is left in red is what no expansion to 512 could reach. Panel (b) repeats the measurement for all 35 adjacent pairs: green plus orange consistently covers roughly half to two thirds of the next layer's top-128. So the drift is real but bounded — it lands in a ring just outside the proposal's own top-κ far more often than in the rest of the context, which is what "localized" means operationally here.</span>
+          <span class="pgref">Report p.2</span>
+    </figcaption>
+  </figure>
+
+  <p>There is a subtlety in this figure that the appendix later makes quantitative. Index <em>counts</em> understate how much of the attention actually survives: most of the tokens that migrate out of the shared set carry little mass individually. Figure 9 puts a number on it — the roughly one-third of indices that rigid reuse already shares are worth 75.5% of the refined layer's attention mass — which is why a pool that catches only part of the migration is enough to keep the softmax honest.</p>
+
+  <h3>Step 3 — expansion converts the structure into coverage (Figure 3)</h3>
+  <p>The third exhibit is the bridge from observation to mechanism. Instead of four proposal layers, it sweeps all 36, producing a layer-by-layer coverage matrix for Qwen3-4B on AIME24 traces, and then re-draws the same matrix with the proposal expanded from top-128 to top-256 (ρ = 2) while the refined layer still selects 128.</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: layer-by-layer index overlap heatmaps with a top-128 proposal (left) versus a top-256 proposal (right)">
+    <figcaption>
+      <b>Figure 3:</b> Effect of expanded proposal regions on cross-layer sparse-index coverage. We conduct the analysis on Qwen3-4B using decoding traces collected from AIME24, and report the average cross-layer coverage of refined-layer top-128 sparse indices by the reference-layer proposal set. Left: the reference proposal is restricted to its top-128 indices, corresponding to rigid top-κ index reuse by the refined layer. Right: the reference proposal is expanded from top-128 to top-256 ($\rho = 2$), doubling the candidate pool used for refinement while keeping the refined-layer sparse support fixed at top-128.
+      <span class="ex">Rows are proposal layers, columns refined layers, and the colour is the share of the column layer's top-128 that lies inside the row layer's proposal; the diagonal is 1 by construction and burns red in both panels. Left: away from the diagonal the whole field is blue, i.e. 0.0–0.3 on the colour bar, with the darkest cells at maximum layer distance — rigid reuse is worst exactly where a 9-proposal-layer schedule needs it most. Right: with the pool merely doubled to 256, the same off-diagonal field turns pink to red, roughly 0.4–0.7, and the brightening is largest in the band a few layers off the diagonal. Doubling the pool roughly doubles coverage cell by cell, which is the empirical licence for the "slightly expanded candidate pool" the method is built on.</span>
+          <span class="pgref">Report p.4</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Takeaway (the three-step logic):</b> drift exists (Fig 1), drift is bounded and sits at the boundary of what was already selected (Fig 2), and a cheap expansion of that boundary recovers most of the lost coverage (Fig 3). The statement that carries the method is the second one — "indices change <em>at the edge</em>" — because a method that copies a top-κ set has no way to express it, while a method that passes a slightly larger set and re-ranks it does.</div>
+</section>
+<!-- ============================ s4 ============================ -->
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">Method: a proposal, then a refinement</h2>
+
+  <p>Prism changes two things and inherits a third. It changes what a proposal layer <em>exports</em> — an expanded candidate pool instead of a top-κ set. It changes what a refined layer <em>does</em> — re-score inside the pool instead of copying. It inherits, untouched, the assignment of which layers are which: the offline greedy calibration of IndexCache (Bai et al., 2026), run once on a held-out subset of OpenR1-MATH-220k with token-level cross-entropy as the objective, at a 1:3 anchor-to-shared ratio, then frozen for every downstream evaluation. No part of Prism is trained.</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: overview of Prism Attention — a proposal layer exports a top-ρ times κ pool, a refined layer gathers and re-ranks it">
+    <figcaption>
+      <b>Figure 4:</b> An overview of Prism Attention. Algorithm 1 presents the per-step decoding procedure.
+      <span class="ex">Two stacked panels, one per layer type. Bottom (proposal layer): the query is scored against the layer's INT2 key cache, a TopK produces the top-ρκ candidate list, and that list is used twice — sliced to its first κ entries for the proposal layer's own sparse attention over the BF16 KV cache, and passed upward in full. Top (refined layer): the inherited list arrives as token ids, a <em>gather</em> pulls exactly those rows out of the refined layer's own INT2 key cache, the refined query is scored against that block alone, TopK keeps κ, and only the survivors are read from the BF16 KV cache for the actual attention. The two orange columns in the middle are drawn κ and (ρ−1)κ wide, which is the pool's literal shape: the first κ candidates plus ρ−1 further κ-sized blocks. Three details are easy to miss and all three matter — every layer keeps its own quantized key copy, because keys differ per layer; the quantized keys are used for both the proposal score and the refinement score; and the BF16 cache is only ever touched κ times per layer, which is where the bandwidth saving comes from.</span>
+          <span class="pgref">Report p.5</span>
+    </figcaption>
+  </figure>
+
+  <h3>Notation and the ideal support</h3>
+  <p>At decoding step $t$ in layer $\ell$, the query $q^{\ell}_{t}$ is compared with the cached keys $K^{\ell} = \{k^{\ell}_{1}, \dots, k^{\ell}_{L_t}\}$. A scoring function $\phi$ — the same token-selection score the base method uses, defined operationally in Equation 9 — gives a relevance value for every historical token:</p>
+
+  <div class="math">$$s^{\ell}_{t}(i) = \phi\!\left(q^{\ell}_{t},\, k^{\ell}_{i}\right), \qquad i \in [L_t] \tag{1}$$</div>
+
+  <p>and the layer's ideal sparse support is the top-κ of that vector:</p>
+
+  <div class="math">$$T^{\ell}_{t} = \operatorname{TopK}\!\left(s^{\ell}_{t},\, \kappa\right) \tag{2}$$</div>
+
+  <p>Equation 2 is where the bill comes due: producing $T^{\ell}_{t}$ exactly requires evaluating $\phi$ against all $L_t$ cached tokens, an $O(L_t)$ selection cost <em>per layer</em> on top of the $O(\kappa)$ attention it enables. Everything that follows is an attempt to stop paying that cost at every layer without letting the support go stale.</p>
+
+  <h3>What static reuse does</h3>
+  <p>Partition the layers into proposal layers $F$ and refined layers $S$, and give each refined layer an association $f(S) \in F$ pointing at its preceding proposal layer. The conventional method writes:</p>
+
+  <div class="math">$$T^{S}_{t} \leftarrow T^{F}_{t} \tag{3}$$</div>
+
+  <p>— one assignment, no scoring. Equation 3 is the target of the paper's criticism, and the criticism is precise: it "assumes that the exact identity of salient tokens remains unchanged across layers." Figure 1 shows the assumption failing, and Section 3 explains the consequence — the mismatch between reused indices and true salient tokens "accumulates as the distance from the proposal layer increases."</p>
+
+  <h3>The proposal: export a wider set</h3>
+  <p>Prism's first change is to give the proposal layer a second output whose size is a controlled overshoot:</p>
+
+  <div class="math">$$C^{F}_{t} = \operatorname{TopK}\!\left(s^{F}_{t},\, n\right), \qquad n = \rho\kappa,\; \rho \ge 1 \tag{4}$$</div>
+
+  <p>Two things are worth pinning down about Equation 4. First, $\rho$ is small in practice — 4 for long-context tasks ($n$ = 8192) and 2 for reasoning ($n$ = 4096) — because, per Section 3, the drift lives just outside the boundary and a 4× window already reaches it. Second, the proposal layer does not pay for the expansion: it "still attends to its own top-κ tokens, while caching $C^{F}_{t}$ for downstream reuse." The extra ρκ − κ candidates cost storage and a longer TopK, not attention FLOPs.</p>
+
+  <h3>The refinement: re-rank inside the pool</h3>
+  <p>The second change is what the refined layer does with the pool. It recomputes scores, but only over the inherited candidate set:</p>
+
+  <div class="math">$$\hat{s}^{S}_{t}(i) = \phi\!\left(q^{S}_{t},\, k^{S}_{i}\right), \qquad i \in C^{F}_{t} \tag{5}$$</div>
+
+  <div class="math">$$\hat{T}^{S}_{t} = \operatorname{TopK}\!\left(\hat{s}^{S}_{t},\, \kappa\right) \tag{6}$$</div>
+
+  <p>Equations 5–6 are the whole trick, and their cost profile is the reason the paper is short: the search space is $|C^{F}_{t}| = \rho\kappa$, which is independent of $L_t$. A refined layer therefore costs the same at 8K and at 128K, and the only length-dependent work left in the model is the proposal layer's. The paper's own summary of the transformation is exact: reuse becomes "proposal-constrained local search," where $C^{F}_{t}$ supplies a high-recall region and the refinement absorbs the localized deviations.</p>
+
+  <div class="note"><b>What is genuinely new here, and what is not.</b> The partition, the anchor ratio, the calibration corpus and the greedy search are IndexCache's; the paper says so and does not claim otherwise. The delta is a change of payload: a refined layer receives a <em>region</em> rather than a <em>decision</em>, and spends a small, length-invariant amount of work converting one into the other. That is a smaller claim than "a new sparse attention algorithm," and it is the reason the ablations in Section 5 isolate calibration and refinement as separate rows.</div>
+
+  <h3>The per-step procedure</h3>
+  <p>Algorithm 1 folds the two equations into a decoding loop. It is worth reading line by line, because it is where the bookkeeping — the association function, the κ-slice, the shared candidate cache — actually lives.</p>
+
+  <div class="tbl-wrap">
+  <figure class="fig">
+    <img src="figs/algo1.png" alt="Algorithm 1: PrismAttention decoding at step t, with proposal and refined branches">
+    <figcaption>
+      <b>Algorithm 1:</b> PrismAttention Decoding at Step t
+      <span class="ex">Inputs: the representation $X_t$, layers 1…N split into proposal set $F$ and refined set $S$, the association $f : S \rightarrow F$, the sparse budget κ and the expansion factor ρ. Line 3 scores the whole context with INT2 keys (the only full-context operation in the loop); line 4 keeps ρκ of it as the shared candidate pool; line 5 slices the first κ of that same sorted list for the proposal layer's own attention, which is why the expansion costs the proposal layer nothing. The refined branch never re-scores history: line 7 hands it the pool of its associated proposal layer $C^{f(S)}_{t}$ and rescores only those rows, and line 8 keeps κ. Line 10 is the only place the BF16 K/V cache is read. Two consequences follow directly from the listing and are the ones to hold onto when reading the efficiency section: the loop's cost is dominated by whichever layers execute line 3, and the cost of lines 7–8 does not contain $L_t$ anywhere.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>Making the proposal affordable: INT2 keys</h3>
+  <p>Even at one layer in four, proposal construction is the remaining full-context pass, and the paper is explicit that it is bandwidth-bound rather than compute-bound: "each proposal layer must repeatedly access a large historical key cache." The remedy is to keep a second, very small copy of the keys for scoring. Each full-precision key vector of head dimension $d$ is cut into $M = d/g$ groups,</p>
+
+  <div class="math">$$k^{F}_{i} = \left[\,k^{F}_{i,1} \;\|\; k^{F}_{i,2} \;\|\; \cdots \;\|\; k^{F}_{i,M}\,\right], \qquad M = d/g \tag{7}$$</div>
+
+  <p>and each group is quantized on its own. The scheme is group-wise, asymmetric and 2-bit ($b = 2$), so every group carries a private scale and zero-point,</p>
+
+  <div class="math">$$\alpha^{F}_{i,m} = \frac{\max\left(k^{F}_{i,m}\right) - \min\left(k^{F}_{i,m}\right)}{2^{b}-1}, \qquad \beta^{F}_{i,m} = \min\left(k^{F}_{i,m}\right)$$</div>
+
+  <p>and the stored value is the rounded, clamped integer:</p>
+
+  <div class="math">$$\tilde{k}^{F}_{i,m} = \operatorname{clip}\!\left(\left\lfloor \frac{k^{F}_{i,m} - \beta^{F}_{i,m}}{\alpha^{F}_{i,m}} \right\rceil,\; 0,\; 2^{b}-1\right) \tag{8}$$</div>
+
+  <p>Per-group asymmetry is the right choice for this particular job. Keys are heavy-tailed and channel-wise heterogeneous, so a single global scale would spend most of its four levels on a few large channels; taking max and min within each group of size $g$ lets the four levels $\{0,1,2,3\}$ cover the range the group actually occupies. The cost model follows immediately: 2 bits per element against BF16's 16 divides the scoring pass's bytes by eight <b>[estimated]</b>. What the paper does not state is the group size $g$ — it appears only as a symbol in $M = d/g$ — which is one of the items in the "worth testing" list in Section 8.</p>
+
+  <h3>The max over heads, and why GQA makes it necessary</h3>
+  <p>Under <abbr title="Grouped Query Attention — several query heads share one key/value head">GQA</abbr>, several query heads read the same key. Scoring them independently would mean streaming one key block once per query head, which is exactly the redundant traffic the quantization is trying to remove. Equation 9 collapses the group first:</p>
+
+  <div class="math">$$\tilde{s}^{F}_{t}(i) = \max_{j \in G}\left\langle q^{F}_{t,j},\; \tilde{k}^{F}_{i}\right\rangle, \qquad i \in [L_t] \tag{9}$$</div>
+
+  <p>where $G$ is the set of query heads assigned to a shared KV group. The paper's justification is purely an efficiency one — "the max-reduction aggregates multiple query heads into one score per KV head, so each KV head is loaded only once per decoding step, avoiding redundant memory accesses across grouped heads." There is a second reading available, which the paper leaves implicit: max is the recall-maximising reduction, keeping a token if <em>any</em> head in the group cares about it, which is the right bias for a proposal whose errors are corrected downstream by the refined layer's re-ranking.</p>
+
+  <h3>Configuration, walked down to layers</h3>
+  <p>Abstract as Equations 1–9 are, the method is specified by a handful of numbers. Following them onto an actual model is the quickest way to see where the work lands.</p>
+  <ul class="tight">
+    <li><b>Layers.</b> Qwen3-4B has 36 transformer layers and 32 attention heads (Appendix A). Under the group-4 partition used throughout, 9 layers build proposals and 27 refine them <b>[organized]</b>, read off Table 4's string <code>FSSSSSSFFSSSSFSFSFFSSSSSSSFSSSSSSSSF</code>: the proposal layers are layers 0, 7, 8, 13, 15, 17, 18, 26 and 35. Under group-9 the same string count gives 4 proposal layers (0, 7, 13, 18).</li>
+    <li><b>Budget and pool.</b> κ = 2048 with ρ = 4 for long context, so $n$ = 8192; ρ = 2 with $n$ = 4096 for reasoning. A refined layer therefore examines 8192 of the 131,072 possible rows at 128K, i.e. 6.25% of the context <b>[estimated]</b>: 8192 / 131072.</li>
+    <li><b>Head grouping.</b> The SGLang measurements in Appendix D use "the tensor shapes of one <abbr title="Tensor Parallelism">TP</abbr>8 rank (4 query heads, 1 KV head, head dimension 128)." Combined with the 32-head count in Appendix A, that implies 8 KV heads shared by 32 query heads, so $|G| = 4$ query heads per KV head and the max in Equation 9 runs over four terms <b>[organized]</b>.</li>
+    <li><b>Storage.</b> Each layer keeps a BF16 K/V cache plus a 2-bit key copy used only for scoring. The copy is one eighth the size of the K cache it duplicates <b>[estimated]</b>: 2 bits / 16 bits. The paper reports no memory measurement for it.</li>
+  </ul>
+
+  <div class="takeaway"><b>Takeaway:</b> the algorithm is three lines of control flow — propose wide, refine narrow, attend — and the engineering is the two numbers that make it pay: 0.011 ms for the refinement (which contains no $L_t$) and 8× fewer bytes for the proposal (which does). Everything in the next two sections is a measurement of those two numbers and of what the accuracy gives up in exchange.</div>
+</section>
+
+<!-- ============================ s5 ============================ -->
+<section id="s5">
+  <div class="sec-no">05 · Accuracy results</div>
+  <h2 class="sec">Accuracy: best average among the sparse baselines</h2>
+
+  <p>The evaluation uses Qwen3-4B and Qwen3-8B, both reasoning-tuned models that emit long thinking traces. Reasoning is measured on AIME24, AIME25, GPQA-Diamond and MATH500 with Pass@1 over 64, 8 and 16 sampled answers respectively and a 32,768-token generation cap; long-context understanding uses the LongBench subsets whose average input length exceeds 8192 tokens, with generation capped at 4096. The baseline set is full attention plus four sparse decoders — Quest (Tang et al., 2024), LessIsMore, or <abbr title="LessIsMore">LIM</abbr> (Yang et al., 2025), SeerAttention-R (Gao et al., 2025) and IndexCache (Bai et al., 2026) — all run at κ = 2048, with Prism configured at ρ = 2 for reasoning and ρ = 4 for long context.</p>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: accuracy on AIME24, AIME25, GPQA and MATH500 for Qwen3-4B and Qwen3-8B across six methods">
+    <figcaption>
+      <b>Table 1:</b> Accuracy comparison on reasoning benchmarks using Qwen3-4B and Qwen3-8B.
+      <span class="ex">Read the four subset columns before the average, because the average hides the pattern. On Qwen3-4B, Prism takes the best sparse average (71.43) — 25.28 points above Quest, 2.08 above Seer-R and 1.27 above IndexCache — and it does so on the back of AIME24 (72.60), where it actually edges past full attention (71.25). On Qwen3-8B the same method lands at 73.83 against full attention's 74.33, a 0.50-point gap that comes almost entirely from AIME25 (65.52 vs 67.86); GPQA (60.45 vs 60.54) and MATH500 (94.30 vs 94.43) are level. Two honest observations. First, the gap between IndexCache and Prism is small on MATH500 and GPQA and large on AIME — the harder and longer the reasoning, the more the refinement buys, which is what the localized-drift story predicts. Second, Prism beating full attention on 4B-AIME24 is a 64-sample estimate on a 30-problem set; the paper does not claim it and this page does not either.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>The paper's aggregate claims are computed the way one would hope. The "1.46 points over IndexCache on the two AIME subsets" is the mean of the two models' two-subset means — 68.435 vs 66.145 on 4B and 70.285 vs 69.655 on 8B, averaging to 1.46 <b>[estimated]</b>, reproduced here only to confirm the paper is not cherry-picking a single model. The same arithmetic on LessIsMore gives the quoted 1.21.</p>
+
+  <h3>Long context: where the mechanism is supposed to matter most</h3>
+  <p>LongBench is the more interesting test, because the drift in Figure 1 worsens with context length — if Prism's story is right, this is where static reuse should bleed the most accuracy.</p>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table2.png" alt="Table 2: LongBench subset accuracy for Qwen3-4B and Qwen3-8B across five methods">
+    <figcaption>
+      <b>Table 2:</b> Performance comparison of different methods across various LLMs on LongBench.
+      <span class="ex">Nine subsets, printed with rotated headers in the original: reading them bottom-up gives 2WikiMQA, TriviaQA, HotpotQA, TREC, Qasper, PCount, MF-en, PR-en and GovReport <b>[organized from the rotated header text]</b>. Per-column behaviour matters more than the averages. Prism is the only sparse method that improves on full attention's TREC score on 4B (52.00 vs 45.00, against 48.00 for the next best) and it is the best method in the PCount column on 8B (27.11, above full attention's 24.95). The averages then read 54.98 on 4B (full attention 55.07, IndexCache 53.27) and 54.97 on 8B (full attention 54.58, Seer-R 53.64, IndexCache 52.65). The offsetting weakness is Qasper, where Prism trails full attention on both models (23.89 vs 29.35 on 4B, 25.67 vs 31.52 on 8B) — a reminder that an aggregate of nine heterogeneous tasks is doing a lot of work in the headline number.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>Set against the baselines the paper names, the ordering is stable: Prism is first among sparse methods on both models and both benchmark families, and on 8B-LongBench it is first outright, slightly above full attention. What it is not is uniformly better than full attention — on 4B-LongBench it is 0.09 points behind, and on Qasper it is well behind. That is the honest shape of a 2048-of-131072 sparse decoder.</p>
+
+  <h3>The Pareto picture</h3>
+  <p>Section 5.3 closes its accuracy discussion with the trade-off plot that the efficiency claims are usually judged against: accuracy against average per-token decoding latency, with every point measured inside SGLang.</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: accuracy versus average decoding latency on AIME25 for full attention and eight sparse configurations">
+    <figcaption>
+      <b>Figure 5:</b> Accuracy-Efficiency Pareto Comparison.
+      <span class="ex">Axes: AIME25 accuracy (vertical) against average latency in ms (horizontal, broken between 4.4 and 7.05 where full attention sits). Every baseline cluster is below and to the left of Prism's. Prism-g4-1K is the reference point the text quotes: 64.43 accuracy at 3.84 ms, which is 1.84× faster than full attention while retaining 97.0% of its accuracy, and it strictly dominates both LIM-2K (62.87 at 4.19 ms) and Seer-R-4K (58.59 at 4.00 ms). The point that keeps the result honest is IDC-g4-1K: 0.55 ms faster, but 5.21 points less accurate — the refinement is not free, it is simply priced. Note also that the two Prism-g9 points sit below their g4 counterparts: sharing across eight layers instead of three is cheaper and less accurate, exactly the trade-off Section 2.2 described.</span>
+          <span class="pgref">Report p.7</span>
+    </figcaption>
+  </figure>
+
+  <h3>Ablation: which half of the method does the work</h3>
+  <p>Table 3 is the most informative single exhibit in the paper, because it switches on the components independently and shows that neither half is sufficient. It is run at κ = 1024 (not the 2048 of the main experiments) on Qwen3-4B, with ρ = 4 in every proposal-refined row.</p>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table3.png" alt="Table 3: ten-row ablation over per-layer indices, index reuse, quantization, group size, calibration and proposal-refined sharing">
+    <figcaption>
+      <b>Table 3:</b> Ablation study of index construction and proposal-refined sharing on Qwen3-4B. Group x denotes that one in every x layers acts as a proposal layer (i.e., a proposal-to-refined ratio of 1:(x − 1)). All configurations use a sparse budget of κ = 1024; in proposal-refined configurations, each refined layer selects its final κ tokens from a candidate pool of n = ρκ with ρ = 4.
+      <span class="ex">Row 1 is the expensive ceiling — rebuild indices at every layer — at 71.35 / 63.87. Row 2 shows that at 4B and κ = 1024 plain reuse costs almost nothing on AIME24 (72.08) but already loses 0.61 on AIME25. Row 3 adds the quantized proposal and the model collapses on AIME25 (50.05): an INT2-scored, statically reused index set is a bad index set. Rows 4–5 are the two repairs taken separately, calibration alone (72.19 / 59.22) and refinement alone (71.56 / 62.60); row 6 takes both and recovers to 72.03 / 64.43. The group-9 block tells the same story with larger amplitudes: 43.33 → 52.81 (calibration) → 59.01 (refinement) → 60.89 (both), where the refinement contributes more precisely because indices travel further. The one number the paper passes over without comment is that row 6 (64.43) is higher than row 1 (63.87): at κ = 1024, proposal-refined sharing edges out exhaustive per-layer indexing.</span>
+          <span class="pgref">Report p.9</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>That last comparison deserves caution rather than celebration. AIME25 with 30 problems and avg@64 has a noisy mean, and the paper reports no confidence intervals anywhere; a 0.56-point difference between two rows of a single 4B model is well inside what one would expect from re-sampling. What the table does establish robustly is the ordering of the three regimes — quantized static reuse ≪ calibration ≪ calibration + refinement — and the fact that the two fixes are close to additive, which is what a design in which one fixes the payload and the other fixes the placement should look like.</p>
+
+  <h3>Sensitivity: how much expansion is enough</h3>
+  <p>The two knobs introduced in Equations 4 and 6 both have an interior optimum, and Figure 8 is the sweep that locates them.</p>
+
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8: AIME25 accuracy against the proposal expansion factor rho and the sparse budget kappa">
+    <figcaption>
+      <b>Figure 8:</b> Sensitivity to proposal expansion factor ρ and sparse budget κ on AIME25.
+      <span class="ex">Two curves on a dual x-axis. The dashed ρ curve (top axis) rises with expansion — 59.22 at ρ = 1, 61.20 at ρ = 2, 64.43 at ρ = 4 — and then falls at ρ = 8 (62.50). The shape is the argument: ρ = 1 is static reuse restored, ρ = 4 is the point where the pool has reached the boundary ring, and ρ = 8 adds candidates that are mostly noise the refined layer cannot filter out at κ = 1024. The solid κ curve (bottom axis) climbs monotonically — 57.66 at κ = 512, 64.43 at 1024, 64.69 at 2048, 65.26 at 4096 — and flattens: most of the gain arrives by κ = 1024, which is why the main experiments can afford κ = 2048 for long context and still be faster than dense. The paper's reading, that ρ between 2 and 4 with κ between 1024 and 2048 is the sweet spot, is a statement about this one 4B model on this one benchmark and should be inherited with that caveat.</span>
+          <span class="pgref">Report p.9</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>Takeaway:</b> accuracy-wise Prism is a modest, consistent win — first among sparse methods on both benchmark families, within half a point of full attention on 8B reasoning and 0.09 on 4B LongBench. The ablation is the more valuable result: it shows that the two ingredients are separately necessary and roughly additive, and that the quantized proposal on its own is actively harmful, which is the paper's strongest implicit argument that proposal <em>and</em> refinement are one idea rather than two.</div>
+</section>
+
+<!-- ============================ s6 ============================ -->
+<section id="s6">
+  <div class="sec-no">06 · Systems &amp; efficiency</div>
+  <h2 class="sec">Systems: the cost lands on one layer in four</h2>
+
+  <p>The efficiency story is told at three levels — a single kernel, a served model, and the end-to-end step — and the three levels agree. All measurements are on NVIDIA H800 GPUs: the kernel numbers come from custom Triton kernels timed under CUDA-graph replay with no tensor-parallel sharding, and the serving numbers come from the same kernels integrated into SGLang.</p>
+
+  <p>Before taking the three levels one at a time, it is worth putting the two halves of the argument on a single picture: <b>which layers are proposals</b> (searched offline, then frozen) and <b>what each layer's index stage costs</b> (measured). The paper states the blending formula and the measured breakdown in separate places; the chart below puts them together.</p>
+
+  <figure class="fig" data-selfchart="1">
+    <img src="figs/chart-layer-ledger-en.svg" alt="Self-drawn: layer roles and per-layer index-stage cost for Qwen3-4B — 9 of 36 layers carry the length-dependent cost">
+    <figcaption>
+      <b>Self-drawn:</b>Layer roles × per-layer index-stage cost for Qwen3-4B (group-4) — only 9 of 36 layers carry the cost that grows with context.
+      <span class="ex">
+        Top: the 36 cells are the 36 layers, a dark <b>F</b> is a proposal layer and a pale cell a refined layer, positioned exactly as in the
+        Qwen3-4B group-4 calibration string <code>FSSSSSSFFSSSSFSFSFFSSSSSSSFSSSSSSSSF</code> of Table 4
+        (layers 0, 7, 8, 13, 15, 17, 18, 26 and 35).
+        Bottom: each layer's index-stage cost at one decoding step, scaled from the Table 6 measurements at BSZ=4 and 128K —
+        a proposal layer is 0.0109 (quantization) + 0.2930 (proposal construction) + 0.0340 (sparse decode) ≈ 0.338 ms, while a refined layer is
+        0.0109 + 0.0106 + 0.0340 ≈ 0.056 ms; the thin green band at the base is the INT2 quantization both layer types pay, fixed at ≈0.011 ms.
+        The three dashed lines are the reference levels: FlashAttention at 0.6985 ms, the 1:3 blend at 0.1261 ms per layer, and a single proposal layer at 0.3379 ms.
+        <b>The conclusion is a glance away</b>: there are only nine tall bars, and the other twenty-seven have a height that does not depend on context length;
+        the blending arithmetic <b>[estimated]</b> is 9 × 0.338 + 27 × 0.056 = 4.540 ms over 36 layers = 0.1261 ms per layer, i.e. 5.54× FlashAttention,
+        which lands on the same value as the BSZ=4 curve of the paper's Figure 6b at 128K.
+        <b>The chart also exposes the scheme's own weakness</b>: those twenty-seven short bars are not zero, they are a ≈0.056 ms constant, so the shorter the context,
+        the larger that constant's share of total latency — which is the crossover discussed in the closing section.
+      </span>
+      <span class="pgref">Organized from Table 4 (Report p.16) and Table 6 (Report p.17); the layer count and the blend are this page's estimate</span>
+    </figcaption>
+  </figure>
+
+  <h3>Level 1 — inside the kernel</h3>
+  <p>A proposal layer and a refined layer differ in exactly one stage. Both run the INT2 decode and the sparse decode; the difference is whether the index stage is a full proposal construction or a local refinement, which the paper writes as two sums:</p>
+
+  <div class="math">$$T_{\text{proposal}} = T_{\text{INT2Decode}} + T_{\text{ProposalConstruction}} + T_{\text{SparseDecode}}$$</div>
+  <div class="math">$$T_{\text{refine}} = T_{\text{INT2Decode}} + T_{\text{IndexRefinement}} + T_{\text{SparseDecode}}, \qquad T = \frac{T_{\text{proposal}} + 3\,T_{\text{refine}}}{4}$$</div>
+
+  <p>Whatever is true of that middle term is true of the layer. Figure 6a is the measurement, and Figure 6b is what happens to the blend when the batch and the context grow.</p>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: (a) stacked kernel latency at batch size 4 across context lengths, with proposal and refined layer speedups annotated; (b) speedup over FlashAttention versus context length for three batch sizes">
+    <figcaption>
+      <b>Figure 6:</b> (a) Kernel latency breakdown at BSZ=4 across different context lengths. (b) The speedup of the average per-layer kernel latency over FlashAttention across context lengths and batch sizes.
+      <span class="ex">Panel (a): the FlashAttention bar (hatched) grows from 0.06 ms at 8K to 0.70 ms at 128K; the Prism stacks next to it grow only through their orange "proposal construction" segment. The annotated pairs are per-layer-type speedups, and they are the sentence the figure exists to say — at 128K a proposal layer is 2.07× faster than FlashAttention while a refined layer is 12.59×, and the 12.59 has a flat 0.011 ms index stage inside it that does not care about context. Panel (b): the blended speedup of the 1:3 schedule rises with both axes and reaches 7.50× at 128K with BSZ=16. Note the two places where the curve dips below the dashed FlashAttention line: BSZ=1 is slower than dense until about 32K. The method is a long-context, large-batch proposition, and the figure says so.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table6.png" alt="Table 6: component-wise kernel latency in milliseconds for FlashAttention, quantization, proposal construction, index refinement and sparse decode at three batch sizes">
+    <figcaption>
+      <b>Table 6:</b> Detailed latency breakdown (ms) of Prism Attention kernels compared with FlashAttention across various batch sizes and sequence lengths.
+      <span class="ex">The table is the raw material for every claim in this section, so read the two rows that do not move. Quantization sits at 0.0107–0.0111 ms and index refinement at 0.0106–0.0152 ms across the entire grid — 15 cells, five context lengths, three batch sizes, no trend with context length. Proposal construction is the only index stage with a length term: 0.0807 → 0.2930 → 1.1019 ms at BSZ 1/4/16 as context goes 8K → 128K, roughly linear, which is the full-context scoring pass the INT2 keys were introduced to make cheap. Sparse decode also grows with batch (0.0334 → 0.0623 ms) but barely with context, as it should: it touches κ tokens regardless. The blended per-layer cost at 128K and BSZ=16 works out to (1.1749 + 3 × 0.0880)/4 = 0.360 ms against FlashAttention's 2.698 ms <b>[estimated]</b>, i.e. 7.50×.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>That blend is worth dwelling on, because it is where the "only 1/4 of the layers pay" story gets its arithmetic. At 128K and BSZ=16 the proposal layers consume 1.1749 ms each and the refined layers 0.0880 ms each; after averaging, 81.7% of the total per-layer cost still comes from the 25% of layers that build proposals <b>[estimated]</b>: (1.1749/4) / 0.3597 = 81.7%. The schedule concentrates the work but does not dilute it — which is why the INT2 quantization of the proposal pass, not the sharing ratio, is the dominant lever, and why the group-9 configuration used later on GLM-5.2 is faster still.</p>
+
+  <figure class="fig">
+    <img src="figs/fig14.png" alt="Figure 14: component-wise latency stacks at batch size 1 (a) and 16 (b) across five context lengths">
+    <figcaption>
+      <b>Figure 14:</b> Component-wise latency breakdown of Prism Attention compared to the FlashAttention baseline across different sequence lengths at (a) BSZ=1 and (b) BSZ=16.
+      <span class="ex">The same decomposition as Figure 6a, drawn at the two batch extremes, with the per-layer-type speedups annotated on every stack. At BSZ=1 the pair reads 0.51× / 0.53× at 8K — Prism is slower than dense on both layer types — and only reaches 1.56× / 3.52× at 128K, because at batch 1 the FlashAttention kernel is latency-bound rather than bandwidth-bound and the 2-bit scoring pass has nothing to amortise against. At BSZ=16 the same pair reads 1.26× / 2.31× at 8K and 2.30× / 30.66× at 128K: the refined-layer speedup grows by an order of magnitude with batch, the proposal-layer speedup by less than a factor of two. The visual invariant is the pale "index refinement" sliver, which stays the same height in every stack of both panels — a flat bar in a figure whose every other bar grows is the clearest possible statement that the refinement is context-independent.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption>
+  </figure>
+
+  <h3>Level 2 — the served model</h3>
+  <p>The kernel numbers above are measured in isolation. Table 7 re-measures the same kernels after they are compiled into SGLang, where each layer is a single fused CUDA-graph chain rather than four separable stages, at a 2K sparse budget and the tensor shapes of one TP8 rank (4 query heads, 1 KV head, head dimension 128).</p>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table7.png" alt="Table 7: per-layer latency for Prism gate and refine layers versus IndexCache anchor and reuse layers and FlashAttention, at five context lengths and three batch sizes">
+    <figcaption>
+      <b>Table 7:</b> Attention-path kernel latency breakdown under a 2K sparse budget, measured with our Triton kernels integrated into the SGLang serving framework. Gate and Refine denote the full layer chain of an index-construction layer (Prism: proposal, IndexCache: anchor) and an index-reuse layer (Prism: refined, IndexCache: shared), respectively. Eff. is the effective cost at the 1:3 construction-to-reuse ratio used throughout our experiments, i.e., T = (T<sub>construct</sub> + 3 T<sub>reuse</sub>)/4; parenthesized values are speedups over FlashAttention (FA).
+      <span class="ex">Three readings. First, Prism's Refine column is pinned at 0.0196–0.0281 ms regardless of context and batch — a 0.0085 ms drift across a 16× change in sequence length, versus 0.0328 → 0.1794 ms for the Gate column. Second, Prism's Gate is genuinely more expensive than IndexCache's anchor at short contexts (0.0328 vs 0.0279 ms at 8K, BSZ=1): the INT2 pass plus the wider TopK are a fixed cost that has nothing to amortise against yet. Third, that gap disappears as the workload grows and reverses by 128K/BSZ=16, where Prism's Gate is 0.1794 ms against IndexCache's 0.2326 ms — cheaper index construction at the long end, which is the whole point of quantizing it. The Eff. column is the bottom line: 5.42× over FlashAttention at 128K/BSZ=16, and still 0.61× (slower than dense) at 8K/BSZ=1.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>Level 3 — the end-to-end step</h3>
+  <p>Finally, per-step decoding latency measured inside SGLang on Qwen3-4B at a 2K sparse budget. This is the number in the abstract, and Figure 7 and Table 8 are the same measurement presented twice — as bars and as a grid — which is convenient, because the grid makes the losses visible.</p>
+
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7: end-to-end per-step decoding latency bars at 16K, 64K and 128K for FlashAttention and four sparse methods">
+    <figcaption>
+      <b>Figure 7:</b> End-to-end latency comparison across different context lengths on Qwen3-4B at BSZ=16.
+      <span class="ex">At 128K the FlashAttention bar is 15.03 ms and Prism-g4 is 4.47 ms, the 3.36× the abstract quotes; the multiplier grows with context from 1.23× at 16K and 2.28× at 64K. But the bars also show what the headline hides: at 128K, IndexCache-g4 is marginally ahead of Prism (4.43 ms, 3.39×), Seer-R is faster still (3.48 ms, 4.31×), and the group-9 rows of Table 8 are faster than both. Prism's claim is therefore not "fastest sparse decoder" but "best accuracy at a competitive latency" — the accuracy half of that sentence lives in Tables 1–2 and in Figure 5, and the two have to be read together. The comparison that matters for the method itself is Prism-g4 against IDC-g4, since they differ only by the refinement: 0.7% slower at 128K, 8.0% at 64K and 15.7% at 16K.</span>
+          <span class="pgref">Report p.8</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table8.png" alt="Table 8: end-to-end decoding latency in milliseconds and speedup over FlashAttention for six methods at 16K, 64K and 128K and two batch sizes">
+    <figcaption>
+      <b>Table 8:</b> End-to-end per-step decoding latency on Qwen3-4B with the SGLang serving framework under a 2K sparse budget. Each cell reports the absolute latency (ms) and, in parentheses, the speedup over FlashAttention (FA).
+      <span class="ex">The tabular twin of Figure 7, extended to BSZ=1. Read the BSZ=1 half first, because it is where the method loses: at 16K and 64K, Prism-g4 is slower than FlashAttention (2.492 vs 2.151 ms and 2.565 vs 2.623 — the second is a narrow win, the first a clear loss) and every sparse method is in the same neighbourhood, because at batch 1 nothing is bandwidth-starved. Then read the BSZ=16 column: 15.025 ms for FlashAttention against 4.467 for Prism-g4, 4.434 for IDC-g4, 3.703 for Prism-g9 and 3.483 for Seer-R. The g4→g9 step is instructive — halving the number of proposal layers buys 0.76 ms at 128K and costs accuracy (see the group-9 rows of Table 3) — and it is the configuration the GLM-5.2 experiments in Section 7 lean on.</span>
+          <span class="pgref">Report p.18</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>Stated as a deployment rule, the picture is consistent across all three levels: Prism wins when the cache is large enough that the attention path is bandwidth-bound and the batch is large enough that the kernel is not latency-bound. Below roughly 32K tokens, or at batch 1, it is a wash or a regression, and the paper's own tables say so.</p>
+
+  <div class="takeaway"><b>Takeaway:</b> the systems contribution is not a faster kernel but a cheaper schedule — one layer in four does a full-context pass on 2-bit keys and the other three do a length-free local re-rank, which is why the blended speedup rises monotonically with context and batch while its own internal overhead (the 15.7% → 8.0% → 0.7% premium over IndexCache) shrinks toward nothing.</div>
+</section>
+<!-- ============================ s7 ============================ -->
+<section id="s7">
+  <div class="sec-no">07 · Appendix analyses</div>
+  <h2 class="sec">Appendix: does the observation hold elsewhere?</h2>
+
+  <p>Everything in Section 3 was measured on one model family, at one length, on mathematics. The appendices exist to answer the obvious objection — that localized drift is a Qwen artefact, or a 8K artefact, or a maths artefact — and then, in Appendix E, to show the method running on a model it was not designed for. Each appendix figure keeps the same two-panel layout, which makes the whole group readable as a single experiment repeated under three different swaps.</p>
+
+  <div class="note"><b>How to read the paired bars.</b> In Figures 9, 10 and 11 the left panel puts two bars side by side for each of the three rank bands: the <em>solid</em> bar is the index overlap ratio (what share of the refined layer's 128 indices fall in that band) and the <em>hatched</em> bar is the attention-mass ratio (what share of the refined layer's total attention score those indices carry). Both are normalised over the refined layer's own top-128, so each triple sums to 100%. The right panel asks a different question: of the attention score that rigid reuse already covers, how much extra does expanding the proposal from top-128 to top-512 recover, bucketed by how good the original coverage was.</div>
+
+  <h3>B.1 — across architectures, including MLA</h3>
+  <p>Qwen3-4B and DeepSeek-R1-Distill-Llama-8B both use <abbr title="Grouped Query Attention">GQA</abbr>; GLM-4.7-Flash uses <abbr title="Multi-head Latent Attention — keys and values are held in a compressed latent rather than per head">MLA</abbr>. All three are measured on 8K mathematical-reasoning sequences with the Figure 2 protocol.</p>
+
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9: index overlap and attention-mass bars for Qwen3-4B, DSR1-8B and GLM-4.7, plus recovered attention score by expansion">
+    <figcaption>
+      <b>Figure 9:</b> Cross-layer index/attention-mass distribution (Left) and attention score recovered by proposal expansion (Right) across model architectures. Left figure: within each pair of bars, the solid bar denotes the index overlap ratio (the share of the target/refined layer's 128 indices) and the hatched bar denotes the attention-mass ratio (the share of the total attention score those indices carry in the target layer). Both are normalized over the target layer's own Top-128, so the horizontal axis is a percentage and each bar sums to 100%. Right figure: the legend groups samples by the original attention coverage, i.e., the share of the target layer's Top-128 attention score that is already covered by reusing only the proposal layer's Top-128 indices. The recovered attention decreases consistently as the original coverage grows.
+      <span class="ex">The left panel is the strongest single piece of evidence in the paper. Index overlap in the shared top-128 band is only 33.4% for Qwen3-4B, 23.8% for DSR1-8B and 34.5% for GLM4.7 — but the <em>attention mass</em> carried by those same indices is 75.5%, 79.6% and 81.0%. The tokens that migrate between layers are numerous and individually unimportant, and that asymmetry is precisely what makes a candidate pool viable: catching the tail is cheap because the tail carries little weight. It also holds across a GQA-vs-MLA divide, which rules out the explanation that this is an artefact of one attention layout. The right panel adds the corollary: the lower the original coverage, the more the expansion recovers — in the regimes where rigid reuse is most lossy, the pool has the most to give back.</span>
+          <span class="pgref">Report p.14</span>
+    </figcaption>
+  </figure>
+
+  <h3>B.2 — across context lengths</h3>
+  <p>The same measurement at 4K, 8K and 16K on Qwen3-4B, with everything else fixed.</p>
+
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10: the same index and attention-mass distributions at 4K, 8K and 16K context">
+    <figcaption>
+      <b>Figure 10:</b> Cross-layer index/attention-mass distribution (Left) and attention score recovered by proposal expansion (Right) across context lengths. Both follow the conventions of Figure 9.
+      <span class="ex">The three rows barely move: index overlap in the shared band is 35.9% at 4K, 33.4% at 8K and 35.3% at 16K, and the captured attention mass is 79.0%, 75.5% and 74.3%. Captured attention drifts down by about five points as the context quadruples — the same direction as Figure 1's decay, and mild enough that the design does not need a length-dependent ρ over this range. The right panel shows the recovered score rising as original coverage falls, with the low-coverage buckets recovering the most, which is the same ordering Figure 9 established across architectures. Read together with Figure 1, the appendix makes a cleaner claim than the main text does: pairwise overlap at a fixed layer offset degrades with length, but the <em>structure</em> of the degradation is stable, and it is the structure the method exploits.</span>
+          <span class="pgref">Report p.14</span>
+    </figcaption>
+  </figure>
+
+  <h3>B.3 — across task types</h3>
+  <p>Four task families at 8K: mathematical reasoning, summarisation, few-shot learning and multi-document QA, ten samples each, all from the benchmark suites the main experiments already use.</p>
+
+  <figure class="fig">
+    <img src="figs/fig11.png" alt="Figure 11: index and attention-mass distributions for mathematics, summarisation, few-shot learning and multi-document QA">
+    <figcaption>
+      <b>Figure 11:</b> Cross-layer index/attention-mass distribution (Left) and attention score recovered by proposal expansion (Right) across task types. Both follow the conventions of Figure 9. Note: for conciseness, we abbreviate Mathematical Reasoning, Summarization, Few-shot Learning, and Multi-Document QA as Math, Summ, FS, and MDQA, respectively, in both figures above.
+      <span class="ex">This is the one appendix panel where the rows visibly differ, and the difference is the interesting part. Few-shot learning is the most cross-layer-stable task (37.3% index overlap, 79.5% mass captured); summarisation is the least (27.8%, 72.4%); MDQA and mathematics sit in between. A 9.5-point spread in index overlap across tasks is real evidence that drift is task-dependent, and it supports the paper's own admission in Appendix F that the calibration corpus — a single mathematical-reasoning set — is a design variable it chose not to explore. For the mechanism it is reassuring rather than damaging: the mass captured stays above 72% in every task, so the pool remains worth having everywhere, even where it is least well matched.</span>
+          <span class="pgref">Report p.15</span>
+    </figcaption>
+  </figure>
+
+  <h3>B.3 (continued) — the same effect in raw overlap matrices</h3>
+  <p>Figure 3 showed the 36×36 coverage matrix on AIME24. Figure 12 repeats it on GPQA and MATH500, with both a top-128 and a top-256 proposal, so the effect can be checked without averaging over dataset or over layer.</p>
+
+  <figure class="fig">
+    <img src="figs/fig12.png" alt="Figure 12: four layer-by-layer overlap heatmaps — GPQA and MATH500, each with a top-128 and a top-256 proposal">
+    <figcaption>
+      <b>Figure 12:</b> Effect of expanded proposal regions on cross-layer sparse-index coverage, with the refined-layer sparse support fixed at top-128 (Qwen3-4B; GPQA [23] and MATH500 [13] traces).
+      <span class="ex">Four panels in a 2×2: GPQA with a top-128 proposal (a) and a top-256 proposal (b), then MATH500 with the same pair (c, d). Panels (a) and (c) are the rigid-reuse picture — off-diagonal cells sit in the blue end of the bar, worsening with distance from the diagonal. Panels (b) and (d) are the same matrices with the pool merely doubled, and the field turns warm across the board. Because the improvement is uniform rather than confined to a few layers, it cannot be an artefact of a lucky anchor: doubling the candidate window shifts the whole off-diagonal distribution, on both traces, exactly as Figure 3 did on AIME24.</span>
+          <span class="pgref">Report p.15</span>
+    </figcaption>
+  </figure>
+
+  <h3>C — how stable is the layer assignment?</h3>
+  <p>Prism inherits IndexCache's partition, which means it inherits the question of whether that partition is fragile. Appendix C answers with two exhibits: the assignment recovered from five different calibration subsets, and the downstream accuracy of each.</p>
+
+  <p>Table 4 first records the partitions the search actually returns. The notation differs from the GLM-5.2 table later in the appendix and the paper flags this — here <code>F</code> is a proposal layer and <code>S</code> a refined one, and the string is the layer sequence from 0 to 35.</p>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table4.png" alt="Table 4: proposal/refined layer assignment strings for Qwen3-4B and Qwen3-8B under group-4 and group-9">
+    <figcaption>
+      <b>Table 4:</b> Searched Proposal/Refined layer assignment patterns (F: Proposal layer, S: Refined layer).
+      <span class="ex">Four 36-character strings, one per model × group. Counting the letters gives the schedule the rest of the paper uses <b>[organized]</b>: Qwen3-4B group-4 is <code>FSSSSSSFFSSSSFSFSFFSSSSSSSFSSSSSSSSF</code> with 9 F (layers 0, 7, 8, 13, 15, 17, 18, 26, 35) and 27 S; group-9 gives 4 F (0, 7, 13, 18). Two patterns are worth noticing. The search never places the first layer anywhere but 0, which is what one would expect — layer 0 has no predecessor to inherit from. And the proposal layers cluster rather than distribute evenly (7–8 and 17–18 are adjacent pairs), so the "1 in 4" ratio is an average, not a rhythm; some spans of the network run eight refined layers deep. Those are exactly the spans where the ρ = 4 pool has to hold.</span>
+          <span class="pgref">Report p.16</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <figure class="fig">
+    <img src="figs/fig13.png" alt="Figure 13: heatmap of proposal-layer assignment across five random calibration seeds and 36 layers">
+    <figcaption>
+      <b>Figure 13:</b> Sensitivity of proposal layer assignment to calibration sample selection on Qwen3-4B.
+      <span class="ex">Five seeds by 36 layers; a dark cell means that layer was chosen as a proposal layer. Six layers — 0, 7, 8, 13, 18 and 35 — are dark in every seed, and the frequency bar along the bottom reads 1.0 for them. The contested layers (3, 14, 16, 17, 20, 21, 26, 28, 34) flip between seeds, at frequencies from about 0.2 to about 0.8 on the average bar. The paper highlights layers 0, 8, 13 and 35 as "almost always" proposal layers; the figure shows 7 and 18 behaving the same way. The practical reading is that the search has a stable core and a noisy periphery, which is a much better property than a stable-looking point estimate: it means the calibration is finding something structural about where attention reorganises, not fitting the sample.</span>
+          <span class="pgref">Report p.16</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table5.png" alt="Table 5: AIME25 accuracy for the five seed-derived layer assignments">
+    <figcaption>
+      <b>Table 5:</b> Performance across layer assignment patterns from random calibration seeds.
+      <span class="ex">Five rows, κ = 1024, ρ = 4, AIME25 only: 64.43, 64.32, 64.69, 64.06, 63.91. The spread is 0.78 points between the best and worst seed <b>[estimated]</b>: 64.69 − 63.91, against a mean of 64.28. That is roughly the size of the difference the paper itself leans on when comparing Prism to IndexCache (1.27 points on 4B), which is worth keeping in mind — but it also means the mechanism is insensitive to which partition it is handed, and that is the claim the table is making. A method whose accuracy moved by several points across seeds would need the calibration to be part of its contribution; Prism does not.</span>
+          <span class="pgref">Report p.17</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>E — the GLM-5.2 scaling experiment</h3>
+  <p>The most interesting appendix is the last: a 78-layer production model whose <em>native</em> configuration is an IndexCache schedule, evaluated at a unified κ = 2048 and ρ = 4. Here the notation changes again — <code>F</code> (Full) builds indices from the full context, <code>S</code> (Shared) copies them, and <code>R</code> (Refined) does Prism's local re-selection — and the experiment is designed as a controlled subtraction: take the model's own 21F57S schedule, cut the F layers to 10 to make it cheaper, watch what breaks, then add R layers back.</p>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table9.png" alt="Table 9: three GLM-5.2 layer-assignment patterns — 21F57S default, 10F68S, and 10F11R57S">
+    <figcaption>
+      <b>Table 9:</b> Layer-assignment patterns evaluated on GLM-5.2 under a unified sparse budget κ = 2048 and proposal expansion factor ρ = 4. Note: the meanings of F, S, and R here differ from those in Table 4, and throughout this table follow the definitions given below. F (Full) layers construct sparse indices from the full context, S (Shared) layers directly reuse the indices of their nearest preceding index-producing layer, and R (Refined) layers refine an inherited candidate pool. 21F57S is the default pattern of GLM-5.2 itself, i.e., its native trained IndexCache configuration.
+      <span class="ex">Three 78-character strings. 21F57S is the model as shipped and is the accuracy reference, not a fair cost reference. 10F68S keeps the IndexCache mechanism but halves the number of index-building layers — the cheap configuration whose accuracy loss the next table quantifies. 10F11R57S is the hybrid: the same ten F layers as 10F68S, eleven R layers inserted to consume their pools, and 57 S layers that copy from whichever F or R layer precedes them. The design of the comparison is what makes it persuasive: the F budget is held constant between the two 10F variants, so any accuracy recovered is attributable to the eleven R layers and not to extra index construction.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table10.png" alt="Table 10: GLM-5.2 accuracy and average output length on LongBenchV2_128K, RULER_64K and RULER_128K for the three patterns">
+    <figcaption>
+      <b>Table 10:</b> Accuracy on GLM-5.2 with the SGLang framework under a unified sparse budget κ = 2048. Each cell reports accuracy and, to the right of the slash, the average output length. The _L suffix in each dataset name denotes the maximum input length.
+      <span class="ex">The story is in the RULER_128K column. Cutting F layers from 21 to 10 costs 2.48 points (95.53 → 93.05) — that is the price of cheap static reuse on a 78-layer model, and it is exactly the failure mode Section 3 predicts. Adding eleven R layers at the same F budget recovers all but 0.38 of it (95.15), while LongBenchV2_128K slightly improves over the default (66.06 vs 65.91) and RULER_64K improves too (96.24 vs 96.03). Note also the output-length column: the hybrid produces shorter answers on RULER (2,752 vs 3,254 tokens at 128K) and slightly longer ones on LongBenchV2, which is a reminder that these averages are accuracy-and-verbosity pairs, not accuracy alone.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <div class="tbl-wrap">
+<figure class="fig">
+    <img src="figs/table11.png" alt="Table 11: per-subtask RULER accuracy at 64K and 128K for the three GLM-5.2 patterns">
+    <figcaption>
+      <b>Table 11:</b> Per-subtask accuracy (%) on RULER (64K and 128K) with GLM-5.2 under the SGLang framework and a unified sparse budget κ = 2048.
+      <span class="ex">Thirteen RULER subtasks across two lengths. Three of them — the two single-needle variants and VT — read 100.00 in every one of the six cells, so the aggregate's 2.48-point loss has to come from a handful of columns, and it does: at 128K, 10F68S falls to 86.00 and 88.00 on the second and third multi-key needle variants, which the default holds at 100.00, and to 89.60 on CWE against 95.00. The hybrid puts those three back at 98.00, 100.00 and 95.00. The recovery is not uniform, and the exceptions are informative: SQuAD drops from 88.17 to 79.50 under the hybrid while HotpotQA rises from 76.00 to 80.00 and MV-NIAH eases from 98.00 to 94.50 — a re-ranking mechanism changes which tokens each layer sees, so per-column give-and-take is what one should expect. The tasks that break under rigid reuse are the needle-in-a-haystack ones, where the missing index really is the answer, and those are the tasks the refinement restores.</span>
+          <span class="pgref">Report p.19</span>
+    </figcaption>
+  </figure>
+  </div>
+
+  <div class="takeaway"><b>Takeaway:</b> the appendix converts a single-model observation into a general one — the index/mass asymmetry holds under GQA and MLA, at 4K through 16K, on maths, summarisation, few-shot and multi-document QA, and on a 78-layer production model with a native sharing schedule. It also converts the method's central claim from "recovers accuracy" into something sharper: at a fixed index-construction budget on GLM-5.2, refinement recovers 2.10 of the 2.48 points that cheap static reuse costs on RULER_128K.</div>
+</section>
+
+<!-- ============================ s8 ============================ -->
+<section id="s8">
+  <div class="sec-no">08 · Discussion</div>
+  <h2 class="sec">Discussion: which bill does it actually pay?</h2>
+
+  <p>The paper's title says "efficient inference," and the abstract's 3.4× invites the reading that this is a speed paper that happens not to lose accuracy. Read closely, it is the other way round: it is an accuracy-recovery paper whose selling point is that the recovery is nearly free. The distinction decides which of its numbers you should trust and which you should re-measure.</p>
+
+  <h3>The three-part ledger</h3>
+  <p>What Prism changes about the cost of a decoding step can be stated without any of its own tables, which is a good sign for the mechanism. First, index construction happens at one layer in four instead of every layer — a 4× reduction in the number of full-context passes, independent of the hardware. Second, that remaining pass reads a 2-bit key copy rather than a BF16 one — an 8× reduction in bytes moved <b>[estimated]</b>, which is where the FLOPs are not but the bandwidth is. Third, each of the other three layers pays a re-rank whose cost is bounded by ρκ rather than $L_t$, measured at 0.011 ms and flat from 8K to 128K.</p>
+
+  <p>Those three effects are not additive in wall-clock, and the paper is careful never to claim they are. What Table 6 and Table 7 show is that the second one dominates: at 128K and BSZ=16 the proposal layer's construction term is 1.1019 ms out of a 1.1749 ms proposal layer, while the refinement is 0.0150 ms. Without the INT2 compression, the 4× reduction in construction frequency would leave a per-step cost still dominated by index work; with it, the blended layer reaches 7.50× over dense at that operating point.</p>
+
+  <h3>Where the evidence is strongest — and where it is thinnest</h3>
+  <p>Three results in this paper would be hard to attribute to noise. The ablation's recovery path in Table 3 (50.05 → 59.22 → 62.60 → 64.43 on AIME25) is large, monotone and mechanistically interpretable. The GLM-5.2 subtraction in Table 10 (95.53 → 93.05 → 95.15 at constant F budget) is a controlled experiment on a model the authors did not design. And the refinement's flatness — 0.011 ms across a 16× change in context, visible as the same pale sliver in every bar of Figure 14 — is a fact about the implementation, not an estimate from a benchmark.</p>
+
+  <p>The thinner results are worth naming too. The 3.36× headline requires a 128K context <em>and</em> batch 16: at 16K and batch 1 the same configuration is slower than dense FlashAttention (2.492 vs 2.151 ms in Table 8), and at 128K batch 1 it is only 1.15×. Prism-g4 is not the fastest sparse decoder on the authors' own table: at 128K and BSZ=16, IDC-g9 reaches 3.348 ms, Seer-R 3.483 ms and the paper's own Prism-g9 3.703 ms, all ahead of Prism-g4's 4.467 ms — so the claim being made is Pareto dominance at a given accuracy, not raw speed. And every accuracy number in the paper is a single evaluation of a single checkpoint with no confidence intervals, on benchmarks where 0.5 points sits inside the resampling noise; the abstract also rounds 3.36× to 3.4×, a habit worth noticing when comparing its numbers to the tables.</p>
+
+  <h3>Where the lineage comes from</h3>
+  <p>The paper is unusually explicit about which parts are borrowed. The table below reconstructs that account; the middle column uses the paper's own inline citations and does not add literature the paper does not cite.</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Component-by-component provenance (compiled from the paper's own inline citations; the reference list itself was not re-checked, and no outside attribution has been added)</caption>
+    <thead><tr><th>Component</th><th>Upstream, as labelled in the paper</th><th>What this paper changes</th></tr></thead>
+    <tbody>
+      <tr><td>Cross-layer index reuse</td><td>TidalDecode (Yang et al., 2024); LessIsMore (Yang et al., 2025); OmniKV (Hao et al., 2025)</td><td>The reused object becomes an expanded candidate region rather than a decided top-κ set; the consumer re-ranks instead of copying.</td></tr>
+      <tr><td>Anchor-layer placement</td><td>Kascade (Deshmukh et al., 2025); HyLRA (Ai et al., 2026)</td><td>Not changed. The paper treats placement as out of scope and adopts a single inherited partition for all evaluations.</td></tr>
+      <tr><td>Offline calibration under error propagation</td><td>IndexCache (Bai et al., 2026)</td><td>Inherits the greedy search, the 1:3 anchor ratio, the 64-sample OpenR1-MATH-220k subset and the token-level cross-entropy objective, then freezes them; changes only the transmitted payload and the refined layer's work.</td></tr>
+      <tr><td>Token-level sparse attention at production scale</td><td>DeepSeek Sparse Attention (Liu et al., 2025); GLM-5 (Zeng et al., 2026)</td><td>Keeps the paradigm and attacks its per-layer index-construction cost; the GLM-5.2 experiment runs on a model whose native schedule is already an IndexCache pattern.</td></tr>
+      <tr><td>Low-bit scoring for candidate selection</td><td>No upstream is cited for the quantized proposal; the paper presents it as its own component</td><td>Group-wise asymmetric 2-bit quantization with per-group scale and zero-point (Eqs 7–8), plus a max-reduction across the query heads of a KV group so each key block is read once (Eq 9).</td></tr>
+      <tr><td>Kernels and serving</td><td>Triton (Tillet et al., 2019); SGLang</td><td>Custom decoding kernels measured under CUDA-graph replay, then fused into SGLang's per-layer graph at a 2K budget on one TP8 rank.</td></tr>
+      <tr><td>Evaluation corpora</td><td>Qwen3 (Yang et al., 2025); LongBench (Bai et al., 2024); AIME, MATH500 (Hendrycks et al., 2020), GPQA (Rein et al., 2023); OpenR1-MATH-220k (Hugging Face, 2025)</td><td>Reused unchanged, with the LongBench subset restricted to average input lengths above 8192 tokens and generation capped at 4096.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Citations follow the paper's own inline labels; this page did not verify the bibliography entries.</p>
+
+  <h3>Not disclosed, worth testing next</h3>
+  <p>The paper's own limitations section (Appendix F) is candid about one thing — the calibration partition is inherited and unexplored. The list below is this page's, and it is deliberately about things the paper does <em>not</em> report rather than things it reports badly.</p>
+  <ul class="tight">
+    <li><b>The fidelity of the 2-bit proposal.</b> The paper does not report how much INT2 scoring changes the ranking: no recall@κ of the quantized pool against a BF16 pool, no rank correlation, and no value for the group size $g$, which appears only as a symbol in $M = d/g$ (Eq. 7). Worth testing: pool recall and downstream AIME accuracy as a function of $g$ and of the bit-width $b$, since the entire proposal budget rests on the assumption that a 4-level score ranks well enough.</li>
+    <li><b>Memory. Nothing in the paper measures it.</b> Prism keeps a BF16 K/V cache, a per-layer 2-bit key copy for scoring, and ρκ token ids per proposal layer; only latency is reported. Worth testing: peak HBM against IndexCache at equal batch, and how the extra INT2 cache behaves under paged-KV eviction and prefix caching, where a stored candidate pool can outlive the blocks it points at.</li>
+    <li><b>Prefill, throughput and TTFT.</b> Every measurement is per-step decoding latency at a fixed batch; the paper does not report prefill cost, <abbr title="Time To First Token">TTFT</abbr>, tokens per second under continuous batching, or any mixed-length workload. Worth testing: whether the proposal/refined schedule survives chunked prefill and whether a 3.36× per-step win at a static batch 16 turns into a serving-throughput win at a realistic request mix.</li>
+    <li><b>Tensor-parallel behaviour of the max-reduction.</b> Table 7 measures one TP8 rank holding 4 query heads and 1 KV head, so the group in Equation 9 is entirely local. The paper does not say what happens when the query heads of one KV group are split across ranks, which would turn a free maximum into a cross-rank reduction on the critical path. Worth testing: whether a KV group straddles ranks under common TP layouts, and whether the fix is a fused kernel or a small all-reduce.</li>
+    <li><b>How far the calibration transfers.</b> The partition is searched on a mathematical-reasoning corpus at 32K with a 512-token budget, then frozen for 128K LongBench, RULER and a 78-layer model. Figure 11 shows drift is task-dependent (index overlap spans 27.8%–37.3% across four task types), yet the paper does not report what the mismatch costs. Worth testing: per-workload calibration, and whether ρ should be raised for the tasks that drift most rather than fixed at 4 for everything.</li>
+  </ul>
+
+  <div class="takeaway"><b>Takeaway:</b> the contribution that will survive is not the 3.36× but the reframing — cross-layer sharing should transmit a <em>region</em> and let the consumer decide, because the drift it was designed to tolerate is concentrated exactly where a slightly larger region can reach. That reframing is cheap, training-free, and orthogonal to how the anchors are chosen, which is why it is likely to be absorbed into other people's indexers rather than shipped as a standalone method.</div>
+</section>
+
+<!-- ============================ s9 ============================ -->
+<section id="s9">
+  <div class="sec-no">09 · Glossary</div>
+  <h2 class="sec">Glossary</h2>
+
+  <p class="muted">Abbreviations in the prose carry a dotted underline; hover to see the expansion. The table below covers both the abbreviations and the symbols the equations use, so it doubles as a notation sheet.</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Symbols and abbreviations used on this page (the paper's own notation, plus the benchmark and systems vocabulary it relies on)</caption>
+    <thead><tr><th>Term</th><th>Expansion</th><th>What it means here</th></tr></thead>
+    <tbody>
+      <tr><td>KV cache</td><td>Key–Value cache</td><td>The per-layer store of past keys and values that autoregressive decoding reads at every step; the object all of this paper's bandwidth arguments are about.</td></tr>
+      <tr><td>GQA</td><td>Grouped Query Attention</td><td>Several query heads share one key/value head. Makes the max-reduction of Eq. 9 necessary, since otherwise the same key block would be streamed once per query head.</td></tr>
+      <tr><td>MLA</td><td>Multi-head Latent Attention</td><td>The compressed-latent attention used by GLM-4.7-Flash; one of the three architectures the locality observation is checked on (Fig. 9).</td></tr>
+      <tr><td>DSA</td><td>DeepSeek Sparse Attention</td><td>The token-level sparse attention of DeepSeek-V3.2 (Liu et al., 2025), cited as the paradigm's production proof point.</td></tr>
+      <tr><td>LIM</td><td>LessIsMore</td><td>Baseline that merges per-head rankings at one selection layer into a cross-head token set and unions it with a recency window (Yang et al., 2025).</td></tr>
+      <tr><td>IDC</td><td>IndexCache</td><td>Baseline, and the source of Prism's layer partition: indexers at a few anchor layers, top-κ copied into the layers that follow (Bai et al., 2026). Written Prism-g4 / IDC-g4 for the 1:3 schedule.</td></tr>
+      <tr><td>Seer-R</td><td>SeerAttention-R</td><td>Block-level sparse decoding baseline with a self-distilled attention gate; block size 64, all layers sparse (Gao et al., 2025).</td></tr>
+      <tr><td>FA</td><td>FlashAttention</td><td>Dense baseline and the reference for every speedup in the paper.</td></tr>
+      <tr><td>TTFT</td><td>Time To First Token</td><td>Standard serving metric; the paper does not report it, which is one of the gaps flagged in Section 8.</td></tr>
+      <tr><td>TP</td><td>Tensor Parallelism</td><td>Model sharding across GPUs. The SGLang measurements use one TP8 rank: 4 query heads, 1 KV head, head dimension 128.</td></tr>
+      <tr><td>BSZ</td><td>Batch size</td><td>Concurrent sequences per decoding step; the speedups scale strongly with it, from 2.68× at BSZ=1 to 7.50× at BSZ=16 (128K).</td></tr>
+      <tr><td>SGLang</td><td>—</td><td>The serving framework the end-to-end and Table 7 measurements are taken in.</td></tr>
+      <tr><td>Triton</td><td>—</td><td>The kernel language the custom decoding kernels are written in (Tillet et al., 2019).</td></tr>
+      <tr><td>CUDA graph</td><td>—</td><td>Captured kernel-launch sequence replayed to remove launch overhead; the timing methodology for Tables 6–7.</td></tr>
+      <tr><td>κ</td><td>sparse budget</td><td>Tokens attended to per layer per step: 2048 in the main experiments, 1024 in the ablation and Figure 8's sweep.</td></tr>
+      <tr><td>ρ</td><td>proposal expansion factor</td><td>Pool size divided by budget: 4 for long context, 2 for reasoning. ρ = 1 reduces Prism to static reuse.</td></tr>
+      <tr><td>n</td><td>candidate-pool size</td><td>$n = \rho\kappa$: 8192 for long context, 4096 for reasoning.</td></tr>
+      <tr><td>F / S</td><td>Proposal / Refined layer</td><td>Prism's two layer types (Eqs 3–6). In the GLM-5.2 tables the letters are re-used for Full / Shared / Refined — the paper says so explicitly.</td></tr>
+      <tr><td>$C^{F}_{t}$</td><td>shared candidate cache</td><td>The $n$-token pool a proposal layer emits at step $t$ and every associated refined layer reads.</td></tr>
+      <tr><td>$L_t$</td><td>context length</td><td>Number of cached tokens available at decoding step $t$; the quantity the refinement's cost is independent of.</td></tr>
+      <tr><td>Index construction</td><td>—</td><td>The score-everything-then-take-top-κ pass. Performed by proposal layers only.</td></tr>
+      <tr><td>Index refinement</td><td>—</td><td>Prism's third operation: re-score the inherited pool and pick κ. 0.011 ms, flat in context length.</td></tr>
+      <tr><td>INT2</td><td>2-bit integer</td><td>Storage format of the key copy used for scoring: 4 levels per group element, 1/8 the bytes of BF16.</td></tr>
+      <tr><td>Group-wise asymmetric quantization</td><td>—</td><td>Split the head dimension into groups of size $g$; each group gets its own scale α and zero-point β, both taken from that group's max and min (Eqs 7–8).</td></tr>
+      <tr><td>α / β</td><td>scale / zero-point</td><td>Per-group quantization parameters: $\alpha = (\max - \min)/(2^{b}-1)$ and $\beta = \min$.</td></tr>
+      <tr><td>max-reduction</td><td>—</td><td>Eq. 9: collapse the query heads of a KV group into one score with a maximum, so each key block is loaded once per step.</td></tr>
+      <tr><td>Pass@1</td><td>—</td><td>Accuracy of a single sampled answer; the paper samples 64 answers on AIME, 8 on MATH500 and 16 on GPQA.</td></tr>
+      <tr><td>avg@64</td><td>—</td><td>The AIME convention used in the ablation and sweeps: mean accuracy over 64 samples per problem.</td></tr>
+      <tr><td>LongBench</td><td>—</td><td>Bilingual long-context suite; only subsets with average input length above 8192 tokens are used (Bai et al., 2024).</td></tr>
+      <tr><td>RULER</td><td>—</td><td>Long-context benchmark with 13 needle-in-a-haystack and aggregation subtasks, run at 64K and 128K on GLM-5.2.</td></tr>
+      <tr><td>AIME24 / AIME25</td><td>American Invitational Mathematics Examination</td><td>30-problem competition sets used for the reasoning comparison; the noisiest columns in Table 1.</td></tr>
+      <tr><td>GPQA</td><td>Graduate-level Google-Proof Q&amp;A</td><td>Graduate science questions (Rein et al., 2023); the Diamond subset is used.</td></tr>
+      <tr><td>MATH500</td><td>—</td><td>500-problem competition mathematics subset; the metric cited for it is from (Hendrycks et al., 2020).</td></tr>
+      <tr><td>[organized]</td><td>—</td><td>Marks a count or grouping this page read off the paper's tables, pattern strings or plots, rather than a number stated in prose.</td></tr>
+      <tr><td>[estimated]</td><td>—</td><td>Marks arithmetic this page performed on the paper's numbers; the calculation is shown inline.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Full-size image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    An English deep-read of arXiv:2610.22985, <em>Prism Attention: Proposal-Refined Index Sharing Mechanism for Efficient LLM Inference</em> (Tian, Liu, Yang et al., NeurIPS 2026).<br>
+    All 26 exhibits are shown as extracted from the original PDF at 300&nbsp;DPI, scaled to fit the column at their natural aspect ratio and never cropped; every table is exhibited as its original image rather than re-typeset, so each cell is the paper's own. Numerical claims are the authors'; the readings, the two lineage tables and the open-questions list are the editor's.<br>
+    Source: <a href="https://arxiv.org/abs/2610.22985">arXiv:2610.22985</a> · Chinese edition: <a href="index.html">中文精读</a><br>
+    <span style="opacity:.75">Dark mode · click any image for the original · print-friendly</span>
+  </div>
+</footer>
+
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+
+  // 阅读进度条 + 窄屏章节条自动跟随当前小节
+  var pr = document.getElementById('readProgress');
+  var bar = document.querySelector('.topbar .linkbar');
+  var jumpLinks = bar ? [].slice.call(bar.querySelectorAll('a')) : [];
+  function syncProgress(){
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var y = window.scrollY || document.documentElement.scrollTop;
+    if (pr) pr.style.transform = 'scaleX(' + (h > 0 ? Math.min(1, Math.max(0, y / h)) : 0) + ')';
+    if (!jumpLinks.length) return;
+    var active = null;
+    for (var i = 0; i < jumpLinks.length; i++){
+      var t = document.getElementById(jumpLinks[i].getAttribute('href').slice(1));
+      if (t && t.getBoundingClientRect().top <= 90) active = jumpLinks[i];
+    }
+    for (var j = 0; j < jumpLinks.length; j++){
+      if (jumpLinks[j] === active){
+        jumpLinks[j].style.color = 'var(--accent)';
+        jumpLinks[j].style.borderColor = 'var(--accent)';
+        if (active.offsetLeft < bar.scrollLeft ||
+            active.offsetLeft + active.offsetWidth > bar.scrollLeft + bar.clientWidth){
+          bar.scrollLeft = Math.max(0, active.offsetLeft - 16);
+        }
+      } else {
+        jumpLinks[j].style.color = '';
+        jumpLinks[j].style.borderColor = '';
+      }
+    }
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function(){
+    if (!ticking){
+      ticking = true;
+      (window.requestAnimationFrame || setTimeout)(function(){ syncProgress(); ticking = false; });
+    }
+  }, {passive:true});
+  window.addEventListener('resize', syncProgress);
+  syncProgress();
+})();
+</script>
+
+</body>
+</html>
