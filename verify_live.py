@@ -34,6 +34,8 @@ PAGES = [
     "/efficient-inference/deepseek-v41-flash/en.html",
     "/efficient-inference/kite/",
     "/efficient-inference/kite/en.html",
+    "/efficient-inference/pp-serving/",
+    "/efficient-inference/pp-serving/en.html",
     "/benchmarks/mmlongembed/",
     "/benchmarks/mmlongembed/en.html",
     "/benchmarks/longharness/",
