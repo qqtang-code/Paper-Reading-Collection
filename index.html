@@ -151,8 +151,8 @@
       <span class="i18n-en">Paper Reading Collection</span>
     </h1>
     <div class="subtitle">
-      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(九篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
-      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the nine flagship papers, quick-read editions for the other six).</span>
+      <span class="i18n-zh">每篇论文一个"图文配合"的精读页:全部 Figure / Table 以 300 DPI 高清内嵌于对应讲解段落,配逐点解读、术语速查与编者点评。每篇均提供<strong>中文精读版</strong>与<strong>英文版</strong>(十篇旗舰论文为完整英译,其余六篇为英文速读)。</span>
+      <span class="i18n-en">One illustrated reading page per paper: every figure and table embedded at 300 DPI in the paragraph that discusses it, with point-by-point commentary, a glossary and editorial notes. Every paper ships a <strong>full Chinese deep-read</strong> plus an <strong>English edition</strong> (complete English editions for the ten flagship papers, quick-read editions for the other six).</span>
     </div>
     <div>
       <span class="pill"><span class="i18n-zh">图文配合</span><span class="i18n-en">Illustrated</span></span>
@@ -163,8 +163,8 @@
       <span class="pill"><span class="i18n-zh">中英双语</span><span class="i18n-en">中文 · English</span></span>
     </div>
     <div class="stats">
-      <div class="s"><span class="i18n-zh">论文 <b>15</b> 篇</span><span class="i18n-en"><b>15</b> papers</span></div>
-      <div class="s"><span class="i18n-zh">图表 <b>124</b> 图 + <b>114</b> 表</span><span class="i18n-en"><b>124</b> figures + <b>114</b> tables</span></div>
+      <div class="s"><span class="i18n-zh">论文 <b>16</b> 篇</span><span class="i18n-en"><b>16</b> papers</span></div>
+      <div class="s"><span class="i18n-zh">图表 <b>138</b> 图 + <b>115</b> 表</span><span class="i18n-en"><b>138</b> figures + <b>115</b> tables</span></div>
       <div class="s"><span class="i18n-zh">分类 <b>3</b> 大类</span><span class="i18n-en"><b>3</b> categories</span></div>
       <div class="s"><span class="i18n-zh">语言 <b>中 / EN</b></span><span class="i18n-en">Languages <b>ZH / EN</b></span></div>
     </div>
@@ -176,12 +176,12 @@
 <section id="matrix">
   <div class="sec-no">How to read the collection</div>
   <h2 class="sec">
-    <span class="i18n-zh">机制对照:15 篇论文的分工图</span>
-    <span class="i18n-en">Mechanism matrix: how the fifteen papers divide the work</span>
+    <span class="i18n-zh">机制对照:16 篇论文的分工图</span>
+    <span class="i18n-en">Mechanism matrix: how the sixteen papers divide the work</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑨)、模型权重与系统栈(⑩–⑬)、度量而非优化(⑭–⑮)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
-    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑨), the model weights and the system stack (⑩–⑬), or measurement rather than optimization (⑭–⑮). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
+    <span class="i18n-zh">分类只用一个轴——<b>这项工作在「哪一层」把钱省下来</b>:注意力层内部的可见键集合(①–⑨)、模型权重与系统栈(⑩–⑭)、度量而非优化(⑮–⑯)。把「省什么、谁来决定、要不要训练」三件事横向排开,就是下面这张表。</span>
+    <span class="i18n-en">One axis decides the categories — <b>which layer the saving happens in</b>: the visible key set inside the attention layer (①–⑨), the model weights and the system stack (⑩–⑭), or measurement rather than optimization (⑮–⑯). Laying out "what is saved, who decides, does it need training" side by side gives the table below.</span>
   </p>
   <div class="matrix-wrap">
   <table class="matrix">
@@ -302,6 +302,14 @@
       </tr>
       <tr>
         <td class="num">14</td>
+        <td class="pap"><a href="efficient-inference/pp-serving/">Revisiting Pipeline Parallelism</a></td>
+        <td><span class="i18n-zh">跨 stage 空转(pipeline bubble)</span><span class="i18n-en">Cross-stage idling (pipeline bubbles)</span></td>
+        <td><span class="i18n-zh"><b>动态 chunk 大小 + 按负载把请求在 microbatch 间迁移</b>:greedy 反馈 / 在线延迟预测(ALP)决定每轮塞多少 token,delay scheduling 把 decode 请求从最重迁到最轻的 stage</span><span class="i18n-en"><b>Dynamic chunk sizing plus migrating requests across microbatches</b>: greedy feedback or an online latency predictor (ALP) picks how many tokens each iteration carries, and delay scheduling moves decode requests from the heaviest to the lightest stage</span></td>
+        <td><span class="i18n-zh">不需要(纯调度;ALP 只做在线 RLS 拟合)</span><span class="i18n-en">No training (pure scheduling; ALP only fits online via RLS)</span></td>
+        <td><span class="i18n-zh">P99 迭代时延 65.34 → 30.94 ms(2.11×);decode-heavy SLO scale 上 goodput +1.4×;SLO 达成率 TP 1.9% / PP_2048 1.6% / PP_static 92.5% / DCP_pred+DS 94.6%</span><span class="i18n-en">P99 iteration latency 65.34 → 30.94 ms (2.11×); goodput +1.4× on the decode-heavy SLO scale; SLO attainment 1.9% (TP) / 1.6% (PP_2048) / 92.5% (PP_static) / 94.6% (DCP_pred+DS)</span></td>
+      </tr>
+      <tr>
+        <td class="num">15</td>
         <td class="pap"><a href="benchmarks/mmlongembed/">MMLongEmbed</a></td>
         <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
         <td><span class="i18n-zh">基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型</span><span class="i18n-en">Benchmark construction: 4 tasks / 8 datasets / 8,460 queries / 11 models</span></td>
@@ -309,7 +317,7 @@
         <td><span class="i18n-zh">现役模型靠表面特征匹配"作弊";细粒度保持随长度衰退</span><span class="i18n-en">Current models "cheat" via surface matching; fine-grained retention decays with length</span></td>
       </tr>
       <tr>
-        <td class="num">15</td>
+        <td class="num">16</td>
         <td class="pap"><a href="benchmarks/longharness/">LongHarness Bench</a></td>
         <td><span class="i18n-zh">—(度量,不优化)</span><span class="i18n-en">— (measures, does not optimize)</span></td>
         <td><span class="i18n-zh">基准构建:4 任务 × 5 模型 × 5 配置,同时测准确率与成本</span><span class="i18n-en">Benchmark construction: 4 tasks × 5 models × 5 configurations, measuring accuracy and cost together</span></td>
@@ -523,8 +531,8 @@
     <span class="i18n-en">⚡ Efficient Inference &amp; Deployment</span>
   </h2>
   <p class="axis">
-    <span class="i18n-zh">在模型权重与系统栈上省算力与显存,按「模型 → 权重 → 系统」排列:<b>整篇模型报告的架构与缓存压缩 → 量化精度与定制内核 → 服务系统与部署形态</b>,再加一篇把<b>扩容本身</b>做成省算力手段的架构工作。</span>
-    <span class="i18n-en">Saving compute and memory in the weights and the system stack, ordered "model → weights → system": <b>a full model report on architecture and cache compression → quantization accuracy and custom kernels → the serving system and deployment shape</b>, plus one architecture paper that turns <b>expansion itself</b> into a way to save compute.</span>
+    <span class="i18n-zh">在模型权重与系统栈上省算力与显存,按「模型 → 权重 → 系统 → 调度」排列:<b>整篇模型报告的架构与缓存压缩 → 量化精度与定制内核 → 服务系统与部署形态</b>,再加一篇把<b>扩容本身</b>做成省算力手段的架构工作,以及一篇回到<b>系统栈里多卡调度</b>的工作:流水线并行配动态 chunk。</span>
+    <span class="i18n-en">Saving compute and memory in the weights and the system stack, ordered "model → weights → system → scheduling": <b>a full model report on architecture and cache compression → quantization accuracy and custom kernels → the serving system and deployment shape</b>, plus one architecture paper that turns <b>expansion itself</b> into a way to save compute, and one that returns to <b>multi-GPU scheduling in the system stack</b>: pipeline parallelism with dynamic chunking.</span>
   </p>
   <div class="cards">
 
@@ -608,6 +616,26 @@
       </div>
     </div>
 
+    <div class="pcard">
+      <span class="cat"><span class="i18n-zh">流水线并行 · 动态 Chunked Prefill · 延迟预测模型 · Delay Scheduling · 在线服务</span><span class="i18n-en">Pipeline Parallelism · Dynamic Chunked-Prefill · Latency Prediction · Delay Scheduling · Online Serving</span></span>
+      <h3>
+        <a class="i18n-zh" href="efficient-inference/pp-serving/">⑭ Revisiting Pipeline Parallelism<br><span style="font-size:14px; font-weight:600; color:var(--muted)">重新审视流水线并行:动态分块与跨 stage 延迟调度</span></a>
+        <a class="i18n-en" href="efficient-inference/pp-serving/en.html">⑭ Revisiting Pipeline Parallelism<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Dynamic Chunking and Cross-Stage Delay Scheduling for Online Serving</span></a>
+      </h3>
+      <p class="one">
+        <span class="i18n-zh">在 4×A100(PCIe)上重审被 TP 挤到角落的流水线并行:把 pipeline bubble 拆成 <b>P-P / P-D / D-D</b> 三类,用「动态 chunk 大小」与「跨 stage 延迟调度」两条抓手分别压制。静态调好的 PP 已在 goodput 上反超 TP;DCP_pred 再把 AzureConv 的 TPOT 压 <b>35%</b>、E2E 压 31%,真实 trace 上 SLO 达成率 <b>92.5% → 94.6%</b>。</span>
+        <span class="i18n-en">Revisits pipeline parallelism for online LLM serving on PCIe-class 4×A100: splits pipeline bubbles into <b>P-P / P-D / D-D</b> classes and attacks them with dynamic chunk sizing plus cross-stage delay scheduling. Even a tuned static PP already beats TP on goodput; DCP_pred then cuts AzureConv TPOT by <b>35%</b> and E2E by 31%, lifting real-trace SLO attainment from <b>92.5% to 94.6%</b>.</span>
+      </p>
+      <div class="meta">
+        <span>2026-10</span><span><span class="i18n-zh">14 图 1 表 + 1 算法</span><span class="i18n-en">14 figures · 1 table · 1 algorithm</span></span><span><a href="https://www.usenix.org/conference/osdi26/presentation/hwang">OSDI 2026</a></span>
+        <span class="i18n-zh">中文精读 + 英文完整版</span><span class="i18n-en">ZH deep-read + full EN mirror</span>
+      </div>
+      <div class="go">
+        <a class="i18n-zh" href="efficient-inference/pp-serving/">开始阅读 →</a>
+        <a class="i18n-en" href="efficient-inference/pp-serving/en.html">Read in English →</a>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -626,8 +654,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">多模态 · 嵌入模型 · 长上下文</span><span class="i18n-en">Multimodal · Embeddings · Long Context</span></span>
       <h3>
-        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑭ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
-        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑭ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
+        <a class="i18n-zh" href="benchmarks/mmlongembed/">⑮ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">长上下文场景下的多模态嵌入模型基准</span></a>
+        <a class="i18n-en" href="benchmarks/mmlongembed/en.html">⑮ MMLongEmbed<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Benchmarking Multimodal Embedding Models in Long-Context Scenarios</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">首个专门评测多模态嵌入模型长上下文能力的基准:<b>4 个检索任务、8 个数据集、8,460 个查询、11 个模型</b>。核心发现:现役模型靠表面特征匹配"作弊",细粒度信息保持随长度衰退——"窗口大"≠"读得懂"。</span>
@@ -646,8 +674,8 @@
     <div class="pcard">
       <span class="cat"><span class="i18n-zh">Agent Harness · 长上下文推理 · 准确率–成本权衡</span><span class="i18n-en">Agent Harness · Long-Context Reasoning · Accuracy–Cost Trade-offs</span></span>
       <h3>
-        <a class="i18n-zh" href="benchmarks/longharness/">⑮ LongHarness Bench<br><span style="font-size:14px; font-weight:600; color:var(--muted)">压力测试长上下文推理的语言模型 harness</span></a>
-        <a class="i18n-en" href="benchmarks/longharness/en.html">⑮ LongHarness Bench<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Stress-Testing Language Model Harnesses for Long-Context Reasoning</span></a>
+        <a class="i18n-zh" href="benchmarks/longharness/">⑯ LongHarness Bench<br><span style="font-size:14px; font-weight:600; color:var(--muted)">压力测试长上下文推理的语言模型 harness</span></a>
+        <a class="i18n-en" href="benchmarks/longharness/en.html">⑯ LongHarness Bench<br><span style="font-size:14px; font-weight:600; color:var(--muted)">Stress-Testing Language Model Harnesses for Long-Context Reasoning</span></a>
       </h3>
       <p class="one">
         <span class="i18n-zh">第一个把 <b>harness 本身</b>当评测对象的基准:<b>4 个信息密集任务 × 5 模型 × 5 配置</b>,同时测准确率与成本。最好的配置只到 <b>68%</b>;同等准确率成本可差 <b>12.4 倍</b>;「多推理」既不必要也不充分(RLM 92% 要 $7.23,mini-swe-agent 100% 只要 $0.583)。</span>

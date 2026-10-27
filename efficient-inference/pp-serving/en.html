@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="English full mirror of the deep-read page for 'Revisiting Pipeline Parallelism for LLM Serving' (OSDI 2026): three classes of pipeline bubbles, two dynamic chunk schedules and delay scheduling on SGLang, with all 14 figures, the algorithm and the prediction-model table embedded at 300 DPI.">
+<meta name="keywords" content="paper reading, pipeline parallelism, chunked prefill, dynamic chunk size, delay scheduling, SGLang, goodput, TTFT, TPOT, SLO, LLM serving">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Reading · Revisiting Pipeline Parallelism for LLM Serving (OSDI 2026)">
+<meta property="og:description" content="Pipeline bubbles are not one problem but three: P-P, P-D and D-D. A tuned static PP already beats TP on goodput; dynamic chunk sizing and delay scheduling then cut TPOT by 35% (32B) and 50% (14B), and lift real-trace SLO attainment from 92.5% to 94.6%.">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/pp-serving/en.html">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>Paper Reading · Revisiting Pipeline Parallelism for LLM Serving (OSDI 2026)</title>
+<style>
+  /* ===== Illustrated deep-read styles (paper-reading-html skill v2) ===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* sticky top navigation */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  /* reading-progress bar: pinned to the topbar's bottom edge, driven by a CSS transform */
+  .topbar .progress{position:absolute; left:0; bottom:-1px; height:2px; width:100%;
+                    background:var(--accent); transform:scaleX(0); transform-origin:0 50%;
+                    opacity:.9; pointer-events:none}
+  @media print{.topbar .progress{display:none!important}}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media print{.lang-toggle{display:none!important}}
+  /* narrow screens: desktop chapter links hide, a horizontally scrollable chapter strip takes over.
+     The breakpoint is 1080px (not 860px) because nine English chapter labels need more room
+     than nine CJK ones; below that the inline .jump row would push the topbar past the viewport. */
+  .topbar .linkbar{display:none}
+  @media (max-width:1080px){
+    .topbar a.jump{display:none}
+    .topbar .inner{flex-wrap:wrap; gap:8px 10px; padding:9px 18px 8px}
+    .topbar .links{gap:8px}
+    .topbar .linkbar{display:flex; order:3; width:100%; gap:8px; overflow-x:auto;
+                     scrollbar-width:none; -ms-overflow-style:none; padding:2px 0 3px;
+                     margin:0; -webkit-overflow-scrolling:touch}
+    .topbar .linkbar::-webkit-scrollbar{display:none}
+    .topbar .linkbar a{flex:0 0 auto; font-size:12.5px; color:var(--muted); text-decoration:none;
+                       white-space:nowrap; padding:4px 11px; border:1px solid var(--border);
+                       border-radius:999px; background:var(--card)}
+    .topbar .linkbar a:hover,.topbar .linkbar a:focus-visible{color:var(--accent); border-color:var(--accent)}
+  }
+  @media print{.topbar .linkbar{display:none!important}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0; scroll-margin-top:64px}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* abbreviations */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+  /* math: KaTeX renders display $$...$$ and inline \(...\) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:860px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* images: scale proportionally, never cropped; click to open the original */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:0; padding:9px 2px 0; border-top:1px solid var(--border);
+                        font-size:13px; line-height:1.72; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink); font-weight:600}
+  /* the English reading below is the caption's main body: full size, higher contrast;
+     the paper's original sentence stays as the secondary line above it */
+  figure.fig figcaption .ex{display:block; margin-top:5px; color:#333c4b; font-size:14px}
+  html[data-theme="dark"] figure.fig figcaption .ex{color:#cdd5e3}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; font-size:11.5px; color:var(--muted); opacity:.8}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* print */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox,.lang-toggle{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  /* the glossary table's last column carries full sentences, so it wraps at every width;
+     the short first two columns stay nowrap. Below 1100px everything wraps, otherwise the
+     table's min-content width forces the whole document to scroll sideways. */
+  table.data:not(.wrap) td:last-child{white-space:normal; text-align:left}
+  table.data:not(.wrap) th:last-child{text-align:left}
+  @media (max-width:1100px){
+    table.data:not(.wrap) th, table.data:not(.wrap) td{white-space:normal}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- topbar: chapter jumps + language + theme -->
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">PP for LLM Serving<span> · deep read</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">Glance</a>
+      <a class="jump" href="#s2">Background</a>
+      <a class="jump" href="#s3">Bubbles</a>
+      <a class="jump" href="#s4">Methods</a>
+      <a class="jump" href="#s5">System</a>
+      <a class="jump" href="#s6">Evaluation</a>
+      <a class="jump" href="#s7">Related</a>
+      <a class="jump" href="#s8">Assessment</a>
+      <a class="jump" href="#s9">Glossary</a>
+      <a class="lang-toggle" href="index.html" title="阅读中文版" onclick="try{localStorage.setItem('pr-lang','zh')}catch(e){}">中文</a>
+      <button class="theme-toggle" aria-label="Toggle dark / light" title="Toggle dark / light">🌓</button>
+    </div>
+    <!-- narrow-screen chapter strip: same anchors as the .jump links above -->
+    <div class="linkbar" aria-label="Chapter navigation">
+      <a href="#s1">Glance</a>
+      <a href="#s2">Background</a>
+      <a href="#s3">Bubbles</a>
+      <a href="#s4">Methods</a>
+      <a href="#s5">System</a>
+      <a href="#s6">Evaluation</a>
+      <a href="#s7">Related</a>
+      <a href="#s8">Assessment</a>
+      <a href="#s9">Glossary</a>
+    </div>
+  </div>
+  <div class="progress" id="readProgress" aria-hidden="true"></div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · OSDI 2026 · Korea University</div>
+    <h1>Revisiting Pipeline Parallelism for LLM Serving</h1>
+    <div class="subtitle">Pipeline parallelism communicates far less than tensor parallelism and can overlap prefill across stages, yet single-node serving treats it as the fallback. The paper's argument is that PP's real defect is not bandwidth but <em>stage imbalance</em> — and that online traffic, with its variable arrivals and prompt lengths, composes batches badly by construction. On four PCIe-attached A100 40GB GPUs the authors make the chunk size a per-iteration control variable and add a decode-side rebalancing knob: a carefully tuned static PP already beats TP on goodput, and the dynamic variants then cut TPOT by 35% (32B) and up to 50% (14B) against it.</div>
+    <div class="meta">
+      <span>Authors: Soonjae Hwang, Jeongseob Ahn (Korea University)</span>
+      <span>Paper: <a href="https://www.usenix.org/conference/osdi26/presentation/hwang">USENIX OSDI 2026</a></span>
+      <span>PDF: <a href="https://www.usenix.org/system/files/osdi26-hwang.pdf">osdi26-hwang.pdf</a></span>
+      <span>中文版: <a href="index.html">index.html</a></span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">Pipeline parallelism</span><span class="pill">Chunked prefill</span><span class="pill">Delay scheduling</span><span class="pill">SGLang 0.4.1</span><span class="pill">TTFT / TPOT SLO</span><span class="pill">Goodput</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Reading path (every exhibit sits inside the prose that explains it)</h2>
+  <ol>
+    <li><a href="#s1">At a glance: problem, observation, three mechanisms, numbers</a></li>
+    <li><a href="#s2">Background: TP vs PP on PCIe, and the SLO vocabulary</a></li>
+    <li><a href="#s3">Three faces of the pipeline bubble (P-P, P-D, D-D)</a></li>
+    <li><a href="#s4">Two dynamic chunk schedules and delay scheduling</a></li>
+    <li><a href="#s5">Putting it into SGLang: what is disclosed, what is not</a></li>
+    <li><a href="#s6">Evaluation: goodput, latency, SLO sweeps, real trace, predictor cost</a></li>
+    <li><a href="#s7">Where it sits: related work and the conclusion</a></li>
+    <li><a href="#s8">Assessment: strengths, limits, lineage, open questions</a></li>
+    <li><a href="#s9">Glossary (jump back anytime)</a></li>
+  </ol>
+</nav>
+
+<!-- ===== s1 At a glance ===== -->
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">At a Glance</h2>
+  <p class="lead">This is a scheduling paper, not a kernel paper: not one weight is changed. It starts from a measurement that contradicts the usual advice — on PCIe-class hardware, pipeline parallelism serves <em>fewer</em> requests per second than tensor parallelism, but not because it wastes bandwidth. It wastes <strong>time</strong>, and the waste has three distinct shapes. Prefill-Prefill imbalance comes from prompts of unequal length sharing a batch; Prefill-Decode imbalance comes from one microbatch being all decode while its peer is all prefill; Decode-Decode imbalance comes from decode-only iterations whose microbatches hold unequal numbers of requests. Each shape has a different actuator, so the paper builds two: a per-iteration chunk size chosen either by a greedy feedback loop or by a small latency model, and a delay-scheduling policy that suspends and resumes decode requests to even out microbatches across stages. On Qwen2.5-32B and 14B over four A100 40GB GPUs the result is staged — a well-chosen <em>static</em> chunk already puts PP ahead of TP on goodput, and the dynamic variants then buy latency and tail behaviour on top.</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">Problem</div><div class="v">PP idles its own stages<small>TP is the default because all-reduce over NVLink is cheap; on PCIe, AMD and NPU nodes the communication volume becomes the bottleneck, yet PP — which communicates far less — is left unused, partly because it is harder to schedule.</small></div></div>
+    <div class="item"><div class="k">Observation</div><div class="v">Three bubbles, not one<small>P-P: two prefills of 2,048 and 128 tokens leave a bubble of about 627 ms. D-D: moving a decode batch from 96 to 128 requests costs 5%, from 128 to 160 costs 31%.</small></div></div>
+    <div class="item"><div class="k">Mechanism ① · greedy</div><div class="v">Feedback chunk sizing<small>Every <abbr title="Pipeline depth: the number of pipeline stages a microbatch must traverse">\(D_p\)</abbr> scheduling iterations, read TTFT/TPOT slack and the free-KV ratio, then step the chunk size by ±δ (δ = 128) inside the memory check and the α/β/γ slack boundaries (Algorithm 1).</small></div></div>
+    <div class="item"><div class="k">Mechanism ② · predictive</div><div class="v">Price every candidate<small>ALP scores each candidate chunk from {128…2048}: an offline linear-layer fit plus online attention terms calibrated by <abbr title="Recursive Least Squares: an adaptive filter that updates coefficients from each new error sample">RLS</abbr>. The scheduler keeps the candidates inside the TPOT upper bound and the TTFT lower bound and picks the smallest (Figure 6, Table 1).</small></div></div>
+    <div class="item"><div class="k">Scheduling knob</div><div class="v">Delay scheduling<small>In decode-only iterations, suspend a few requests so microbatch sizes land on the hardware-efficient boundaries 128 / 256 / 384, and resume them when KV room or a finishing request frees space (Figure 7).</small></div></div>
+    <div class="item"><div class="k">Headline numbers</div><div class="v">−35% TPOT · −31% E2E<small>DCP<sub>pred</sub> vs the tuned PP<sub>static</sub> on AzureConv (32B); up to −50% TPOT on 14B; iteration-latency P99 65.34 → 30.94 ms (2.11×); real Azure trace SLO attainment 92.5% → 94.6%; at a 150 ms TPOT SLO, 4.14× PP<sub>static</sub>'s attainment.</small></div></div>
+  </div>
+
+  <p>The testbed is a single server — four NVIDIA A100 40GB GPUs attached to the host over <abbr title="Peripheral Component Interconnect Express: the commodity host interconnect; far lower bandwidth than NVLink">PCIe</abbr> 4.0, a 128-core AMD EPYC 9754 at 2.25 GHz, 768 GB of RAM — running <strong>SGLang 0.4.1</strong> with PyTorch v2.5.1, CUDA 12.4 and FlashInfer. Two BF16 models (Qwen2.5-32B and 14B) meet three real traces (Azure Conversation, ShareGPT, CNN), one decode-heavy derivative (CNN-Reversed, built by swapping CNN's input and output distributions) and two synthetic extremes. The budgets are the MLPerf inference defaults: 2,000 ms for <abbr title="Time To First Token: prefill latency until the first output token appears">TTFT</abbr> and 200 ms for <abbr title="Time Per Output Token: the inter-token latency during decode">TPOT</abbr>.</p>
+
+  <div class="note"><b>Reading conventions:</b> every number on this page is the paper's own unless it is explicitly marked <b>[organized]</b> (a grouping or table assembled here from the paper's statements, not a table from the paper) or <b>[estimated]</b> (a value read off a figure, or a ratio computed here from paper numbers with the arithmetic shown). Notation follows the paper: \(D_p\) is the pipeline depth, \(C\) the discrete set of candidate chunk sizes, δ the adjustment step, α and β the safe and critical boundaries for TTFT slack, γ the boundary for TPOT slack, \(\theta_{mem}\) the KV-memory watermark, and \(KV_{free}\) the available KV-cache ratio. Model variants keep the paper's names — PP<sub>static</sub>, DCP<sub>greedy</sub>, DCP<sub>pred</sub>, DCP<sub>pred</sub>+DS — rather than paraphrase, because the subscripts are the paper's own labels in every figure.</div>
+
+  <div class="takeaway"><b>What to take from the overview:</b> the interesting claim is not "PP can beat TP" — with a good chunk size it already does, and the paper says so plainly before introducing any of its techniques. The interesting claim is <em>which</em> part of PP's loss is a scheduling artefact and <em>whose</em> SLO pays for fixing it: dynamic chunking buys TPOT and E2E latency at a small TTFT cost, and delay scheduling buys end-to-end fairness by spending the tail TPOT of the requests it suspends.</div>
+</section>
+
+<!-- ===== s2 Background ===== -->
+<section id="s2">
+  <div class="sec-no">02 · Background &amp; Motivation</div>
+  <h2 class="sec">Background: Why Revisit Pipeline Parallelism</h2>
+
+  <h3>Two phases, and the batching that mixes them</h3>
+  <p>LLM inference runs in two phases. In <strong>prefill</strong> the prompt tokens go through every decoder layer once, which initialises the attention key-value (<abbr title="Key-Value cache: the stored attention keys and values that make autoregressive decoding linear in output length">KV</abbr>) cache and produces the first output token. In <strong>decode</strong> the model generates one token at a time, reusing that cache, so each step attends only to the new token (Vaswani et al., 2017). Per-token cost in decode is therefore near-constant and far below prefill's, and the number of decode steps is simply the output length. An iteration of an online server is thus not one request but a mixed batch, and its cost is dominated by whichever phase happens to be in it.</p>
+  <p>Modern servers schedule at <strong>iteration granularity</strong>: requests join an in-flight batch when resources allow and leave as soon as they finish, instead of waiting for a whole batch to drain (ORCA, Yu et al., 2022; vLLM, Kwon et al., 2023). This is what makes continuous batching work, and it is also what creates the paper's problem — requests in different phases coexist inside one iteration, so a long prompt admitted next to a set of decodes inflates the decode latency of everything in the batch. <strong>Chunked prefill</strong> (Sarathi-Serve, Agrawal et al., 2024) is the standard answer: cut the prompt into fixed-size chunks so a long prefill is spread over several iterations instead of dominating one. It is now routine in vLLM (Kwon et al., 2023), SGLang (Zheng et al., 2024) and Dynamo (NVIDIA AI Dynamo Team, 2024) — the substrates this paper builds on.</p>
+
+  <h3>Tensor parallelism and pipeline parallelism: what each buys</h3>
+  <p><strong><abbr title="Tensor parallelism: shard intra-layer tensors across devices and combine partial results with all-reduce">TP</abbr></strong> shards the intra-layer tensors: attention projections and feed-forward weight matrices are split across devices, each GPU computes partial GEMMs and partial attention on its shard, and the partial outputs are combined with collectives such as all-reduce so the layer keeps its logical semantics. Every GPU holds a shard of every layer, so every forward pass touches every device. That gives low per-token latency when the interconnect is NVLink, which hides the frequent all-reduce (Shoeybi et al., 2020), and it is why TP became the default for latency-sensitive single-node serving.</p>
+  <p><strong><abbr title="Pipeline parallelism: partition the model by layer depth into stages, one stage per device">PP</abbr></strong> partitions by depth instead: contiguous sets of layers — stages — go to different GPUs, and a microbatch (a smaller split of the iteration's batch) walks the stages in order (GPipe, Huang et al., 2019; PipeDream, Narayanan et al., 2019). While stage 0 processes microbatch <em>i</em>+1, stage 1 can process microbatch <em>i</em>, so latency hides behind pipelining and the communication volume is a fraction of TP's. What PP buys in bandwidth it pays in <em>shape</em>: a stage cannot run faster than its slowest peer in the same step, so any difference in per-stage work becomes idle time — a pipeline bubble.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Cost structure of the two parallelism strategies ([organized] from §2.2 — assembled here, not a table from the paper)</caption>
+    <thead><tr><th>Dimension</th><th>Tensor parallelism (TP)</th><th>Pipeline parallelism (PP)</th></tr></thead>
+    <tbody>
+      <tr><td>What is split</td><td>Intra-layer tensors: attention projections and feed-forward weight matrices</td><td>Layer depth: contiguous sets of layers, one stage per GPU</td></tr>
+      <tr><td>Communication pattern</td><td>All-reduce per layer; every GPU joins every forward pass</td><td>Point-to-point activation handoff between neighbouring stages</td></tr>
+      <tr><td>Communication volume</td><td>Large: needs NVLink-class bandwidth to stay hidden</td><td>Small: tolerable over PCIe and weaker interconnects</td></tr>
+      <tr><td>Load balance</td><td>Automatic: every GPU runs the same operator set</td><td>Dependent on batch composition; unequal stages mean idle time</td></tr>
+      <tr><td>Dominant risk</td><td>Communication becomes the bottleneck once bandwidth is short</td><td>Pipeline bubbles; high scheduling complexity, immature framework support</td></tr>
+      <tr><td>The paper's stance</td><td>Still the pragmatic choice on NVLink clusters</td><td>Worth revisiting on bandwidth-constrained machines, provided the bubbles are attacked</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The paper is explicit about why PP nonetheless lost. NVLink exists only on a limited set of platforms, such as DGX systems with A100 or H100 GPUs, while many GPU servers in public clouds still rely on PCIe, which offers lower bandwidth — the same constraint applies to AMD GPUs and NPUs. In those settings PP should win on communication, and yet TP is preferred for a second, less technical reason: TP is generally simpler to implement and integrate, avoiding the scheduling complexity and microbatching challenges inherent in PP. The consequence the authors point at is that modern serving frameworks remain relatively immature in their support for efficient PP — which is the gap this paper occupies.</p>
+
+  <h3>The three numbers the evaluation is built on</h3>
+  <p><strong>TTFT</strong> is the latency of the prefill path and <strong>TPOT</strong> the inter-token latency of the decode path; MLPerf Inference (2024) uses 2,000 ms and 200 ms as typical targets, and the paper adopts both. Over them sits <strong>goodput</strong>, defined in §5.1 as the highest request rate at which <em>both</em> the 90th-percentile TTFT and the 90th-percentile TPOT satisfy their <abbr title="Service Level Objective: the latency budget a request must meet">SLO</abbr>. That definition matters for reading every result that follows: a configuration is not "good" because its mean is low, but because its P90 stays inside budget while the arrival rate climbs. The paper optimises goodput first and only then compares P90 latency, which is why several figures show flat goodput but very different tails.</p>
+
+  <h3>Figure 1: where each parallelism breaks first</h3>
+  <p>The opening measurement is a head-to-head on the target platform — four A100 GPUs on PCIe 4.0, Qwen2.5-32B, SGLang, the Azure Conversation trace, request rate swept from 1 to 8 requests per second. The top panel is P90 TTFT, the bottom panel is P90 TPOT, and the vertical dotted lines mark the highest request rate that still satisfies both budgets.</p>
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: P90 TTFT and P90 TPOT versus request rate for pipeline and tensor parallelism, Qwen2.5-32B on 4 A100 GPUs">
+    <figcaption>
+      <b>Figure 1:</b> Performance comparison for pipeline and tensor parallelism in serving Qwen2.5-32B with the Azure Conversation workload on 4 NVIDIA A100 GPUs
+      <span class="ex">The two curves are annotated with the SLO each one dies of. <b>Top (P90 TTFT)</b>: PP stays near 1,000 ms across the sweep and only jumps at the far right, while TP's TTFT turns sharply upward and crosses the 2,000 ms budget at 4 req/s — the red arrow the paper draws. <b>Bottom (P90 TPOT)</b>: the ordering inverts — PP is the curve that crosses 200 ms first, at roughly 3.3 req/s, because stage imbalance (Figure 2) stalls the decode path. So TP is limited by <em>TTFT</em> and PP by <em>TPOT</em>; the dotted vertical marks each limit, and the ratio between them is the 1.2× by which TP sustains a higher request rate than PP. Note that the two curves cross again at 5–6 req/s on TPOT, but by then TP has already left the feasible region on TTFT.</span>
+          <span class="pgref">Proc. p.1806</span>
+    </figcaption>
+  </figure>
+  <p class="zoom-hint">💡 Click any image to open the original high-resolution version; click again or press Esc to close.</p>
+  <p>That is precisely the gap the paper attacks. If PP's TPOT penalty came from arithmetic or bandwidth it would be structural; if it comes from how work is distributed across stages in time, it is a scheduling problem with schedulable knobs. Everything after this figure is an argument for the second reading — and, importantly, a measurement of how much of the penalty each knob actually removes.</p>
+
+  <div class="takeaway"><b>The background in one line:</b> PP's advantage is communication volume and cross-stage overlap; its disadvantage is that a stage's step is set by its slowest peer. Nothing in the gap is about arithmetic throughput — it is about which requests occupy which stage in which iteration, which is exactly what an iteration-level scheduler already controls.</div>
+</section>
+
+<!-- ===== s3 Three faces of the bubble ===== -->
+<section id="s3">
+  <div class="sec-no">03 · Observation</div>
+  <h2 class="sec">Three Faces of the Pipeline Bubble</h2>
+  <p>The root cause of pipeline bubbles is computational imbalance between pipeline stages — between GPU workers. In training the inputs are fixed and predictable, so stages can be balanced once. Online serving is the opposite: arrival times and batch composition vary continuously, which makes balanced compute across stages hard to maintain even when every stage runs the same code on the same model. The paper's contribution in this section is to stop treating that imbalance as one phenomenon and split it into three, because each has a different cause and therefore a different fix.</p>
+
+  <h3>P-P, P-D and D-D</h3>
+  <ul class="tight">
+    <li><strong>Prefill-Prefill (P-P)</strong> — iteration-level scheduling composes batches out of requests with different input lengths, so prefill latency differs across microbatches. At <em>T</em><sub>2</sub> in Figure 2, a microbatch A<sub>1</sub>B<sub>1</sub> carries long prompts while C<sub>1</sub>D<sub>1</sub> carries short ones. Worker 0 finishes C<sub>1</sub>D<sub>1</sub> early and then waits; Worker 1 is still executing prefill for A<sub>1</sub>B<sub>1</sub>, so A<sub>2</sub>B<sub>2</sub> cannot start and the stage sits idle.</li>
+    <li><strong>Prefill-Decode (P-D)</strong> — one microbatch consists only of decode-phase requests while the other consists only of prefills, so the two stages' workloads diverge sharply. At <em>T</em><sub>3</sub>, Worker 0 holds the decode-only A<sub>2</sub>B<sub>2</sub> and goes idle while Worker 1 grinds through the prefill-only C<sub>1</sub>D<sub>1</sub>, which also raises A<sub>2</sub>B<sub>2</sub>'s TPOT. A second P-D case appears at <em>T</em><sub>4</sub>: C<sub>2</sub>D<sub>2</sub>E<sub>1</sub>F<sub>1</sub> on Worker 0 mixes two prefills with two decodes while A<sub>2</sub>B<sub>2</sub> on Worker 1 is decode-only; Worker 0 becomes the bottleneck and delays the start of A<sub>3</sub>B<sub>3</sub>.</li>
+    <li><strong>Decode-Decode (D-D)</strong> — at <em>T<sub>i</sub></em> to <em>T</em><sub>i+2</sub> every microbatch on every stage is decode-only, yet one microbatch handles many requests and another handles few. Nothing is prefilling, and the stages still stall.</li>
+  </ul>
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: timeline of a two-stage pipeline showing P-P, P-D and D-D imbalance">
+    <figcaption>
+      <b>Figure 2:</b> Three types of pipeline bubbles (The subscript indicates the iteration number.)
+      <span class="ex">A two-stage timeline with the four block types colour-coded — prefill, decode, prefill+decode and idle — and the three imbalance classes marked ① ② ③. The left half (<em>prefill-heavy</em>) contains ① P-P at <em>T</em><sub>2</sub> (long vs short prompt microbatches) and ② P-D at <em>T</em><sub>3</sub>–<em>T</em><sub>4</sub>, where a decode-only microbatch faces a prefill-only one and the idle strip appears on the worker that finished first. The right half (<em>decode-heavy</em>) contains ③ D-D: identical phases, unequal request counts, idle strips again. The point of drawing all three on one axis is that they need different fixes — only the first two are touched by the chunk size, because only they contain prefill work at all.</span>
+          <span class="pgref">Proc. p.1807</span>
+    </figcaption>
+  </figure>
+
+  <h3>Quantifying the imbalance</h3>
+  <p>The paper then measures the two phase types separately. Prefill latency depends largely on the input sequence length (Figure 3a), which is why balancing <em>compute density</em> of prefill across workers is the whole game: when two prefills of 2,048 and 128 tokens are issued back to back, the resulting P-P imbalance leaves a bubble of around <strong>627 ms</strong> that stalls every subsequent stage. Decode behaves differently — with one token per request per step, the batch size becomes the dominant factor (Figure 3b) — but the underlying cost curve is not smooth, because the linear layers that dominate decode execute as a function of token count in a step pattern (Figure 3c). The gap between batch sizes 96 and 128 is a relatively minor 5%; between 128 and 160 it widens to 31%. Going from 128 to 129 requests can therefore abruptly trigger about 31% idle time, and the practical corollary is blunt: configure decode-only microbatches in multiples of 128 to align with the preferred efficiency of the underlying compute kernels.</p>
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: prefill time versus sequence length, decode time versus batch size, and linear-layer time versus number of tokens">
+    <figcaption>
+      <b>Figure 3:</b> Performance characteristics: (a) prefill time when varying the sequence length, (b) decode time when increasing the batch size, and (c) linear operations when increasing the number of tokens
+      <span class="ex">Three measurements that between them explain all three bubbles. <b>(a)</b> Prefill time against sequence length, broken into linear, attention and other: the total climbs with the prompt, so two prompts in one batch cannot help but finish at different times — this is P-P in one chart. <b>(b)</b> Decode time against batch size from 1 to 160: it grows with the number of requests, and attention becomes a larger share, but the total is still dominated by linear work. <b>(c)</b> Linear-layer time against token count, which is the step function behind D-D: the curves jump in quantised strides, so 129 tokens can cost nearly what 256 costs. That is why the paper's decode-side advice is not "make microbatches equal" but "make them land on the boundaries".</span>
+          <span class="pgref">Proc. p.1807</span>
+    </figcaption>
+  </figure>
+
+  <h3>Why the chunk size cannot simply be fixed</h3>
+  <p>Chunked prefill bounds the prefill work per iteration, which attacks P-P and P-D directly — but the bound itself is a trade-off. Figure 4a measures bubble time against request rate for two fixed chunk sizes on the Azure Code workload with the 32B model. At a chunk of 128 the bubbles stay small across the whole range; at 2,048 a handful of long prefill microbatches dominate the pipeline at low to moderate load (1–3 req/s), and the bubble only collapses once the request rate passes roughly 4 req/s and the pipeline is consistently filled with prefills — above 5 req/s bubbles are rare for either size because every stage is kept busy by the sheer number of tokens. Figure 4b shows the other side of the trade-off: token throughput rises monotonically with the chunk size, from about 6.8k tok/s at 128 to about 11.3k tok/s at 2,048 (values read off the figure). Fewer tokens per iteration means lower GPU utilisation, which shows up as TTFT growth exactly when the queue is longest.</p>
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: (a) pipeline bubble time versus request rate for chunk sizes 128 and 2048; (b) prefill token throughput versus chunk size">
+    <figcaption>
+      <b>Figure 4:</b> Pipeline bubbles and prefill token throughput according to load and chunk size (when serving Qwen2.5-32B with the Azure Code workload on 4 NVIDIA A100 GPUs)
+      <span class="ex"><b>(a)</b> PP<sub>128</sub> (blue) is almost flat at a few milliseconds across 1–6 req/s, while PP<sub>2048</sub> (red) peaks at roughly 55 ms near 3 req/s and then falls away: at low load a 2,048-token chunk lets a few long prefills monopolise the pipeline, and only when arrivals are frequent enough to keep every stage fed does the imbalance disappear. <b>(b)</b> The price of small chunks: prefill throughput grows with the chunk size all the way to 2,048. Put the two panels together and the tuning problem is visible — the chunk size that minimises bubbles is not the one that maximises throughput, and which of them matters depends on the current load.</span>
+          <span class="pgref">Proc. p.1808</span>
+    </figcaption>
+  </figure>
+
+  <h3>Figure 5: what chunking actually removes</h3>
+  <p>The mechanism is easiest to see on a timeline. In naive PP, A<sub>1</sub>'s prefill occupies Worker 0 for one long block, Worker 1 waits for the whole block, and the idle strip after it is unavoidable. With chunked prefill, A<sub>1</sub> is split into A<sub>1</sub>[C1] and A<sub>1</sub>[C2]: stage 0 hands over the first chunk and can start B<sub>1</sub> while stage 1 is still working on A<sub>1</sub>[C1], so the pipeline fills earlier and the same work finishes with less idle time.</p>
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: naive pipeline parallelism versus pipeline parallelism with chunked prefill">
+    <figcaption>
+      <b>Figure 5:</b> Reducing pipeline stalls from chunked-prefill [2]
+      <span class="ex"><b>(a) Naive PP</b>: A<sub>1</sub> is one indivisible prefill, so Worker 1 cannot begin until the whole block has traversed Worker 0, and the gap after B<sub>1</sub> is idle. <b>(b) With chunked prefill</b>: the same A<sub>1</sub> is issued as A<sub>1</sub>[C1] then A<sub>1</sub>[C2], each stage's occupancy gets shorter and interleaved with B<sub>1</sub>, and later the decode of B<sub>3</sub> can overlap with the prefill of C<sub>1</sub>[C1]. Chunking does not change the total work — it changes the granularity at which work is handed between stages, which is the property the rest of the paper exploits.</span>
+          <span class="pgref">Proc. p.1808</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Three kinds of imbalance: triggers, symptoms and the lever used against each ([organized] from §3–§4 — assembled here, not a table from the paper)</caption>
+    <thead><tr><th>Imbalance</th><th>Trigger</th><th>Symptom</th><th>Lever in this paper</th></tr></thead>
+    <tbody>
+      <tr><td>P-P (prefill-prefill)</td><td>Microbatch input lengths within one iteration differ sharply (e.g. 2,048 vs 128 tokens)</td><td>The long prefill occupies one stage while the short one idles; a single bubble reaches about 627 ms</td><td>Dynamic chunk size — cutting long prefills so per-stage work evens out</td></tr>
+      <tr><td>P-D (prefill-decode)</td><td>One microbatch is all decode while another is all or mostly prefill</td><td>Per-stage work differs by an order of magnitude; the decode side idles and TPOT climbs</td><td>Dynamic chunk plus the predictor's bounds, which stop a large prefill from entering a decode iteration</td></tr>
+      <tr><td>D-D (decode-decode)</td><td>An all-decode iteration in which one microbatch holds noticeably more requests (e.g. 129 vs 128)</td><td>Linear layers are a step function, so a few extra requests cost about 31% more; the stall repeats every iteration</td><td>Delay scheduling — migrate requests between microbatches and align to 128-sized hardware boundaries</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="takeaway"><b>Where this leaves the reader:</b> chunked prefill fixes the <em>size</em> of the prefill block but not the <em>choice</em> of it, and it does nothing at all when there is no prefill in the iteration. Two actuators therefore remain: how many tokens an iteration may prefill (a chunk-size decision, affecting P-P and P-D), and which requests share a microbatch (a rebalancing decision, affecting D-D). Section 4 builds one of each.</div>
+</section>
+
+<!-- ===== s4 Two dynamic chunk schedules ===== -->
+<section id="s4">
+  <div class="sec-no">04 · Design</div>
+  <h2 class="sec">Two Dynamic Chunk Schedules</h2>
+
+  <h3>The control objective</h3>
+  <p>Both mechanisms answer the same question at every scheduling iteration: <em>how many tokens may this iteration prefill?</em> The stated goal is to pick the smallest chunk size that can still absorb the current request load, because small chunks minimise the prefill-induced bubble, while a growing queue forces the chunk up to keep utilisation high. The two SLOs act as the constraints that bound that search from opposite sides. <strong>TPOT<sub>SLO</sub></strong> caps the chunk: as demand rises the system enlarges the chunk, but strictly limits the increase so that no TPOT violation is anticipated. <strong>TTFT<sub>SLO</sub></strong> acts as the load indicator: when the waiting queue grows, incoming requests are likely to miss their TTFT budget, so the chunk is enlarged to drain the queue faster; when TTFT is comfortable the system is lightly loaded and the chunk can be reduced, which costs little throughput because the system is not compute-saturated. Together the two SLOs define the feasible range of chunk sizes — the paper's framing, and the reason both the greedy and the predictive variant can be described as "pick a point inside the SLO-derived interval".</p>
+
+  <h3>Greedy: a feedback loop</h3>
+  <p>Algorithm 1 keeps a current chunk size \(c\) inside a discrete candidate set \(C\) (for example {128, 256, …}), initialised to the minimum, and updates it every \(D_p\) scheduling iterations — the cadence is forced by the hardware, since a chunk-size change only takes effect after a microbatch has traversed all \(D_p\) stages. Five quantities steer the update: the available KV-cache ratio \(KV_{free}\in[0,1]\), the KV watermark \(\theta_{mem}\), two boundaries α and β for TTFT slack, and one boundary γ for TPOT slack. The loop then walks four branches in strict priority order.</p>
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/algo1.png" alt="Algorithm 1: Greedy chunk size adjustment">
+      <figcaption>
+        <b>Algorithm 1:</b> Greedy chunk size adjustment
+        <span class="ex">Lines 1–8 are state, not logic: pipeline depth \(D_p\), the candidate set \(C\), the current size \(c\), the step δ, the free-KV ratio, the memory watermark \(\theta_{mem}\), the two TTFT boundaries α/β and the TPOT boundary γ. The loop body executes once every \(D_p\) iterations and has exactly four outcomes. <b>① Retrieve</b> (line 12): read TTFT slack, TPOT slack and \(KV_{free}\) from the previous iterations. <b>② Memory check</b> (lines 14–15): if \(KV_{free} &lt; \theta_{mem}\), keeping a large chunk risks a stage failing its KV allocation, so \(c\) jumps to the smallest candidate larger than the number of running requests — draining in-flight work and freeing memory takes priority over every other consideration. <b>③ Shrink</b> (lines 17–18): if TPOT slack is negative (the SLO is, or is about to be, violated) <em>or</em> TTFT slack exceeds α·TTFT<sub>SLO</sub> (the load is low relative to the current chunk), subtract δ. The first clause protects in-flight TPOT, the second removes P-P and P-D bubbles that cost almost no throughput under light load. <b>④ Grow</b> (lines 20–21): if TTFT slack has fallen below β·TTFT<sub>SLO</sub> while TPOT slack is still above γ·TPOT<sub>SLO</sub>, add δ — this raises prefill compute per iteration and drains the queue, but only while TPOT stays comfortable. There is no fifth branch: if none matches, the chunk size is left alone.</span>
+            <span class="pgref">Proc. p.1809</span>
+    </figcaption>
+    </figure>
+  </div>
+  <p>The ordering is the design. The memory check pre-empts the latency logic because a failed KV allocation is not a slow iteration but a dropped one; the shrink branch is evaluated before the grow branch because over-large chunks are the failure mode the paper set out to remove; and both α and β are expressed as fractions of the SLO, which is what makes the loop portable across SLO settings instead of hard-coded to 2,000 ms and 200 ms.</p>
+  <p>Its limits are structural, and the paper states them rather than hiding them. Because the adjustment is step-wise and reactive, the loop needs several iterations to converge on the right chunk size, so under rapidly changing workloads the scheduler is permanently chasing a moving target and spends long stretches in a suboptimal state. And because the only evidence it sees is the TTFT/TPOT slack measured in previous iterations, that evidence is delayed by the pipeline depth and skewed by whatever larger chunks are still executing in other stages — under pipeline parallelism the feedback is both late and polluted.</p>
+
+  <h3>Predictive: price every candidate</h3>
+  <p>The second mechanism replaces reaction with estimation. The latency model — the paper calls it ALP, adaptive latency prediction — is deliberately split along the same line Figure 3 draws. Iteration latency is dominated by linear layers, whose cost scales with the total number of batched tokens and is therefore largely determined by the chunk size; that makes the linear part predictable by <em>offline</em> profiling, a straight line through token counts. Attention is a smaller but dynamic share, tied to request composition, and because inference is autoregressive the batch composition evolves gradually across iterations — gradual enough to be tracked online without making the prediction unstable.</p>
+  <div class="math">$$ T_{iter} = T_{offline} + T_{online} $$</div>
+  <div class="math">$$ T_{offline} = \alpha_0 \cdot N_{tokens} + \alpha_1, \qquad T_{online} = \beta_0 \sum (L_{past} \cdot L_{pre}) + \beta_1 \sum (L_{pre}^{2}) + \beta_2 \sum L_{dec} + \varepsilon $$</div>
+  <p>Each term in the online component has a concrete referent in chunked prefill: \(L_{past}\) is the context accumulated from earlier chunks, \(L_{pre}\) the current prefill chunk, and \(L_{dec}\) the context lengths of the decode requests in the batch. Their products give the three attention shapes the iteration actually pays for — prefill attention over the past context (\(L_{past}\cdot L_{pre}\)), self-attention inside the current chunk (\(L_{pre}^{2}\)), and decode attention (\(L_{dec}\)) — with coefficients \(\beta_0,\beta_1,\beta_2\) and a residual ε for unmodelled system noise. The offline part is measured once, across discrete token counts from 128 to 2,048.</p>
+  <p>The coefficients are not fitted offline. Each iteration the scheduler compares the prediction with the measured latency and updates the parameters with <strong>Recursive Least Squares</strong> (Haykin, <em>Adaptive Filter Theory</em>). The paper gives two reasons RLS fits this problem specifically: unlike gradient descent, whose updates are sensitive to the scale of input features, RLS carries an internal covariance matrix that adapts to feature-wise scaling, which matters because \(L_{pre}^{2}\) and \(L_{dec}\) differ in magnitude by orders of magnitude; and a forgetting factor lets recent observations dominate, so the model tracks dynamic effects such as prefill-decode interference rather than averaging them away.</p>
+
+  <h3>Figure 6: five steps from state to chunk size</h3>
+  <p>With a calibrated model the scheduler can price every candidate before committing to one. It reads the current state, updates the predictor with the previous iteration's measurement, throws out candidates whose predicted latency would break TPOT<sub>SLO</sub>, throws out candidates whose predicted throughput is too low to meet TTFT<sub>SLO</sub>, and then takes the cheapest candidate that survives both filters.</p>
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: workflow of predictive dynamic chunked-prefill, from system state through the adaptive latency predictor to chunk-size bounds">
+    <figcaption>
+      <b>Figure 6:</b> Workflow of predictive dynamic chunked-prefill
+      <span class="ex">The loop is drawn as a table of candidates between two boxes. <b>① State</b> — \(KV_{free}\), \(L_{measured}\), \(Q_{waiting}\), \(B_{running}\). <b>② Predictor</b> — a baseline offline-profiling component plus an online-updating adaptation component, refitted from the measurement of the previous iteration. The table then lists chunk sizes 128…2,048 with predicted latency and predicted throughput (the excerpt shows 45/7127 at 128 up to 467/14745 at 2,048). <b>③ Upper bound</b> — the lower (blue) dashed line, derived from TPOT<sub>SLO</sub>: candidates whose predicted latency exceeds the bound are discarded, which in the excerpt removes 512 and everything above it (the blue-tinted latency cells). <b>④ Lower bound</b> — the upper (red) dashed line, derived from the minimum throughput TTFT<sub>SLO</sub> demands: chunks below it are too small to drain the queue, which removes 128 and 256 (the red-tinted throughput cells). <b>⑤</b> The one candidate left between the two lines (384, green) is selected and handed to the inference engine; the measured latency then feeds back into the predictor. Note that predicted latency is multiplied by the pipeline depth to get the end-to-end estimate — the depth enters as a multiplier, not as a second model.</span>
+          <span class="pgref">Proc. p.1810</span>
+    </figcaption>
+  </figure>
+  <p>Two details are easy to miss and matter for a re-implementation. First, the memory safety check is identical to the greedy algorithm's — the predictive path does not get to skip the branch that prevents a stage from failing its KV allocation. Second, when <em>no</em> candidate satisfies both SLOs, the system is treated as overloaded and the scheduler deliberately switches objective: it takes the <em>largest</em> chunk that still satisfies TPOT<sub>SLO</sub>, because at that point the priority is draining the waiting queue rather than minimising bubbles. The lower bound itself has two parts — an arrival-matching throughput computed from the request rate and token distribution over a sliding window, plus a component for requests that have already waited longer than a freshness threshold, obtained by dividing their total prompt length by their remaining budget (TTFT<sub>SLO</sub> minus the average waiting time).</p>
+
+  <h3>Delay scheduling: pay a little waiting to buy balance</h3>
+  <p>Neither chunk-size mechanism helps when the iteration contains no prefill at all. In decode-only iterations the request count is the dominant factor for imbalance — each request contributes exactly one input token, so the per-request linear-layer work is nearly uniform — and yet existing systems fix a request to its microbatch for its entire lifetime (Kwon et al., 2023; Zheng et al., 2024). That static assignment magnifies D-D imbalance and sustains stalls across iterations. Delay scheduling rebalances at runtime: each scheduling iteration it inspects the load distribution across stages and migrates requests from the heaviest to the lightest microbatch in proportion to their computational demand.</p>
+  <p>The policy has two parts. First, batch sizes are aligned to hardware-efficient boundaries (128, 256, 384) because, as Figure 3c showed, 129 tokens cost almost the same as 256 while adding imbalance. Second, a threshold-based preemption: if a microbatch overshoots a boundary but the overflow is within a configured threshold, the excess requests are suspended and the batch is reduced to the nearest boundary; if the overflow exceeds the threshold, the batch is instead aligned to the average request count across all microbatches and previously suspended requests are resumed to fill the gap. Which requests get suspended depends on which resource is scarce — when TPOT slack is insufficient the scheduler preempts <em>older</em> requests, which tolerate additional latency more readily, protecting the TPOT of newer ones; when TPOT slack is ample the risk shifts to KV-cache exhaustion and TTFT violations, so it preempts <em>newer</em> requests instead, letting older ones finish and release KV memory sooner.</p>
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7: imbalanced decode-heavy pipeline versus the same pipeline with delay scheduling">
+    <figcaption>
+      <b>Figure 7:</b> Reducing pipeline stalls with delay scheduling
+      <span class="ex"><b>(a) Imbalanced</b>: from <em>T<sub>i</sub></em> onward the two workers carry very different decode loads — at <em>T</em><sub>i+2</sub>, Worker 0 holds C<sub>3</sub>D<sub>3</sub>E<sub>2</sub>F<sub>2</sub> while Worker 1 only has A<sub>3</sub>B<sub>3</sub> — so one stage waits on the other every iteration. <b>(b) With delay scheduling</b>: requests E and F are temporarily suspended (the small dashed boxes above the timeline) so the microbatches even out; E<sub>2</sub> resumes once A completes at <em>T</em><sub>i+2</sub>, forming B<sub>4</sub>E<sub>2</sub>, and F<sub>2</sub> resumes after D completes, forming C<sub>5</sub>F<sub>2</sub>. The bracketed region on the right is the saved time: individual requests are delayed, but the pipeline stops stalling, so total completion time falls. That trade — a few requests pay extra latency so every request finishes sooner — is the honest summary of delay scheduling.</span>
+          <span class="pgref">Proc. p.1811</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>How the three pieces fit:</b> the greedy loop and the predictor are alternative solutions to the same problem (choose the chunk size per iteration), and the paper evaluates them as such — one cheap and reactive, one accurate and predictive. Delay scheduling is not an alternative but an addition, and it only has work to do when the chunk-size mechanisms have nothing to chew on. That is why the evaluation's strongest single result for DS appears on a decode-heavy workload where DCP barely moves the needle.</div>
+</section>
+
+<!-- ===== s5 Putting it into SGLang ===== -->
+<section id="s5">
+  <div class="sec-no">05 · System</div>
+  <h2 class="sec">Putting It Into SGLang</h2>
+  <p>The implementation sits on <strong>SGLang 0.4.1</strong>, with PyTorch v2.5.1, CUDA 12.4 and FlashInfer underneath. Both baselines and the three techniques were built on top of SGLang: the baseline is pipeline parallelism with chunked prefill, and the techniques are additions to the scheduling path rather than to the model or the kernels. That is the paper's main systems claim — the mechanisms need no new operator, no custom kernel and no retraining — and it is the reason the whole page can talk about "knobs" at all.</p>
+
+  <h3>The timing model uses two stages; the evaluation's stage count is never stated</h3>
+  <p>Every timing diagram in the paper draws two workers, and §3.1.1 makes the assumption explicit for the illustration ("assuming a two-stage pipeline and a maximum batch size of three"). The evaluation, however, describes only "a server with four NVIDIA A100 (40GB) GPUs" connected via PCIe 4.0; the pipeline degree used for PP, the number of layers per stage and the number of GPUs per TP group are <em>not</em> reported. This matters when reading \(D_p\): the greedy loop's update cadence is defined as one update per \(D_p\) iterations, so \(D_p\) is whatever the deployed stage count is, and the paper's numbers therefore validate the mechanism without pinning down its most structural parameter. It is flagged again in the assessment below rather than papered over here.</p>
+
+  <h3>What the paper discloses, and what it leaves to the reader</h3>
+  <p>Because the paper is a scheduling study rather than a systems-release paper, its disclosure is asymmetric: the control <em>structure</em> is stated precisely enough to re-implement, while the numeric <em>operating point</em> is almost entirely absent. The table below separates the two, because a reader who wants to reproduce the mechanism and a reader who wants to reproduce the results need completely different things from this paper.</p>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Disclosed vs. not disclosed in the implementation and method sections ([organized] from §4 and §5.1 — assembled here, not a table from the paper)</caption>
+    <thead><tr><th>Configuration item</th><th>What the paper discloses</th><th>What it does not disclose</th></tr></thead>
+    <tbody>
+      <tr><td>Software stack</td><td>SGLang 0.4.1; PyTorch v2.5.1; CUDA 12.4; FlashInfer; baselines and techniques all implemented on top of SGLang (§5.1)</td><td>Size or location of the scheduler patch; how the PP path was wired into SGLang's iteration loop</td></tr>
+      <tr><td>Candidate chunk set \(C\)</td><td>"Set of possible chunk sizes (e.g., {128, 256, …})"; step δ = 128 ("e.g., 128"); 2,048 is the largest chunk the compute capacity of an A100 supports (Algorithm 1, lines 2 and 4; §3.2.1)</td><td>The exact membership of \(C\) as deployed, and whether it is derived per model or per GPU</td></tr>
+      <tr><td>Update cadence \(D_p\)</td><td>One update per \(D_p\) scheduling iterations, where \(D_p\) is the pipeline depth, because a chunk change only takes effect after a microbatch traverses all stages (Algorithm 1, lines 1 and 10; §4.1.1)</td><td>The pipeline degree used in any experiment — §5.1 lists four GPUs but never the stage count</td></tr>
+      <tr><td>KV watermark \(\theta_{mem}\)</td><td>Exists, is in [0, 1], is tested as \(KV_{free} &lt; \theta_{mem}\), and on trigger resets the chunk to the smallest candidate larger than the running request count (Algorithm 1, lines 6, 14–15)</td><td>Any numeric value, and whether it is a static fraction of the KV pool or load-dependent</td></tr>
+      <tr><td>Slack boundaries α, β, γ</td><td>α = "sufficient TTFT slack" boundary, β = "TTFT slack tight" boundary, γ = TPOT-comfortable boundary, all in [0, 1] and all relative to the respective SLO (Algorithm 1, lines 7–8; conditions on lines 17 and 20)</td><td>Any numeric value for α, β or γ</td></tr>
+      <tr><td>Predictor inputs</td><td>\(KV_{free}\), \(L_{measured}\), \(Q_{waiting}\), \(B_{running}\) are read each iteration; attention features (prefix and context lengths) update the model (Figure 6 ① ②; §4.1.2)</td><td>Length of the sliding window used for the request-rate estimate</td></tr>
+      <tr><td>Predictor cost</td><td>Full accuracy/cost table: MAPE 3.26%, 0.002875 ms per prediction, 0.643 KB model (Table 1)</td><td>The offline profile itself — measured \(T_{offline}\) values, and \(\alpha_0,\alpha_1\)</td></tr>
+      <tr><td>RLS adaptation</td><td>Recursive Least Squares with an internal covariance matrix and a forgetting factor that prioritises recent observations (Haykin, <em>Adaptive Filter Theory</em>)</td><td>Forgetting factor λ, covariance initialisation, and the update rate</td></tr>
+      <tr><td>Delay-scheduling boundaries</td><td>Hardware-efficient batch boundaries given as "e.g., 128, 256, 384"; alignment to the average request count when the overflow is large (§4.2)</td><td>The value of the preemption threshold ("a configured threshold")</td></tr>
+      <tr><td>Preemption policy</td><td>Victim choice is state-dependent: preempt older requests when TPOT slack is short, newer requests when TPOT slack is ample and the risk is KV exhaustion (§4.2)</td><td>Resume ordering and any anti-thrashing rule for repeatedly preempted requests</td></tr>
+      <tr><td>Evaluation platform</td><td>4× NVIDIA A100 40GB on PCIe 4.0; 128-core AMD EPYC 9754 at 2.25 GHz; 768 GB RAM; BF16 models (§5.1)</td><td>PP degree, per-stage layer split, NVLink-vs-PCIe sensitivity, multi-node behaviour</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The practical reading is that this is a <em>reproducible mechanism with an unreproducible operating point</em>. The control law fits on a page: four scalars (α, β, γ, \(\theta_{mem}\)), one step size, one cadence inherited from the topology, plus a threshold and a forgetting factor. A reader can rebuild it in an afternoon; what they cannot know is where α and β should sit on their own hardware, because the paper does not report where they sat on this one. The tuning surface is small enough that a sweep is plausible — which is precisely why the omission is worth flagging rather than treating as fatal.</p>
+
+  <div class="takeaway"><b>System-level verdict:</b> the contribution is architectural honesty — no new kernel, no model surgery, no retraining, and every mechanism expressible as a modification of the scheduler's next-iteration decision. The cost of that honesty is that the paper's evidence is inseparable from its one testbed, and its parameters are inseparable from its authors' tuning.</div>
+</section>
+
+<!-- ===== s6 Evaluation ===== -->
+<section id="s6">
+  <div class="sec-no">06 · Evaluation</div>
+  <h2 class="sec">Evaluation</h2>
+
+  <h3>Setup and workloads</h3>
+  <p>The platform is one node: four NVIDIA A100 40GB GPUs, each attached to the host over PCIe 4.0, a 128-core AMD EPYC 9754 at 2.25 GHz and 768 GB of RAM, with PyTorch v2.5.1, CUDA 12.4 and FlashInfer under SGLang 0.4.1. The models are Qwen2.5-32B and Qwen2.5-14B in BF16. Traffic comes from three real traces — Azure Conversation, ShareGPT and CNN — plus one synthetic derivative, <strong>CNN-Reversed</strong>, built by swapping CNN's input and output distributions so that prompts are short and generations long. Request arrivals follow a Poisson process, the standard model for interactive user-facing services.</p>
+  <p>Five configurations are compared. <strong>TP</strong> is the tensor-parallel baseline, run with the default chunk size of 2,048. <strong>PP<sub>static</sub></strong> is pipeline parallelism with a chunk size chosen by an offline search — 512 for AzureConv, CNN and ShareGPT on the 32B model, 256 for CNN-Reversed on 32B, and 1,024 for AzureConv on the 14B model; the paper notes explicitly that the best chunk size is workload-dependent. On top of that sit <strong>DCP<sub>greedy</sub></strong>, <strong>DCP<sub>pred</sub></strong> and <strong>DCP<sub>pred</sub>+DS</strong>. The primary metric is goodput, the highest request rate at which P90 TTFT and P90 TPOT both satisfy their SLOs (2,000 ms / 200 ms); once goodput is comparable the paper compares P90 TTFT, TPOT and end-to-end latency. In the three latency panels only PP<sub>static</sub> is plotted, so the goodput bars are the only place where all five configurations appear together.</p>
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8: input and output length distributions of the AzureConv, ShareGPT and CNN traces">
+    <figcaption>
+      <b>Figure 8:</b> Input and output length distributions
+      <span class="ex">The reason the four workloads stress different bubbles. <b>(a) Azure Conversation</b> averages 1,161 input and 212 output tokens — prefill-dominated, so P-P and P-D imbalance dominate and the chunk size is the main lever. <b>(b) ShareGPT</b> averages 226 input and 199 output tokens — short prompts but still a prefill share large enough to matter. <b>(c) CNN</b> averages 883 input and only 65 output tokens — the most prefill-heavy of the three. CNN-Reversed, not shown, swaps these distributions and becomes decode-heavy (long outputs, tiny prompts), which is why D-D imbalance and delay scheduling matter there and almost nowhere else.</span>
+          <span class="pgref">Proc. p.1811</span>
+    </figcaption>
+  </figure>
+
+  <h3>Qwen2.5-32B: goodput, and the chunk size that dominates everything</h3>
+  <p>Figure 9 is the core result table rendered as charts: a goodput bar group per workload, then the P90 curves behind it. The goodput bars also expose the static chunk sweep, and that sweep is the most surprising object in the paper. On AzureConv the static chunks read 4.27, 7.07, 8.28, 4.35 and 3.16 req/s for 128, 256, 512, 1,024 and 2,048 tokens — the best static point is 8.28 and the default 2,048 is only 3.16, below TP's 3.48. The chosen chunk size is not a fine-tuning detail; it decides whether PP beats TP at all.</p>
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9: goodput bars and P90 TTFT, TPOT and E2E latency curves for Qwen2.5-32B on AzureConv, CNN, ShareGPT and CNN-Reversed">
+    <figcaption>
+      <b>Figure 9:</b> Goodput, TTFT, TPOT, and E2E latency for Qwen2.5-32B
+      <span class="ex">Four workload blocks, each with a goodput bar group (TP, the static sweep PP<sub>128</sub>…PP<sub>2048</sub>, then DCP<sub>greedy</sub>, DCP<sub>pred</sub>, DCP<sub>pred</sub>+DS) and three P90 curves against request rate. <b>(a) AzureConv</b>: TP 3.48 vs best static 8.28 at 512, falling to 4.35 at 1,024 and 3.16 at 2,048; the DCP bars reach 8.41 / 8.47 / 8.47, i.e. the dynamic schemes recover the good chunk without needing the offline search. <b>(b) CNN</b>: TP 4.30, best static 9.26 at 512, DCP<sub>pred</sub> 10.17 — about 10% above the best static point. <b>(c) ShareGPT</b>: TP 12.45, best static 32.46 at 512, DCP<sub>pred</sub> 36.09 — about 11% above it, the largest goodput gain from prediction in the figure. <b>(d) CNN-Reversed</b>: everything clusters between 5.98 and 7.40 because short prompts leave little for chunking to fix, and only DCP<sub>pred</sub>+DS breaks out to 10.42. In the latency curves TP's TTFT leaves the plot early on every workload — the PCIe bottleneck of Figure 1 — while its TPOT stays lowest, and the DCP curves sit below PP<sub>static</sub> on TPOT and E2E exactly where prefill dominates.</span>
+          <span class="pgref">Proc. p.1812</span>
+    </figcaption>
+  </figure>
+  <p>Against the tuned PP<sub>static</sub> baseline the two DCP variants behave as designed: both slightly increase TTFT and leave goodput roughly unchanged, while substantially improving TPOT and E2E by removing bubbles. On AzureConv, DCP<sub>greedy</sub> cuts TPOT and E2E by up to 19% and 18%, whereas DCP<sub>pred</sub> achieves 35% and 31%. The split is explained by reactiveness: the greedy loop is structurally limited in how aggressively it can exploit favourable operating points, so it nearly matches the predictor on goodput but converts less of it into latency. On CNN the same comparison reads 27% / 28% for greedy against 42% / 36% for the predictor, and on ShareGPT the predictor reaches 36% / 24%. The pattern the paper draws from these three workloads is that predictive chunk selection gives more consistent reductions than greedy selection.</p>
+  <p>A [estimated] reading of the same bars puts the magnitudes in perspective: PP<sub>static</sub> is about 2.4× TP on AzureConv (8.28 / 3.48), 2.2× on CNN (9.26 / 4.30) and 2.6× on ShareGPT (32.46 / 12.45), while DCP<sub>pred</sub> adds about 2% on AzureConv, 10% on CNN and 11% on ShareGPT over PP<sub>static</sub>. Most of the distance from TP to PP is crossed by choosing a good static chunk at all; the dynamic mechanisms convert the remaining few percent of goodput into a large latency reduction, and that is the honest way to read the paper's headline claim.</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Qwen2.5-32B goodput in req/s (assembled here from the bar labels of Figure 9, not a table from the paper)</caption>
+    <thead><tr><th>Workload</th><th>TP</th><th>PP<sub>128</sub></th><th>PP<sub>256</sub></th><th>PP<sub>512</sub></th><th>PP<sub>1024</sub></th><th>PP<sub>2048</sub></th><th>DCP<sub>greedy</sub></th><th>DCP<sub>pred</sub></th><th>+DS</th></tr></thead>
+    <tbody>
+      <tr><td>AzureConv (prefill-heavy)</td><td>3.48</td><td>4.27</td><td>7.07</td><td>8.28</td><td>4.35</td><td>3.16</td><td>8.41</td><td>8.47</td><td>8.47</td></tr>
+      <tr><td>CNN (prefill-heavy)</td><td>4.30</td><td>6.28</td><td>9.15</td><td>9.26</td><td>4.48</td><td>3.21</td><td>9.40</td><td>10.17</td><td>10.16</td></tr>
+      <tr><td>ShareGPT (mixed)</td><td>12.45</td><td>14.34</td><td>26.33</td><td>32.46</td><td>14.69</td><td>12.63</td><td>33.17</td><td>36.09</td><td>36.16</td></tr>
+      <tr><td>CNN-Reversed (decode-heavy)</td><td>5.98</td><td>6.18</td><td>7.27</td><td>7.21</td><td>7.22</td><td>7.23</td><td>7.38</td><td>7.40</td><td>10.42</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Tabulating those bars makes one pattern easier to see than the charts do: <b>on all three prefill-heavy workloads goodput collapses once the chunk exceeds 512</b>, while the decode-heavy CNN-Reversed workload is almost insensitive to the chunk size and only delay scheduling moves it (7.40 → 10.42, i.e. 1.41×). The same table is also why the claim that a tuned static chunk already beats TP has to be read together with the sweep on either side of it: the win is one operating point wide.</p>
+
+  <h3>Qwen2.5-14B: same shape, different operating point</h3>
+  <p>Only two workloads are shown for the smaller model, for space: AzureConv as the prefill-heavy representative and CNN-Reversed as the decode-heavy one. The trends carry over, and one detail is informative precisely because it changes — on the 14B model the best static chunk for AzureConv is 1,024, not 512, so the desired chunk size shifts with the model as well as with the workload. DCP<sub>greedy</sub> and DCP<sub>pred</sub> reach the highest goodput and lower TPOT and E2E; relative to PP<sub>static</sub> the greedy and predictive approaches reduce TPOT latency by up to 40% and 50%.</p>
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10: goodput bars and P90 latency curves for Qwen2.5-14B on AzureConv and CNN-Reversed">
+    <figcaption>
+      <b>Figure 10:</b> Goodput, TTFT, TPOT, and E2E latency for Qwen2.5-14B
+      <span class="ex"><b>(a) AzureConv</b>: TP 4.52, static sweep peaking at 1,024 with 16.55 (6.88, 10.80, 13.10, 16.55, 10.02 for 128…2,048), DCP<sub>greedy</sub> 16.33, DCP<sub>pred</sub> 16.75, DCP<sub>pred</sub>+DS 16.71 — delay scheduling is inert here, as expected for a prefill-heavy trace. <b>(b) CNN-Reversed</b>: TP 5.37, static sweep 8.62 / 13.65 / 15.16 / 15.09 / 14.58, and then DCP<sub>pred</sub>+DS at 19.88, about 31% above the best static point [estimated]. The TTFT panel in the same block shows why: DCP<sub>pred</sub> already spikes around 11 req/s, while the DCP<sub>pred</sub>+DS curve is still far inside the 2,000 ms budget at 15–20 req/s before it too jumps. The paper notes that on this decode-heavy workload delay scheduling reduces TTFT and the median E2E latency, but — unlike the 32B model — produces no visible P90 E2E reduction.</span>
+          <span class="pgref">Proc. p.1813</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Qwen2.5-14B goodput in req/s (assembled here from the bar labels of Figure 10, not a table from the paper)</caption>
+    <thead><tr><th>Workload</th><th>TP</th><th>PP<sub>128</sub></th><th>PP<sub>256</sub></th><th>PP<sub>512</sub></th><th>PP<sub>1024</sub></th><th>PP<sub>2048</sub></th><th>DCP<sub>greedy</sub></th><th>DCP<sub>pred</sub></th><th>+DS</th></tr></thead>
+    <tbody>
+      <tr><td>AzureConv</td><td>4.52</td><td>6.88</td><td>10.80</td><td>13.10</td><td>16.55</td><td>10.02</td><td>16.33</td><td>16.75</td><td>16.71</td></tr>
+      <tr><td>CNN-Reversed</td><td>5.37</td><td>8.62</td><td>13.65</td><td>15.16</td><td>15.09</td><td>14.58</td><td>15.25</td><td>15.45</td><td>19.88</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Where the tail actually goes</h3>
+  <p>Goodput says whether a configuration stays inside budget; the iteration-latency CDF says what it does to individual scheduling rounds. Figure 11 derives the distributions from the runs in Figure 9 at average loads of roughly 4, 5 and 8 requests per second. For AzureConv the 90th-percentile iteration latency falls from 51.68 ms with PP<sub>static</sub> to 29.56 ms with DCP<sub>greedy</sub> and further to 21.53 ms with DCP<sub>pred</sub>; at the 99th percentile the predictor reaches 30.94 ms against 65.34 ms, a 2.11× improvement in the tail.</p>
+  <figure class="fig">
+    <img src="figs/fig11.png" alt="Figure 11: CDF of per-iteration latency for AzureConv at 4 req/s, CNN at 5 req/s and CNN-Reversed at 8 req/s">
+    <figcaption>
+      <b>Figure 11:</b> CDF of iteration latency for (a) AzureConv, (b) CNN, and (c) CNN-Reversed
+      <span class="ex"><b>(a) AzureConv</b>: the DCP curves are shifted left almost everywhere, and the gap widens towards the tail — that is the 51.68 → 29.56 → 21.53 ms P90 sequence and the 65.34 → 30.94 ms P99 sequence, which the paper reads as evidence that the predictor concentrates iterations near the low bound instead of occasionally overshooting. <b>(b) CNN</b>: same shape, with one honest exception — DCP<sub>pred</sub> is slightly <em>worse</em> than PP<sub>static</sub> below the 50th percentile and only crosses over around the 60th, after which its advantage grows towards the tail. <b>(c) CNN-Reversed</b>: all three prefill-side variants sit almost on top of each other, confirming that short prompts leave DCP little room; the curve that separates is DCP<sub>pred</sub>+DS, whose P90 drops to 24.53 ms against PP<sub>static</sub>'s 28.94 ms.</span>
+          <span class="pgref">Proc. p.1814</span>
+    </figcaption>
+  </figure>
+
+  <h3>Under tighter SLOs</h3>
+  <p>Figure 12 sweeps the SLO budget rather than the load: on the x-axis, an SLO scale of 1.0 means 2,000 ms TTFT and 200 ms TPOT, and lower values tighten both proportionally. The headline is that DCP's advantage over the PP baseline <em>grows</em> as the budget tightens — from 2.7× to 5.4× for the 32B model and from 1.7× to 2.4× for the 14B model as the scale drops from 1.0 to 0.4. At the strictest scale of 0.2 on the 32B model even the smallest possible chunk violates the TPOT constraint, so every PP-based system collapses to zero goodput.</p>
+  <figure class="fig">
+    <img src="figs/fig12.png" alt="Figure 12: goodput versus SLO scale for Qwen2.5-32B and 14B on AzureConv and CNN-Reversed">
+    <figcaption>
+      <b>Figure 12:</b> Goodput comparison of Qwen2.5 32B and 14B under various SLO constraints.
+      <span class="ex">Four panels, TP / PP / DCP<sub>greedy</sub> / DCP<sub>pred</sub> / DCP<sub>pred</sub>+DS, against SLO scale 1.0 → 0.2. <b>AzureConv, 32B</b>: the PP baseline here is the <em>default</em> 2,048 chunk, so it sits at or below TP — the paper attributes this to high compute costs dominating on the largest model — while both DCP variants track each other far above both baselines and diverge from them as scale tightens. <b>CNN-Reversed, 32B</b>: the pure-PP curve is almost flat down to 0.6 because violations are driven by KV-cache exhaustion and abrupt TTFT spikes rather than by prefill, and DCP alone barely helps — DS is the curve that opens the gap, up to 1.4× over the PP baseline, until it collapses below 0.6 because the system hits the TPOT limit before accumulating enough requests to reach DS's activation threshold. <b>14B panels</b>: the same ordering at a higher absolute goodput, with the 1.7× → 2.4× range quoted in the text.</span>
+          <span class="pgref">Proc. p.1814</span>
+    </figcaption>
+  </figure>
+
+  <h3>Synthetic prefill-heavy and decode-heavy extremes</h3>
+  <p>To separate the mechanisms from the traces, the paper builds two synthetic workloads by uniform sampling: prefill-heavy draws input lengths from [512, 1024] and output lengths from [32, 64] tokens, while decode-heavy swaps the two ranges. Both are served at rates chosen to be just where the PP baseline starts violating the SLO — 5 and 14 requests per second respectively — which makes the comparison a test of which mechanism rescues the case.</p>
+  <figure class="fig">
+    <img src="figs/fig13.png" alt="Figure 13: mean, P90, P95 and P99 latency for TTFT, TPOT and E2E on synthetic prefill-heavy and decode-heavy workloads">
+    <figcaption>
+      <b>Figure 13:</b> TTFT, TPOT, and E2E latency for (a) prefill-heavy and (b) decode-heavy synthetic workloads. Input and output lengths are uniformly sampled from [512, 1024] and [32, 64] tokens for (a), and from [32, 64] and [512, 1024] tokens for (b).
+      <span class="ex"><b>(a) Prefill-heavy</b>: TP and PP have similar TTFT, but PP's TPOT and E2E are far worse — here the imbalance is the whole story, and both DCP variants cut all three metrics below both baselines, with DCP<sub>pred</sub> shaving a further 25% of P99 TPOT and 13% of P99 E2E over DCP<sub>greedy</sub>; DS changes nothing because there is no D-D imbalance to fix. <b>(b) Decode-heavy</b>: the ordering flips — PP beats TP on all three metrics (mean TTFT 2.82×, TPOT 1.30×, E2E 1.38× better), the DCP variants track PP almost exactly because there is no prefill to chunk, and DS is the only thing that moves: it preempts short-context requests to let long-context ones finish and reclaims their KV memory earlier, cutting E2E by 4,062 ms on average and 8,088 ms at P99 relative to DCP<sub>pred</sub> — at the price of making P99 TPOT 15% worse for the preempted requests.</span>
+          <span class="pgref">Proc. p.1815</span>
+    </figcaption>
+  </figure>
+
+  <h3>The real trace</h3>
+  <p>The last experiment replays the first 15 minutes of the Azure Conversation trace, with the arrival rate scaled to 0.9× the original so that PP<sub>static</sub>'s SLO attainment lands near 90% — a deliberately hard but not saturated regime. This is the only place in the paper where all configurations are judged by attainment rather than by the goodput definition, and the numbers are the cleanest summary of the whole argument: TP attains 1.9%, PP with the default chunk of 2,048 attains 1.6%, the offline-searched PP<sub>static</sub> attains 92.5%, and the dynamic variants attain 93.5%, 94.5% and 94.6%.</p>
+  <figure class="fig">
+    <img src="figs/fig14.png" alt="Figure 14: SLO attainment bars, TPOT-latency CDF and E2E-latency CDF for the Azure Conversation trace on Qwen2.5-32B">
+    <figcaption>
+      <b>Figure 14:</b> Performance of real-trace using Azure Conversation [22]: (a) SLO attainment, (b) TPOT latency CDF (conditional on TTFT<sub>SLO</sub>), and (c) E2E latency CDF (conditional on all SLOs) for Qwen2.5-32B
+      <span class="ex"><b>(a)</b> The static sweep is visible in full — PP<sub>128</sub> 12.4%, PP<sub>256</sub> 82.8%, PP<sub>512</sub> 92.5%, PP<sub>1024</sub> 6.9%, PP<sub>2048</sub> 1.6% — so the entire distance between 1.6% and 92.5% is a chunk-size decision made offline, and TP's 1.9% says that on real Azure traffic TP is effectively unusable at this rate. <b>(b)</b> Conditional on meeting the TTFT SLO, the DCP curves sit left of PP<sub>static</sub>: attainment is similar but a larger fraction of requests lands in the low-latency region, which is the paper's point that equal attainment can hide very different latency distributions. <b>(c)</b> Same for E2E. Two further numbers from the text: if TPOT<sub>SLO</sub> is tightened to 150 ms, DCP<sub>greedy</sub> and DCP<sub>pred</sub> achieve 3.06× and 4.14× the attainment of PP<sub>static</sub>, and 1.3× / 1.6× as many requests complete within 60,000 ms. DS is not activated here because the trace is prefill-heavy.</span>
+          <span class="pgref">Proc. p.1816</span>
+    </figcaption>
+  </figure>
+
+  <h3>Is the predictor worth its complexity?</h3>
+  <p>The final analysis asks whether a learned latency model earns its place, and answers it in two directions: how accurate ALP is as components are added, and what it costs against generic <abbr title="Machine learning: here linear regression, gradient-boosted trees and a small neural network">ML</abbr> alternatives. Accuracy is measured as <abbr title="Mean Absolute Percentage Error: the average of |predicted − measured| / measured">MAPE</abbr> on the AzureConv workload; cost is reported as prediction time and model size, both of which decide whether the model can run inside the scheduler's critical path.</p>
+  <div class="tbl-wrap">
+    <figure class="fig">
+      <img src="figs/table1.png" alt="Table 1: comparison of latency prediction models — ALP component ablation against linear regression, decision tree ensemble and a DNN">
+      <figcaption>
+        <b>Table 1:</b> Comparison of latency prediction models
+        <span class="ex">The top block is an ablation of ALP: starting from offline profiling of the linear layers only (MAPE 15.85%), each attention term added in turn drops the error — prefix attention 12.21%, prefill attention 9.69%, decode attention 3.48% — and the residual ε term, which absorbs runtime noise the attention terms cannot explain, takes it to 3.26%. That the largest single step is the decode term is consistent with Figure 3b: decode attention is where batch composition shows up. The bottom block is the competition: linear regression on ALP's online features (4.26%), a LightGBM decision-tree ensemble (2.74%) and a two-layer DNN with batch normalisation (2.56%), the last two fed extra request-level statistics. Both beat ALP, but the paper's framing is that the margin is small and does not matter — ALP's MAPE is only 0.70 percentage points above the DNN's, which produces no meaningful end-to-end difference in TTFT or TPOT, and ALP reaches it with 0.002875 ms and 0.643 KB per prediction against the DNN's 0.046407 ms and 570 KB, with no offline training phase at all.</span>
+            <span class="pgref">Proc. p.1816</span>
+    </figcaption>
+    </figure>
+  </div>
+  <p>Read as an engineering trade, the table makes a conservative argument: the predictor is roughly 16× cheaper in time and 900× smaller than the DNN for 0.70 points of MAPE [estimated], and it needs no pre-training or feature pipeline. Read as evidence, it also shows the ceiling — no learned model buys more than a few points of MAPE, which is why the paper attributes its latency wins mainly to the scheduling decision rather than to prediction quality.</p>
+
+  <div class="takeaway"><b>What the evaluation establishes, and what it does not:</b> it establishes that the bubble analysis has operational value — the same PP deployment moves from "worse than TP" to "2.4× TP on goodput" purely by choosing a chunk size, and the dynamic schemes then roughly halve TPOT on prefill-heavy traces. It does not establish generality: one node, one interconnect class, one pair of model sizes from one family, one pipeline shape, and a predictor validated on a single trace.</div>
+</section>
+
+<!-- ===== s7 Where it sits ===== -->
+<section id="s7">
+  <div class="sec-no">07 · Related Work</div>
+  <h2 class="sec">Where It Sits</h2>
+  <p>The paper's related-work section reads as a map of three separate research lines that have never quite met: the batching/prefill line, the disaggregation line and the model-parallelism line. Its own position is the intersection — it takes a technique from the first (chunked prefill), refuses the second (disaggregation), and applies both to the third (pipeline parallelism), which it argues has been left behind by serving frameworks.</p>
+
+  <h3>The batching and prefill line</h3>
+  <p>ORCA was the early and influential system that introduced iteration-level scheduling and selective batching to keep GPU cores busy (Yu et al., 2022), and the paper's whole analysis inherits its model of an iteration. Chunked prefill then split long prompts into smaller pieces to relieve TPOT under prefill-heavy traffic (Agrawal et al., 2024; Holmes et al., 2024), and the idea has been absorbed into production stacks: vLLM (Kwon et al., 2023), SGLang (Zheng et al., 2024), TensorRT-LLM (Vaidya et al., 2023) and Dynamo (NVIDIA AI Dynamo Team, 2024). Alongside scheduling, KV-cache management across GPU, CPU and storage has its own literature aimed at avoiding recomputation (Gao et al., 2024; Yu et al., 2025; Yao et al., 2025; Jeong and Ahn, 2025). The paper uses all of this as substrate and changes one thing inside it: the chunk size stops being a constant.</p>
+
+  <h3>Phase disaggregation versus unified serving</h3>
+  <p>The most direct alternative to this paper's approach is to separate the phases physically rather than schedule around their interference — isolating prefill and decode on different GPUs (Patel et al., 2024; Qin et al., 2024; Zhong et al., 2024). The paper concedes that this reduces interference, then names the price: model weight duplication and high-bandwidth requirements for KV-cache transfer. Its counter-position is that <em>unified</em> serving with chunked prefill remains the practical choice once those overheads are counted, but that static chunking leaves non-negligible bubbles — so the overheads of disaggregation and the bubbles of unified serving are the two horns of the same dilemma, and this paper attacks the second horn with scheduling rather than the first with hardware.</p>
+
+  <h3>Parallelism as a resource-allocation problem</h3>
+  <p>Within multi-GPU serving, prior work has examined tensor parallelism (Shazeer et al., 2018; Shoeybi et al., 2020), pipeline parallelism (Huang et al., 2019; Narayanan et al., 2019) and expert parallelism in <abbr title="Mixture-of-Experts: sparse routing where only a few experts activate per token">MoE</abbr> models (Shazeer et al., 2017; Lepikhin et al., 2020) to maximise hardware efficiency. AlpaServe extended this with statistical multiplexing, allocating GPU resources dynamically by workload characteristics and improving throughput in multi-tenant settings (Li et al., 2023), while ExeGPT refined resource allocation with constraint-aware scheduling that jointly optimises latency, throughput and GPU utilisation (Oh et al., 2024). The distinction that matters here is one of granularity and of time scale: those systems decide <em>how many GPUs</em> a model or a tenant gets, whereas this paper keeps the topology fixed and re-decides, every iteration, how much work each stage receives.</p>
+
+  <h3>The nearest neighbour: dynamic chunking for SLO compliance</h3>
+  <p>The closest prior work is recent dynamic chunking, which also adapts the chunk size at runtime but prioritised SLO compliance (Goel et al., 2025) — and, in the paper's characterisation, overlooked the structural constraints of pipeline parallelism, leaving pipeline bubbles unresolved. That sentence is the paper's actual novelty claim, and it is worth stating precisely: not "dynamic chunking is new", nor "chunked prefill is new", but that the chunk size is an <em>actuator for stage-level balance</em>, and that a PP deployment additionally needs a decode-side rebalancing knob which is meaningless outside PP because tensor parallelism does not decompose a batch into microbatches at all.</p>
+
+  <h3>The conclusion the paper draws</h3>
+  <p>The paper closes by restating the arc: pipeline parallelism's inefficiencies in LLM serving come from imbalance, greedy and predictive chunk-size adjustment fix the prefill-heavy half of it, dynamic rebalancing fixes the decode-heavy half, and evaluated on Qwen2.5-32B and 14B over several real workloads the combination outperforms tensor parallelism in goodput for single-node multi-GPU environments. It is a narrow claim, deliberately so — goodput, one node, PCIe — and the paper does not extend it to multi-node, NVLink or phase-disaggregated deployments.</p>
+
+  <div class="takeaway"><b>Positioning in one line:</b> the paper is a <em>second-order</em> systems contribution — every component it uses is standard (iteration-level scheduling, chunked prefill, RLS), and the novelty is in recognising that the chunk size and the microbatch composition are the two control surfaces that PP exposes, then closing the loop on both with SLO slack as the feedback signal.</div>
+</section>
+
+<!-- ===== s8 Assessment ===== -->
+<section id="s8">
+  <div class="sec-no">08 · Assessment</div>
+  <h2 class="sec">Assessment</h2>
+
+  <h3>Strengths</h3>
+  <ul class="tight">
+    <li><strong>The diagnosis is measured, not asserted.</strong> Each of the three imbalance classes is tied to its own measurement (Figure 2 for the mechanism, Figure 3 for the cost curve) before any mechanism is proposed, and the numbers are memorable in the way that makes them reusable: 627 ms for a 2,048-vs-128 prefill pair, +31% for 128 → 160 decode requests against +5% for 96 → 128.</li>
+    <li><strong>The baseline is honest — and it already wins.</strong> The paper states up front that PP<sub>static</sub> with a well-chosen chunk beats TP on goodput, TTFT and TPOT. That removes the easy version of the claim and forces the dynamic mechanisms to justify themselves on latency rather than on beating TP, which they do.</li>
+    <li><strong>Failure cases are reported, not hidden.</strong> DCP<sub>pred</sub> is slower than PP<sub>static</sub> below the 50th percentile on CNN (Figure 11b); DCP alone cannot touch CNN-Reversed; DS is inert on prefill-heavy traces and collapses below SLO scale 0.6; DS makes P99 TPOT 15% worse for the requests it suspends. A reader can map the techniques to the workloads where they fail, which is more useful than a uniform speedup claim.</li>
+    <li><strong>The predictor is right-sized.</strong> 3.26% MAPE at 0.002875 ms and 0.643 KB with no pre-training is a genuinely deployable design, and the paper reports the comparison against an ensemble and a DNN instead of only against linear regression.</li>
+    <li><strong>The evaluation covers the axes that change the answer:</strong> two model sizes, four trace shapes, an SLO sweep, synthetic extremes on both sides of the prefill/decode ratio, and a real trace replay with attainment instead of goodput.</li>
+  </ul>
+
+  <h3>Weaknesses and thin spots</h3>
+  <ul class="tight">
+    <li><strong>No numeric hyperparameters anywhere.</strong> α, β, γ, \(\theta_{mem}\), the preemption threshold and the RLS forgetting factor are all named and all unquantified. The mechanism is portable; the operating point is not, and the paper's own results depend on that operating point being right.</li>
+    <li><strong>The pipeline degree of the evaluation is never stated.</strong> Every timing diagram is two stages, but §5.1 reports only "four A100 GPUs". Since the greedy loop's cadence is \(D_p\) iterations and its feedback is delayed by \(D_p\) stages, the most structural parameter of the design is left implicit — and with more stages the greedy approach's stated weakness (delayed, skewed feedback) should get worse in a way the paper never measures.</li>
+    <li><strong>Delay scheduling is a preemption scheme with a thin fairness account.</strong> It suspends live requests to improve aggregate completion time; the paper reports the P99 TPOT cost for preempted requests (+15%) but no per-request latency distribution, no resume-ordering guarantee and no anti-thrashing rule for requests that get suspended repeatedly.</li>
+    <li><strong>One platform, one interconnect class.</strong> The entire thesis rests on PCIe 4.0 A100 40GB. On NVLink the communication argument that motivates PP weakens, and the crossover point between TP and PP would move; nothing here measures that. AMD GPUs and NPUs are discussed as motivation but never tested.</li>
+    <li><strong>Disaggregation is argued against, not measured against.</strong> The critique of weight duplication and KV transfer is stated qualitatively; there is no head-to-head against a Splitwise- or DistServe-style deployment, so a reader cannot tell whether the bubbles removed here outweigh the overheads avoided there.</li>
+    <li><strong>Goodput is defined by a single percentile pair on Poisson arrivals.</strong> Burstier arrivals, deadline-style SLOs or per-tenant fairness would stress the schedulers differently, and the paper's own bursty real trace is exactly where DCP<sub>greedy</sub> (93.5%) falls behind DCP<sub>pred</sub> (94.5%) — a hint that arrival shape matters more than the main figures show [organized].</li>
+  </ul>
+
+  <h3>What a practitioner should take away</h3>
+  <ul class="tight">
+    <li><strong>Do not run PP at the default chunk of 2,048.</strong> On the real Azure trace that configuration attains 1.6% of requests against 92.5% for the same system with an offline-searched chunk — a gap larger than anything the dynamic mechanisms contribute.</li>
+    <li><strong>Start with a per-workload chunk search, then add the greedy loop.</strong> The greedy variant is a handful of conditionals on slack and free KV; it matches the predictor on goodput and captures a large part of the TPOT gain. Reach for the predictive model when tail latency, not goodput, is what you are paid for.</li>
+    <li><strong>Keep decode microbatches on the 128-multiple boundaries.</strong> Going from 128 to 129 requests can cost about 31% idle time while 96 → 128 costs 5%; the rule survives independently of everything else in the paper.</li>
+    <li><strong>Use delay scheduling only where decode dominates.</strong> It is inert on prefill-heavy traces, worth up to 1.4× goodput on decode-heavy ones, and it is paid for by the suspended requests' tail TPOT — a fairness decision, not a pure optimisation.</li>
+    <li><strong>Treat "PP beats TP" as a PCIe claim.</strong> If your nodes are NVLink-connected, the paper's premise (TP's communication volume is the bottleneck) does not hold, and the crossover has to be re-measured on your hardware.</li>
+  </ul>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>Lineage at a glance — each mechanism this paper uses, the upstream it credits, and what the paper changes ([organized] from the paper's inline citations and §4–§6; not a table from the paper)</caption>
+    <thead><tr><th>Component</th><th>Upstream, as cited in the paper</th><th>What this paper changes</th></tr></thead>
+    <tbody>
+      <tr><td>Iteration-level scheduling</td><td>ORCA (Yu et al., 2022); vLLM (Kwon et al., 2023)</td><td>Kept intact — requests still join and leave per iteration; the paper changes only what each iteration is allowed to contain.</td></tr>
+      <tr><td>Chunked prefill</td><td>Sarathi-Serve (Agrawal et al., 2024); DeepSpeed-FastGen (Holmes et al., 2024)</td><td>The chunk size becomes a per-iteration control variable bounded by TTFT<sub>SLO</sub> and TPOT<sub>SLO</sub>, instead of a fixed configuration.</td></tr>
+      <tr><td>Default chunk size in production frameworks</td><td>2,048 as the default chunk size, which the paper also uses for the TP baseline (Agrawal et al., 2024; vLLM Team, 2025)</td><td>Replaced by a candidate search over {128…2048}: greedy feedback (Algorithm 1) or model-priced bounds (Figure 6).</td></tr>
+      <tr><td>Iteration-latency model</td><td>Offline profiling of the linear layers — this paper's own ablation baseline (Table 1, "ALP (Baseline)")</td><td>Adds three online attention terms plus a residual ε, taking MAPE from 15.85% to 3.26% without an offline training phase.</td></tr>
+      <tr><td>Adaptive filtering</td><td>Recursive Least Squares (Haykin, <em>Adaptive Filter Theory</em>)</td><td>Applied to per-iteration latency calibration; justified by feature-scale disparity (\(L_{pre}^{2}\) vs \(L_{dec}\)) and by non-stationarity that a forgetting factor handles.</td></tr>
+      <tr><td>Microbatch composition</td><td>Static assignment for a request's lifetime (Kwon et al., 2023; Zheng et al., 2024)</td><td>Delay scheduling: suspend and resume requests across stages, aligned to hardware-efficient batch boundaries, with state-dependent victim selection.</td></tr>
+      <tr><td>Phase-disaggregated serving</td><td>Splitwise (Patel et al., 2024); Mooncake (Qin et al., 2024); DistServe (Zhong et al., 2024)</td><td>Not adopted: keeps serving unified to avoid weight duplication and KV-transfer bandwidth, and removes the interference with scheduling instead.</td></tr>
+      <tr><td>Pipeline parallelism itself</td><td>GPipe (Huang et al., 2019); PipeDream (Narayanan et al., 2019)</td><td>Carried from training into online inference, where microbatches cannot be shaped in advance — the source of all three bubbles.</td></tr>
+      <tr><td>Dynamic chunking for SLO compliance</td><td>Niyama (Goel et al., 2025)</td><td>Adds the PP structural constraint that earlier dynamic chunking ignored, plus the decode-side rebalancing such work cannot express.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Citations follow the paper's own inline attributions; this page did not re-verify them against the paper's reference list.</p>
+
+  <h3>Not disclosed, worth testing next</h3>
+  <ul class="tight">
+    <li><b>The operating point.</b> No numeric α, β, γ, \(\theta_{mem}\) or preemption threshold appears anywhere in the paper. A published sensitivity sweep — goodput and P99 TPOT as a function of each — would let a deployment be tuned instead of re-derived, and would show which of the five actually matters.</li>
+    <li><b>RLS parameters.</b> The forgetting factor, covariance initialisation and update rate are unstated; whether the predictor stays stable under bursty arrivals, or under a step change in load mix, is an open question worth measuring against a fixed-coefficient model.</li>
+    <li><b>Pipeline depth.</b> The evaluation never states the stage count, so it is unknown whether the reported gains hold at \(D_p\) = 4 or 8. The greedy loop's convergence lag and its "feedback skewed by larger chunks in other stages" problem should worsen with depth — an experiment that would either strengthen or bound the claim.</li>
+    <li><b>Hardware and interconnect generality.</b> The claim is a PCIe claim. Whether the TP/PP crossover survives NVLink, H100-class GPUs, AMD accelerators or NPUs is untested, as is any combination with data, expert or context parallelism.</li>
+    <li><b>Preemption accounting.</b> Delay scheduling suspends real requests, and the P99 TPOT cost (+15%) is reported only in aggregate. A per-request latency distribution, a resume-order guarantee and a bound on repeated preemption would turn the policy from plausible into auditable.</li>
+  </ul>
+
+  <div class="takeaway"><b>Bottom line:</b> a compact, well-instrumented scheduling paper whose strongest result is also its least glamorous one — the chunk size matters more than the algorithm that chooses it. Read it for the bubble taxonomy, the two-branch control law and the honest failure map; treat its parameters, its pipeline shape and its interconnect as local to the authors' rack until you have measured your own.</div>
+</section>
+
+<!-- ===== s9 Glossary ===== -->
+<section id="s9">
+  <div class="sec-no">09 · Glossary</div>
+  <h2 class="sec">Glossary</h2>
+  <p class="muted">Every abbreviation used on this page, in the sense the paper uses it. Abbreviations in the prose carry a dotted underline — hover to see the expansion without leaving the paragraph.</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Terms and abbreviations used in this deep read</caption>
+    <thead><tr><th>Term</th><th>Expansion</th><th>Meaning in this paper</th></tr></thead>
+    <tbody>
+      <tr><td>TP</td><td>Tensor Parallelism</td><td>Sharding intra-layer tensors across GPUs and combining partial results with all-reduce; the default for single-node serving, cheap on NVLink and expensive on PCIe.</td></tr>
+      <tr><td>PP</td><td>Pipeline Parallelism</td><td>Partitioning the model by layer depth into stages, one per GPU, with microbatches walking the stages in order; the parallelism this paper revisits.</td></tr>
+      <tr><td>DCP</td><td>Dynamic Chunked Prefill</td><td>The paper's umbrella for choosing the chunk size per scheduling iteration; two variants, DCP<sub>greedy</sub> and DCP<sub>pred</sub>.</td></tr>
+      <tr><td>DS</td><td>Delay Scheduling</td><td>The paper's decode-side rebalancing: temporarily suspend requests so microbatches across stages even out, then resume them.</td></tr>
+      <tr><td>ALP</td><td>Adaptive Latency Prediction</td><td>The paper's latency model: an offline linear-layer fit plus online attention terms calibrated by RLS.</td></tr>
+      <tr><td>TTFT</td><td>Time To First Token</td><td>Prefill-path latency from request arrival to the first output token; budgeted at 2,000 ms in this paper.</td></tr>
+      <tr><td>TPOT</td><td>Time Per Output Token</td><td>Inter-token latency during decode; budgeted at 200 ms. The paper also uses \(TTFT_{SLO}\) and \(TPOT_{SLO}\) for the two budgets.</td></tr>
+      <tr><td>E2E</td><td>End-to-End latency</td><td>Total request latency; the paper reports its P90 and P99 alongside TTFT and TPOT.</td></tr>
+      <tr><td>SLO</td><td>Service Level Objective</td><td>The latency target a request must meet. Here always a pair: a TTFT budget and a TPOT budget.</td></tr>
+      <tr><td>Goodput</td><td>—</td><td>Defined in §5.1 as the highest request rate at which both P90 TTFT and P90 TPOT satisfy their SLOs; the paper's primary metric.</td></tr>
+      <tr><td>P90 / P99</td><td>90th / 99th percentile</td><td>Tail statistics of a latency distribution over requests or over scheduling iterations, depending on the figure.</td></tr>
+      <tr><td>KV cache</td><td>Key-Value cache</td><td>The stored attention keys and values that let decode reuse prior computation; its free fraction (\(KV_{free}\)) is one of the greedy scheduler's inputs.</td></tr>
+      <tr><td>Chunked prefill</td><td>—</td><td>Splitting a long prompt's prefill into fixed-size chunks spread over iterations (Sarathi-Serve, Agrawal et al., 2024); the substrate both DCP mechanisms vary.</td></tr>
+      <tr><td>Microbatch</td><td>—</td><td>A smaller split of an iteration's batch that is handed to one pipeline stage; PP's unit of work traversal, and DS's unit of rebalancing.</td></tr>
+      <tr><td>Pipeline bubble</td><td>—</td><td>Idle time on a stage while its peers work; in this paper classified as P-P, P-D or D-D imbalance.</td></tr>
+      <tr><td>RLS</td><td>Recursive Least Squares</td><td>The adaptive filter used to refit ALP's attention coefficients online (Haykin, <em>Adaptive Filter Theory</em>).</td></tr>
+      <tr><td>MAPE</td><td>Mean Absolute Percentage Error</td><td>The predictor accuracy metric in Table 1; ALP reaches 3.26%.</td></tr>
+      <tr><td>MoE</td><td>Mixture-of-Experts</td><td>Sparse expert routing; mentioned only in the related work, as a parallelism axis this paper does not combine with.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">Variant labels follow the paper's figures: PP<sub>static</sub> is PP with an offline-searched fixed chunk; DCP<sub>pred</sub>+DS is the predictive chunk schedule combined with delay scheduling.</p>
+</section>
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="Back to top" title="Back to top">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    English full mirror of the deep-read page for <em>Revisiting Pipeline Parallelism for LLM Serving</em> (Soonjae Hwang, Jeongseob Ahn, Korea University — USENIX OSDI 2026, pp. 1803–1819). All 14 figures, the algorithm listing and the prediction-model table are 300 DPI crops of the paper's own PDF, shown scaled but never cropped further, re-rendered or retouched; the readings under each caption are the editor's, and every number quoted in the prose is the paper's unless marked [organized] or [estimated].<br>
+    Paper: <a href="https://www.usenix.org/conference/osdi26/presentation/hwang">USENIX OSDI 2026</a> · <a href="https://www.usenix.org/system/files/osdi26-hwang.pdf">PDF</a> · Chinese edition: <a href="index.html">index.html</a><br>
+    <span style="opacity:.75">Dark mode · click any image for the original · print-friendly</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<!--
+  MAINTAINER NOTE — inline-math delimiters
+  =======================================
+  This page registers $$...$$ (display) and \(...\) (inline) only. The single-dollar
+  delimiter is deliberately NOT registered: the paper reports no dollar amounts, but a
+  page that pairs bare "$" signs as math would silently typeset any stray currency-like
+  token (and any prose between two of them) as italic formula. Keeping "$" out of the
+  delimiter list makes a lone "$" render literally instead, and every inline formula is
+  written \( ... \) so the intent is explicit at the source.
+-->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // dark mode: remember the choice, otherwise follow the system
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox: click an image to see the original
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // back to top
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+
+  // reading progress + narrow-screen chapter strip follows the current section
+  var pr = document.getElementById('readProgress');
+  var bar = document.querySelector('.topbar .linkbar');
+  var jumpLinks = bar ? [].slice.call(bar.querySelectorAll('a')) : [];
+  function syncProgress(){
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var y = window.scrollY || document.documentElement.scrollTop;
+    if (pr) pr.style.transform = 'scaleX(' + (h > 0 ? Math.min(1, Math.max(0, y / h)) : 0) + ')';
+    if (!jumpLinks.length) return;
+    var active = null;
+    for (var i = 0; i < jumpLinks.length; i++){
+      var t = document.getElementById(jumpLinks[i].getAttribute('href').slice(1));
+      if (t && t.getBoundingClientRect().top <= 90) active = jumpLinks[i];
+    }
+    for (var j = 0; j < jumpLinks.length; j++){
+      if (jumpLinks[j] === active){
+        jumpLinks[j].style.color = 'var(--accent)';
+        jumpLinks[j].style.borderColor = 'var(--accent)';
+        if (active.offsetLeft < bar.scrollLeft ||
+            active.offsetLeft + active.offsetWidth > bar.scrollLeft + bar.clientWidth){
+          bar.scrollLeft = Math.max(0, active.offsetLeft - 16);
+        }
+      } else {
+        jumpLinks[j].style.color = '';
+        jumpLinks[j].style.borderColor = '';
+      }
+    }
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function(){
+    if (!ticking){
+      ticking = true;
+      (window.requestAnimationFrame || setTimeout)(function(){ syncProgress(); ticking = false; });
+    }
+  }, {passive:true});
+  window.addEventListener('resize', syncProgress);
+  syncProgress();
+})();
+</script>
+
+</body>
+</html>

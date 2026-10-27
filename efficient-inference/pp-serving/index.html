@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="OSDI 2026《Revisiting Pipeline Parallelism for LLM Serving》中文精读:14 图 1 表 1 算法高清内嵌,逐段讲解流水线并行的三类气泡与动态调度">>
+<meta name="keywords" content="论文精读, 流水线并行, pipeline parallelism, LLM serving, chunked prefill, goodput, OSDI 2026">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文精读 · Revisiting Pipeline Parallelism for LLM Serving">
+<meta property="og:description" content="重新审视流水线并行:LLM 在线服务的动态分块与跨 stage 延迟调度">
+<meta property="og:url" content="https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/pp-serving/">
+<meta name="theme-color" content="#2f5bd9">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous">
+<title>论文精读 · Revisiting Pipeline Parallelism for LLM Serving(OSDI 2026)</title>
+<style>
+  /* ===== 图文配合精读页样式(paper-reading-html skill v2)===== */
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2432; --muted:#5c6675;
+    --accent:#2f5bd9; --accent-soft:#e8edfb; --teal:#0d8a6d; --teal-soft:#e3f4ee;
+    --border:#dde3ec; --th-bg:#eef1f7; --code-bg:#f3f5f9;
+    --topbar-bg:rgba(255,255,255,.85); --shadow:0 2px 14px rgba(16,30,60,.10);
+    --hl-yellow:#fff3bf;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1420; --card:#171e2d; --ink:#e8ecf4; --muted:#9aa6ba;
+    --accent:#6e95f5; --accent-soft:#1d2a47; --teal:#3dd6ae; --teal-soft:#0f2e26;
+    --border:#26314a; --th-bg:#1c2436; --code-bg:#131a29;
+    --topbar-bg:rgba(15,20,32,.88); --shadow:0 2px 14px rgba(0,0,0,.45);
+    --hl-yellow:#4a3a10;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       line-height:1.85; font-size:16px; transition:background .25s ease,color .25s ease}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+  /* 顶部常驻导航 */
+  .topbar{position:sticky; top:0; z-index:60; background:var(--topbar-bg);
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+          border-bottom:1px solid var(--border); transition:background .25s ease}
+  /* 阅读进度条:贴在顶栏底边,纯 CSS transform 驱动 */
+  .topbar .progress{position:absolute; left:0; bottom:-1px; height:2px; width:100%;
+                    background:var(--accent); transform:scaleX(0); transform-origin:0 50%;
+                    opacity:.9; pointer-events:none}
+  @media print{.topbar .progress{display:none!important}}
+  .topbar .inner{max-width:1180px; margin:0 auto; padding:10px 28px; display:flex; align-items:center; gap:14px}
+  .topbar .brand{font-weight:800; font-size:15px; color:var(--ink); text-decoration:none; white-space:nowrap}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .links{display:flex; gap:14px; margin-left:auto; align-items:center}
+  .topbar a.jump{font-size:13px; color:var(--muted); text-decoration:none; white-space:nowrap}
+  .topbar a.jump:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+                border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer}
+  .theme-toggle:hover{border-color:var(--accent)}
+  /* 窄屏:桌面章节链接隐藏,改用可横向滚动的章节条(不占高度、无需 JS 抽屉) */
+  .topbar .linkbar{display:none}
+  @media (max-width:860px){
+    .topbar a.jump{display:none}
+    .topbar .inner{flex-wrap:wrap; gap:8px 10px; padding:9px 18px 8px}
+    .topbar .links{gap:8px}
+    .topbar .linkbar{display:flex; order:3; width:100%; gap:8px; overflow-x:auto;
+                     scrollbar-width:none; -ms-overflow-style:none; padding:2px 0 3px;
+                     margin:0; -webkit-overflow-scrolling:touch}
+    .topbar .linkbar::-webkit-scrollbar{display:none}
+    .topbar .linkbar a{flex:0 0 auto; font-size:12.5px; color:var(--muted); text-decoration:none;
+                       white-space:nowrap; padding:4px 11px; border:1px solid var(--border);
+                       border-radius:999px; background:var(--card)}
+    .topbar .linkbar a:hover,.topbar .linkbar a:focus-visible{color:var(--accent); border-color:var(--accent)}
+  }
+  @media print{.topbar .linkbar{display:none!important}}
+
+  header.hero{background:linear-gradient(135deg,#1f2c52 0%,#2f5bd9 60%,#3f7de0 100%);
+              color:#fff; padding:60px 0 52px; margin:0}
+  header.hero .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; opacity:.85; font-weight:600}
+  header.hero h1{font-size:33px; line-height:1.35; margin:14px 0 10px; font-weight:800}
+  header.hero .subtitle{font-size:17px; opacity:.92; max-width:900px}
+  header.hero .meta{margin-top:22px; font-size:13.5px; opacity:.9; display:flex; flex-wrap:wrap; gap:8px 22px}
+  header.hero .meta a{color:#cfe0ff; text-decoration:none}
+  .pill{display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+        padding:2px 12px; border-radius:999px; font-size:12.5px; margin:0 6px 6px 0}
+
+  .toc{background:var(--card); border:1px solid var(--border); border-radius:12px;
+       padding:22px 28px; margin:36px auto; max-width:900px}
+  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:40px}
+  .toc li{margin:4px 0; font-size:14.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+
+  section{margin:56px 0}
+  h2.sec{font-size:26px; font-weight:800; margin:0 0 6px; padding-bottom:10px; border-bottom:3px solid var(--accent); display:inline-block}
+  .sec-no{font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px}
+  h3{font-size:19px; margin:32px 0 10px; font-weight:700}
+  h4{font-size:16.5px; margin:22px 0 8px; font-weight:700}
+  p{margin:10px 0}
+  .lead{font-size:17px; color:#38404f}
+  html[data-theme="dark"] .lead{color:#c6cedd}
+  strong{font-weight:700}
+  .muted{color:var(--muted)}
+
+  /* 术语缩略词 */
+  abbr[title]{text-decoration:underline dotted; cursor:help; text-decoration-color:var(--accent)}
+
+  .note{background:var(--accent-soft); border-left:4px solid var(--accent);
+        border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .takeaway{background:var(--teal-soft); border-left:4px solid var(--teal);
+            border-radius:0 10px 10px 0; padding:13px 20px; margin:16px 0; font-size:15px}
+  .kv{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:18px 0}
+  .kv .item{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px}
+  .kv .k{font-size:12.5px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .kv .v{font-size:16.5px; font-weight:700; margin-top:2px}
+  .kv .v small{font-weight:400; color:var(--muted); font-size:12.5px; display:block}
+
+    /* 公式:KaTeX 渲染(display 用 $$…$$,内联用 $…$;避免 Unicode 组合字符) */
+  .math{background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+        padding:14px 22px; margin:14px auto; max-width:820px; text-align:center;
+        overflow-x:auto}
+  .math .katex-display{margin:0}
+  .math>.katex{font-size:1.06rem}
+  p .katex, li .katex{font-size:1em}
+
+  /* 图片:等比缩放,绝不裁剪;点击看原图 */
+  figure.fig{margin:20px 0 8px; padding:0}
+  figure.fig img{display:block; margin:0 auto; max-width:100%; height:auto;
+                 border:1px solid var(--border); border-radius:8px; background:#fff; cursor:zoom-in}
+  figure.fig figcaption{margin:0; padding:9px 2px 0; border-top:1px solid var(--border);
+                        font-size:13px; line-height:1.72; color:var(--muted)}
+  figure.fig figcaption b{color:var(--ink); font-weight:600}
+  /* 中文解读是图注主体:给足字号与对比度,英文原句降为次要信息 */
+  figure.fig figcaption .zh{display:block; margin-top:5px; color:#333c4b; font-size:14px}
+  html[data-theme="dark"] figure.fig figcaption .zh{color:#cdd5e3}
+  figure.fig figcaption .pgref{display:block; margin-top:6px; font-size:11.5px; color:var(--muted); opacity:.8}
+  .zoom-hint{font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; opacity:.85}
+
+  /* lightbox 全图查看 */
+  .lightbox{position:fixed; inset:0; z-index:200; background:rgba(5,10,23,.92);
+            display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:96vw; max-height:86vh; object-fit:contain; border-radius:6px; background:#fff}
+  .lightbox .lb-cap{color:#dfe6f5; font-size:13.5px; margin-top:14px; max-width:900px; text-align:center}
+  .lightbox .lb-close{position:absolute; top:18px; right:28px; color:#fff; font-size:34px; line-height:1;
+                      cursor:pointer; opacity:.8; background:none; border:none}
+  .lightbox .lb-close:hover{opacity:1}
+
+  table.data{border-collapse:collapse; margin:0 auto; font-size:13.5px; line-height:1.5; background:var(--card)}
+  table.data caption{caption-side:top; text-align:left; font-weight:700; font-size:14px; padding:10px 4px; color:var(--ink)}
+  table.data th{background:var(--th-bg); border:1px solid var(--border); padding:7px 11px; font-weight:700; white-space:nowrap}
+  table.data td{border:1px solid var(--border); padding:6px 11px; text-align:center; white-space:nowrap}
+  table.data td:first-child, table.data th:first-child{text-align:left}
+  table.data.wrap td{white-space:normal; text-align:left; vertical-align:top}
+  table.data.wrap th{white-space:normal}
+  table.data.wrap td:first-child{font-weight:600}
+  table.data tr.hl td{background:#eef3ff; font-weight:700}
+  html[data-theme="dark"] table.data tr.hl td{background:#23304f}
+  table.data tbody tr:nth-child(even):not(.hl) td{background:#fafbfd}
+  html[data-theme="dark"] table.data tbody tr:nth-child(even):not(.hl) td{background:#141b29}
+  .tbl-wrap{overflow-x:auto; margin:14px 0; border-radius:10px}
+  .tbl-wrap .data{border:1px solid var(--border)}
+  .tbl-note{font-size:13.5px; color:var(--muted); margin:8px 0 14px; text-align:center}
+
+  ul.tight{margin:8px 0; padding-left:22px}
+  ul.tight li{margin:5px 0}
+
+  .back-top{position:fixed; right:26px; bottom:30px; z-index:90; width:44px; height:44px; border-radius:50%;
+            background:var(--accent); color:#fff; border:none; font-size:20px; cursor:pointer;
+            box-shadow:var(--shadow); display:none}
+  .back-top.show{display:block}
+  .back-top:hover{filter:brightness(1.1)}
+
+  footer{margin-top:70px; padding:34px 0 50px; border-top:1px solid var(--border);
+         color:var(--muted); font-size:13.5px; text-align:center}
+
+  /* 打印 */
+  @media print{
+    .topbar,.back-top,.theme-toggle,.lightbox{display:none!important}
+    body{background:#fff; color:#000}
+    figure.fig{break-inside:avoid}
+    .tbl-wrap{break-inside:avoid}
+    a{color:#000; text-decoration:none}
+  }
+  @media (max-width:760px){
+    body{font-size:15px}
+    header.hero h1{font-size:25px}
+    .toc ol{columns:1}
+    .math{font-size:14px}
+  }
+
+  /* 语言切换器(与 theme-toggle 同族) */
+  .lang-toggle{border:1px solid var(--border); background:var(--card); color:var(--ink);
+               border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer;
+               text-decoration:none; font-weight:700; white-space:nowrap}
+  .lang-toggle:hover{border-color:var(--accent); color:var(--accent)}
+  @media print{.lang-toggle{display:none!important}}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="inner">
+    <a class="brand" href="#top">流水线并行<span>·精读</span></a>
+    <div class="links">
+      <a class="jump" href="#s1">速览</a>
+      <a class="jump" href="#s2">背景</a>
+      <a class="jump" href="#s3">观察</a>
+      <a class="jump" href="#s4">方法</a>
+      <a class="jump" href="#s5">实现</a>
+      <a class="jump" href="#s6">实验</a>
+      <a class="jump" href="#s7">定位</a>
+      <a class="jump" href="#s8">点评</a>
+      <a class="jump" href="#s9">术语</a>
+      <a class="lang-toggle" href="en.html" title="Read in English" onclick="try{localStorage.setItem('pr-lang','en')}catch(e){}">EN</a>
+      <button class="theme-toggle" aria-label="切换深色/浅色" title="切换深色/浅色">🌓</button>
+    </div>
+    <div class="linkbar" aria-label="章节导航">
+      <a href="#s1">速览</a>
+      <a href="#s2">背景</a>
+      <a href="#s3">观察</a>
+      <a href="#s4">方法</a>
+      <a href="#s5">实现</a>
+      <a href="#s6">实验</a>
+      <a href="#s7">定位</a>
+      <a href="#s8">点评</a>
+      <a href="#s9">术语</a>
+    </div>
+  </div>
+  <div class="progress" id="readProgress" aria-hidden="true"></div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Paper Reading Notes · OSDI 2026</div>
+    <h1>重新审视流水线并行:LLM 在线服务的动态分块与跨 stage 延迟调度</h1>
+    <div class="subtitle">论文原文:<i>Revisiting Pipeline Parallelism for LLM Serving</i>。一句话主张——在 PCIe/NPU 这类带宽受限的多卡机器上,把张量并行(TP)换成流水线并行(PP),再用两段调度改造把 pipeline bubble 压回去,PP 的 goodput 就会反超 TP。</div>
+    <div class="meta">
+      <span>作者:Soonjae Hwang、Jeongseob Ahn(Korea University)</span>
+      <span>会议:<a href="https://www.usenix.org/conference/osdi26/presentation/hwang">OSDI 2026</a>(7 月 13–15 日,Seattle)</span>
+      <span>论文:<a href="https://www.usenix.org/system/files/osdi26-hwang.pdf">osdi26-hwang.pdf(18 页,全文报告 p.1803–1819)</a></span>
+    </div>
+    <div style="margin-top:18px"><span class="pill">流水线并行</span><span class="pill">动态 chunked prefill</span><span class="pill">延迟预测模型</span><span class="pill">delay scheduling</span><span class="pill">在线服务</span><span class="pill">goodput</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>阅读导航(图文按讲述顺序穿插)</h2>
+  <ol>
+    <li><a href="#s1">速览:这篇论文在赌什么</a></li>
+    <li><a href="#s2">背景:TP 与 PP 的成本结构、两个时延指标</a></li>
+    <li><a href="#s3">观察:气泡的三种形状与三张性能剖面</a></li>
+    <li><a href="#s4">方法:动态 chunk(greedy / 预测式)与 delay scheduling</a></li>
+    <li><a href="#s5">实现:把论文配置落到一次调度决策上</a></li>
+    <li><a href="#s6">实验:goodput、尾部时延、真实 trace、预测精度</a></li>
+    <li><a href="#s7">定位:它站在哪条谱系上</a></li>
+    <li><a href="#s8">点评:强在哪、能质疑什么、还有什么没披露</a></li>
+    <li><a href="#s9">术语速查(阅读中随时回看)</a></li>
+  </ol>
+</nav>
+
+<section id="s1">
+  <div class="sec-no">01 · Overview</div>
+  <h2 class="sec">速览:这篇论文在赌什么</h2>
+  <p class="lead">大多数线上 LLM 服务系统的默认答案是多卡就上张量并行(TP):把每层的权重矩阵切开放到 4 张卡上,一次 all-reduce 把部分和拼回来,每 token 时延低、负载天然均衡。但这个答案有一个隐含前提——卡之间得有 NVLink 那样的高带宽互连。公共云里大量 GPU 服务器、以及 AMD GPU 和各类 NPU,走的是 PCIe;在这类机器上,TP 每层两轮 all-reduce 的通信量会直接把收益吃掉。</p>
+  <p>流水线并行(PP)的通信量小得多:模型按层深切成若干 stage,激活值只在相邻 stage 之间点对点传一次,microbatch 依次流过各 stage 就形成了流水。但它有两个老问题:一是 <b>pipeline bubble</b>——只要各 stage 的计算量不等,就必然有空转;二是在线服务里"各 stage 计算量相等"这件事根本不成立,因为请求到达时间和输入长度都是抖的。论文的判断是:<b>PP 在带宽受限机器上本来就该赢,它没赢是因为调度没为在线服务改过</b>。于是它把 PP 的失衡拆成三类,再各配一把抓手。</p>
+
+  <div class="kv">
+    <div class="item"><div class="k">三类失衡(论文的分解)</div><div class="v">P-P / P-D / D-D<small>Prefill-Prefill、Prefill-Decode、Decode-Decode。前两类由"长度不等"和"阶段混杂"造成,第三类由"请求数不等"造成。</small></div></div>
+    <div class="item"><div class="k">三把抓手(两机制 + 一调度)</div><div class="v">DCP<sub>greedy</sub> → DCP<sub>pred</sub> → +DS<small>动态 chunk 大小(反馈式 / 预测式),再把请求在 microbatch 之间迁移(delay scheduling)。</small></div></div>
+    <div class="item"><div class="k">主结果(AzureConv,Qwen2.5-32B)</div><div class="v">TPOT −35% · E2E −31%<small>相对"离线调好静态 chunk"的 PP 基线;真实 trace 上 SLO 达成率 92.5% → 94.6%。</small></div></div>
+    <div class="item"><div class="k">最锋利的一个数</div><div class="v">1.4× goodput<small>decode-heavy 负载上 delay scheduling 的单独增益;同一 trace 上把静态 chunk 从 512 改成 1024,SLO 达成率从 92.5% 掉到 6.9%。</small></div></div>
+  </div>
+
+  <div class="note"><b>读数约定:</b>本页全部数字以论文原文为准;凡由本页依据论文配置整理、归纳或换算的内容,均以「<b>整理</b>」「<b>推算</b>」显式标注,便于与论文口径区分。图表页码用论文集的连续页号(p.1803–1819)标注。记号沿用论文:$D_p$ 为流水线深度,$c$ 为 chunk 大小,$N_{tokens}$ 为一次迭代批内的总 token 数,$\mathrm{TTFT}$ 为 Time To First Token,$\mathrm{TPOT}$ 为 Time Per Output Token。</div>
+
+  <p>先把结论摆清楚,再逐段拆证据。论文的贡献可以写成三句话:</p>
+  <ul class="tight">
+    <li><b>诊断</b>:在线服务下 PP 的失衡不是一种,而是三种(P-P / P-D / D-D),它们由不同的原因触发,也必须用不同的手段消除——这一点是全文最有解释力的部分。</li>
+    <li><b>两个机制</b>:动态 chunked prefill,先用一个反馈控制器(greedy)证明"改 chunk 就能压气泡",再用一个轻量时延预测模型(预测式)解决反馈滞后;</li>
+    <li><b>一个调度</b>:delay scheduling,把 decode-only 迭代里的请求在 microbatch 之间挪动,专门对付 greedy/predictive 都碰不到的 D-D 失衡。</li>
+  </ul>
+
+  <div class="takeaway"><b>一句话记住它:</b>论文没有发明新的并行方式,也没有写新 kernel;它把"PP 在在线服务里为什么慢"翻译成了一个<b>每轮迭代都要重算的 chunk 大小与 microbatch 组成问题</b>,然后用 SLO 作为约束去解它。收益全部来自"少空转",而不是"算得更快"。</div>
+</section>
+
+<section id="s2">
+  <div class="sec-no">02 · Background</div>
+  <h2 class="sec">背景:TP 与 PP 的成本结构、两个时延指标</h2>
+
+  <h3>2.1 同一个模型,两种切法</h3>
+  <p><b>张量并行(TP)</b>切的是层内张量:注意力投影、FFN 的大权重矩阵沿某一维切开,每张卡算一部分 GEMM 与 attention,再用 all-reduce 把部分和聚合回来,语义上等价于一个完整层。好处是每张卡都持有全部层,单次前向里所有卡同时在算,单 token 时延低、负载均衡几乎是白送的;代价是每层都要通信,而通信量随隐藏维与 batch 走,必须有高带宽互连才压得住。</p>
+  <p><b>流水线并行(PP)</b>切的是层深:连续的若干层组成一个 stage 放在一张卡上,microbatch 依次流过各个 stage;stage 0 在处理第 $i+1$ 个 microbatch 时,stage 1 正在处理第 $i$ 个,靠流水掩盖时延。通信只在相邻 stage 间点对点传一次激活,量级远小于 TP。代价是引入了 <b>bubble</b>:某个 stage 没事干的时候,其它 stage 想快也快不了。</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>两种并行方式的成本结构对照(据论文 §2.2 整理,非论文原表)</caption>
+    <thead><tr><th>维度</th><th>张量并行 TP</th><th>流水线并行 PP</th></tr></thead>
+    <tbody>
+      <tr><td>切分维度</td><td>层内张量(注意力投影、FFN 权重矩阵)</td><td>层深(连续若干层 = 一个 stage)</td></tr>
+      <tr><td>通信模式</td><td>每层 all-reduce(集合通信),每张卡参与整次前向</td><td>相邻 stage 间点对点传激活,microbatch 顺序流动</td></tr>
+      <tr><td>通信量级</td><td>大,需要 NVLink 级别的高带宽才能被隐藏</td><td>小,PCIe 甚至更弱的互连也能承受</td></tr>
+      <tr><td>负载均衡</td><td>天然均衡:每张卡执行同一组算子</td><td>依赖 batch 组成:各 stage 计算量不等就空转</td></tr>
+      <tr><td>主要风险</td><td>通信成为瓶颈;带宽不足时收益被吃光</td><td>pipeline bubble;调度复杂度高、框架支持不成熟</td></tr>
+      <tr><td>论文的态度</td><td>在 NVLink 集群上仍是务实之选</td><td>在带宽受限机器上应被重新考虑,前提是把气泡压掉</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>2.2 两个时延指标,一个复合目标</h3>
+  <p>在线服务用两个指标刻画体验:<abbr title="Time To First Token,首 token 时延">TTFT</abbr> 衡量 prefill 阶段(用户等第一句话要多久),<abbr title="Time Per Output Token,每个输出 token 的时延">TPOT</abbr> 衡量 decode 阶段(吐字速度)。按 MLPerf inference 的口径,论文采用 <b>TTFT SLO = 2,000 ms、TPOT SLO = 200 ms</b>,并把 <b>goodput</b> 定义为"P90 的 TTFT 与 TPOT 同时满足 SLO 时的最高请求率"——注意这是一个<b>单标量</b>:它只关心"能撑到多高的到达率",不关心低负载下时延有多好。这一点在后面点评里会回来。</p>
+  <p>还有一个绕不开的背景:<b>iteration-level scheduling</b>(ORCA, Yu et al., 2022)让请求可以逐迭代进出批次;<b>chunked prefill</b>(Sarathi-Serve, Agrawal et al., 2024)把长 prompt 切成固定大小的 chunk 分多轮 prefill,避免一次长 prefill 把同批次里正在 decode 的请求顶到 200 ms 以上。这两件事已经是 vLLM、SGLang、TensorRT-LLM、Dynamo 的标配。论文的所有改造都建立在这个"每轮迭代重新组批"的调度模型之上。</p>
+
+  <h3>2.3 论文的起点:4 张 A100(PCIe)上的 TP vs PP</h3>
+  <p>作者先用最朴素的方式把问题摊开:同一台 4×A100 40GB(PCIe 4.0)的机器、同一个 Qwen2.5-32B、同一份 Azure Conversation 流量,分别用 TP 和 PP(带 chunked prefill)去跑,扫描请求率,看 TTFT 与 TPOT 的 P90。</p>
+
+  <figure class="fig">
+    <img src="figs/fig1.png" alt="Figure 1: Performance comparison for pipeline and tensor parallelism in serving Qwen2.5-32B with the Azure Conversation workload on 4 NVIDIA A100 GPUs">
+    <figcaption>
+      <b>Figure 1:</b> Performance comparison for pipeline and tensor parallelism in serving Qwen2.5-32B with the Azure Conversation workload on 4 NVIDIA A100 GPUs.
+      <span class="zh">上:P90 TTFT 随请求率的变化;下:P90 TPOT。虚线竖线标出两条 SLO 线(2,000 ms / 200 ms)各自允许的最大请求率。读这张图要抓住两件事:① <b>PP 的 TTFT 全面低于 TP</b>——前向计算被切到 4 个 stage 上流水重叠,首 token 更快出来;② <b>PP 的 TPOT 在高负载下急剧上升并先撞线</b>,因为不同 stage 之间的空转(bubble)随负载被放大。最终两个曲线的"拐点"决定了 goodput:TP 能撑住比 PP 高 <b>1.2×</b> 的请求率。这就是论文要推翻的那个数字。</span>
+          <span class="pgref">论文集 p.1806</span>
+    </figcaption>
+  </figure>
+
+  <p class="zoom-hint">💡 点击任意图片可查看原始高清大图,再次点击或按 Esc 关闭。</p>
+  <p>这张图还顺手解释了后文所有优化的方向。TP 的 TTFT 在高请求率下陡峭上升,是排队(queueing)带来的;PP 的 TPOT 陡峭上升,是空转带来的。<b>两条曲线的形状不同,说明瓶颈不同</b>:想赢 PP 这一侧,不需要让每一轮算得更快,只需要让 4 个 stage 少等彼此。这也是为什么全文的抓手都是"调度"而不是"算子"。</p>
+
+  <div class="takeaway"><b>本节小结:</b>PP 在带宽受限机器上的优势是结构性的(通信少、TTFT 低),劣势也是结构性的(依 batch 组成而变的气泡)。所以问题不是"PP 行不行",而是"气泡能不能被调度吃掉"。</div>
+</section>
+<section id="s3">
+  <div class="sec-no">03 · Observation</div>
+  <h2 class="sec">观察:气泡的三种形状与三张性能剖面</h2>
+
+  <h3>3.1 气泡不是一种,是三种</h3>
+  <p>论文的第一个贡献是给 pipeline bubble 做了一次"分型"。它假设一个两 stage、每 microbatch 最多 3 个请求的小例子(便于画图),把任一时刻的批次组成归纳成三种失衡:</p>
+
+  <figure class="fig">
+    <img src="figs/fig2.png" alt="Figure 2: Three types of pipeline bubbles">
+    <figcaption>
+      <b>Figure 2:</b> Three types of pipeline bubbles (The subscript indicates the iteration number.)
+      <span class="zh">横轴是时间(依次为 $T_1, T_2, \dots,T_{i+2}$),两行是 Worker 0 / Worker 1;颜色区分 Prefill、Decode、Prefill+Decode 与 Idle。三种失衡都在图里:① <b>P-P'(Prefill-Prefill)</b>出现在 $T_2$:$A_1B_1$ 是长 prompt、$C_1D_1$ 是短 prompt,Worker 0 早早做完 $C_1D_1$ 却要等 Worker 1 把 $A_1B_1$ 的 prefill 算完,才能开始下一个 microbatch $A_2B_2$;② <b>P-D(Prefill-Decode)</b>出现在 $T_3$:$A_2B_2$ 全是 decode、$C_1D_1$ 全是 prefill,两个 stage 的计算量差得更远;$T_4$ 是它的另一种形态——$C_2D_2E_1F_1$(2 prefill + 2 decode)对 $A_2B_2$(纯 decode);③ <b>D-D(Decode-Decode)</b>出现在 $T_i$ 到 $T_{i+2}$:所有 microbatch 都是 decode,但一个装了很多请求、另一个只装了几个,负载依旧不齐。</span>
+          <span class="pgref">论文集 p.1807</span>
+    </figcaption>
+  </figure>
+
+  <p>这个分类的价值在于它把"气泡"从一个笼统的性能现象,变成了三个可以分别对账的原因:<b>P-P 来自长度方差,P-D 来自阶段混杂,D-D 来自请求数方差</b>。后文的三把抓手与这三类一一对应(见 3.3 末的对照表)。也可以顺带看出,Tensor Parallelism 为什么天生没有这个问题:它根本不把输入批次拆成 microbatch,而是把同一批的计算均摊到所有卡上——所以 TP 的均衡是"结构上白送"的。</p>
+
+  <h3>3.2 为什么会失衡:三张性能剖面</h3>
+  <p>光有分类还不够,得证明"失衡的量级足以致命"。论文给出三张 microbenchmark(Qwen2.5-32B、单张 A100):</p>
+
+  <figure class="fig">
+    <img src="figs/fig3.png" alt="Figure 3: Performance characteristics: prefill time vs sequence length, decode time vs batch size, linear layer time vs tokens">
+    <figcaption>
+      <b>Figure 3:</b> Performance characteristics: (a) prefill time when varying the sequence length, (b) decode time when increasing the batch size, and (c) linear operations when increasing the number of tokens.
+      <span class="zh">三张图分别对应三种失衡的"燃料"。<b>(a) prefill 时延几乎只由输入长度决定</b>(128 → 2048 从几十毫秒涨到约 650 ms,柱子里浅蓝色是 linear、深色是 attention、灰色是其它),所以长度不等的两个 prefill 配到一起,差值就是纯空转:论文指出 2048 与 128 两个 prefill 顺序发出会形成约 <b>627 ms</b> 的气泡,把后续 stage 全部拖住。<b>(b) decode 时延由批内请求数决定</b>(1 → 160 个请求,时延从接近 0 涨到约 70 ms),因为每轮每个请求只算一个 token,计算量几乎与请求数成正比。<b>(c) 线性层时延是台阶函数</b>:批从 96 加到 128 只多花 <b>5%</b>,但从 128 加到 160 会突然多花 <b>31%</b>——这是 GEMM tile 粒度决定的(NVIDIA 文档里说的 tile quantization)。台阶的存在意味着"多塞几个请求"可能几乎免费,也可能贵得离谱。</span>
+          <span class="pgref">论文集 p.1807</span>
+    </figcaption>
+  </figure>
+
+  <p>把这三张图的结论拼起来,就是论文的因果链:<b>输入长度决定 prefill 开销、请求数决定 decode 开销,而在线流量的到达时间和长度都在抖</b>,所以每轮迭代凑出来的 microbatch 组成天然不等;一旦 4 个 stage 的计算量不等,bubble 就出现;而 (c) 的台阶又说明,靠"多凑一点"来填平差距本身是有阈值效应的——129 个 token 和 256 个 token 几乎一样贵,所以稍微越过边界的批次是"白付费"。</p>
+
+  <h3>3.3 旋钮只有一个:chunk 大小</h3>
+  <p>既然 P-P 与 P-D 都源于"一个 microbatch 里的 prefill 太长",最直接的干预就是 chunked prefill:把长 prompt 切成固定大小的小块,prefill 的计算量就被人为压平了。但 chunk 大小是个双向的旋钮。</p>
+
+  <figure class="fig">
+    <img src="figs/fig4.png" alt="Figure 4: Pipeline bubbles and prefill token throughput according to load and chunk size">
+    <figcaption>
+      <b>Figure 4:</b> Pipeline bubbles and prefill token throughput according to load and chunk size (when serving Qwen2.5-32B with the Azure Code workload on 4 NVIDIA A100 GPUs).
+      <span class="zh">(a) 气泡时间随请求率变化:chunk=128 的气泡在任何负载下都只有几毫秒;chunk=2048 在低到中等负载(1–3 req/s)时气泡高达 <b>12→48 ms</b>(3 req/s 处最差),因为少量长 prefill 霸占了整条流水;请求率到 4 req/s 之后,进来的 prefill 足够多、流水被持续填满,失衡自然消失;5 req/s 以上两种 chunk 都几乎不产生气泡。(b) 但小 chunk 要付吞吐代价:chunk=128 的 prefill 吞吐约 <b>7.1k tok/s</b>,chunk=2048 约 <b>10.4k tok/s</b>(读图约值,推算),因为每轮处理的 token 少了,GPU 用不满、排队更久、TTFT 变差。</span>
+          <span class="pgref">论文集 p.1808</span>
+    </figcaption>
+  </figure>
+
+  <p>所以"该用多大 chunk"没有全局答案:低负载时要小(压气泡),高负载时要大(保吞吐),而这个"最优点"随负载、模型、甚至 workload 的输入分布漂移。论文的实验也印证了这一点——32B 在 AzureConv / CNN / ShareGPT 上最优点在 <b>chunk 512</b>,在 decode-heavy 的 CNN-Reversed 上变成 <b>256</b>;14B 在 AzureConv 上又变成 <b>1024</b>。静态配置注定只在某一个负载点最优。</p>
+
+  <figure class="fig">
+    <img src="figs/fig5.png" alt="Figure 5: Reducing pipeline stalls from chunked-prefill">
+    <figcaption>
+      <b>Figure 5:</b> Reducing pipeline stalls from chunked-prefill [2].
+      <span class="zh">这张图说明 chunked prefill 为什么能压气泡,也说明它为什么不够。(a) 朴素 PP:$A_1$ 是一次完整长 prefill,它占满 Worker 0 的时候 Worker 1 只能"idle";接着 $B_1$ 又是一整块。两个 stage 的忙碌区间错位,空转可见。(b) 用 chunked prefill 把 $A_1$ 拆成 $A_1[C_1]$、$A_1[C_2]$ 之后,前一段 $A_1[C_1]$ 一算完就能流到 Worker 1,Worker 0 立刻开始 $B_1$ 或下一块——流水被"切碎"后填得更紧,idle 段消失。注意 chunk 越小填得越紧,但每块之间的启动开销与管线不满的问题会放大,这正是 (b) 里 chunk 大小需要动态选择的原因。</span>
+          <span class="pgref">论文集 p.1808</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>三类失衡 × 触发条件 × 论文的对应手段(据论文 §3–§4 整理,非论文原表)</caption>
+    <thead><tr><th>失衡类型</th><th>触发条件</th><th>典型症状</th><th>论文的抓手</th></tr></thead>
+    <tbody>
+      <tr><td>P-P(Prefill-Prefill)</td><td>同一轮里 microbatch 的输入长度差很大(如 2048 vs 128)</td><td>长 prefill 占满一侧,短的早早做完干等;单个气泡可达约 627 ms</td><td>动态 chunk(把长 prefill 切碎,压平各 stage 的计算量)</td></tr>
+      <tr><td>P-D(Prefill-Decode)</td><td>一个 microbatch 全是 decode,另一个全/多是 prefill</td><td>两侧计算量量级不同,decode 侧空转,TPOT 上升</td><td>动态 chunk + 预测式"上下界"选 chunk,避免把大 prefill 塞进正在 decode 的轮次</td></tr>
+      <tr><td>D-D(Decode-Decode)</td><td>整轮都是 decode,但某个 microbatch 请求数明显更多(如 129 vs 128)</td><td>线性层台阶导致"多几个请求就多 31% 时间",跨迭代反复空转</td><td>delay scheduling(在 microbatch 间迁移请求,并对齐 128 的硬件边界)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="takeaway"><b>本节小结:</b>论文把"PP 慢"拆成了 <b>长度方差(P-P)、阶段混杂(P-D)、请求数方差(D-D)</b> 三个可归因的病。前两个病有同一个旋钮(chunk 大小),第三个病必须动批次的组成。这是全文后续所有设计的出发点。</div>
+</section>
+
+<section id="s4">
+  <div class="sec-no">04 · Method</div>
+  <h2 class="sec">方法:动态 chunk(greedy / 预测式)与 delay scheduling</h2>
+
+  <h3>4.1 目标函数:在两条 SLO 约束下,选"最小的可行 chunk"</h3>
+  <p>论文把 chunk 选择写成一个约束优化:在满足 TPOT SLO 的前提下,选<b>能装下当前负载的最小 chunk</b>。理由很直接——chunk 越小,prefill 被切得越碎,stage 间越均衡、气泡越少;但太小会让 GPU 利用率不足、排队变长、TTFT 变差。所以"最小可行"正是"刚好能把当前负载消化掉"的那个点。</p>
+  <p>这里有一个很关键、但容易被跳过的设计:两条 SLO 在算法里承担的角色是不一样的。<b>TPOT SLO 是硬约束</b>(chunk 不能再大,否则正在跑的请求会被拖过 200 ms),而 <b>TTFT SLO 被当成负载指示器</b>——等待队列变长说明到达率高,于是放大 chunk 把队列抽干;TTFT 余量充足说明负载轻,于是缩小 chunk 去压气泡。这一点在预测式版本里被推到了极致(见 4.1.2 的下界)。</p>
+
+  <h3>4.1.1 Greedy:一个只用上下阈值的反馈回路</h3>
+
+  <figure class="fig">
+    <img src="figs/algo1.png" alt="Algorithm 1: Greedy chunk size adjustment">
+    <figcaption>
+      <b>Algorithm 1:</b> Greedy chunk size adjustment
+      <span class="zh">每 $D_p$ 次调度迭代执行一次(因为 chunk 改了要等一个 microbatch 穿过全部 $D_p$ 个 stage 才生效),流程是"取指标 → 查内存 → 调方向":① 取上一轮的 $\mathrm{TTFT}_{slack}$、$\mathrm{TPOT}_{slack}$ 与可用 KV 比例 $\mathrm{KV}_{free}$;② <b>内存优先</b>:若 $\mathrm{KV}_{free} < \theta_{mem}$,说明 KV 快满了,把 chunk 直接压到"大于当前在跑请求数的最小候选值"——以排空在途请求、回收 KV 为第一优先;③ <b>TPOT 要违约或 TTFT 余量充裕</b>:用 $c \leftarrow c-\delta$ 缩小 chunk 压气泡(注意这一条把"TTFT 余量大"也当成缩小的信号,因为此时系统远没到吞吐极限);④ <b>TTFT 吃紧而 TPOT 宽裕</b>:用 $c \leftarrow c+\delta$ 放大 chunk 提高吞吐、加快排空队列。阈值 $\alpha$、$\beta$、$\gamma$ 分别给出"充裕 / 安全 / 危急"三个边界。</span>
+          <span class="pgref">论文集 p.1809</span>
+    </figcaption>
+  </figure>
+
+  <p>这个控制器的优点是<b>改动量极小</b>——它只在既有调度器上加了"每 $D_p$ 轮读一次指标、按阈值加减 $\delta$"三行逻辑,不需要模型、不需要预训练,工程上几乎可以立刻落地。论文也坦白它的两个结构性缺陷:</p>
+  <ul class="tight">
+    <li><b>滞后</b>:一次调整要等 $D_p$ 轮才见效,而负载在秒级波动,于是控制器一直在追一个移动目标,长时间停留在次优状态;</li>
+    <li><b>观测被污染</b>:它读到的 $\mathrm{TTFT}_{slack}$ / $\mathrm{TPOT}_{slack}$ 是被流水线深度延迟、而且被<b>其它 stage 的 chunk 大小</b>搅过的量,反推不出"当前这个 chunk 到底合不合适"。</li>
+  </ul>
+
+  <h3>4.1.2 预测式:把迭代时延拆成"离线线性项 + 在线注意力项"</h3>
+  <p>为了绕开"反馈滞后",预测式版本直接对每个候选 chunk <b>预估</b>一次迭代的时延与吞吐。模型拆成两部分:</p>
+  <div class="math">$$T_{iter} = T_{offline} + T_{online},\qquad T_{offline} = \alpha_0\cdot N_{tokens} + \alpha_1$$</div>
+  <p>$T_{offline}$ 只依赖这一轮批内总 token 数 $N_{tokens}$,而 $N_{tokens}$ 在 chunked prefill 下几乎由 chunk 大小决定,所以这一项可以用<b>离线 profiling</b> 拟合(论文在 128–2048 的离散 token 数上测一遍)。真正动态的是注意力那部分:</p>
+  <div class="math">$$T_{online} = \beta_0\sum (L_{past}\cdot L_{pre}) + \beta_1\sum (L_{pre}^{2}) + \beta_2\sum L_{dec} + \varepsilon$$</div>
+  <p>三项分别对应"当前 chunk 对历史上下文的注意力"($L_{past}\cdot L_{pre}$)、"chunk 自注意力"($L_{pre}^2$)与"decode 请求的注意力"($L_{dec}$),$\varepsilon$ 吸收未建模的运行时噪声。系数 $\beta_0,\beta_1,\beta_2$ 不是离线学出来的,而是<b>在线用递归最小二乘(RLS)更新</b>——每轮拿实测迭代时延与预测值的残差校正一次。论文给了两条"为什么是 RLS"的理由:它用内部协方差矩阵吸收各特征之间的量纲差异($L_{past}^2$ 与 $L_{dec}$ 的量级差得很远,标准梯度下降会被尺度带偏),并且带遗忘因子,能让模型快速跟上 prefill-decode 相互干扰这类非平稳变化。</p>
+
+  <figure class="fig">
+    <img src="figs/fig6.png" alt="Figure 6: Workflow of predictive dynamic chunked-prefill">
+    <figcaption>
+      <b>Figure 6:</b> Workflow of predictive dynamic chunked-prefill
+      <span class="zh">一次调度的完整闭环,五个编号步骤:❶ <b>取状态</b>——$\mathrm{KV}_{free}$、上一轮实测时延 $L_{measured}$、等待队列 $Q_{waiting}$、运行批次 $B_{running}$;❷ <b>内存检查</b>(与 greedy 相同);<b>更新预测器</b>——用上一轮的 $L_{measured}$ 与注意力特征(prefix / context 长度)做一次 RLS 校正,左侧"Baseline(Offline profiling) + Adaptation ↻(Online updating)"即这层含义;❸ <b>逐候选预测</b>——用 $Q_{waiting}$、$B_{running}$ 推出的特征,对 128…2048 每个候选 chunk 算出预测时延与预测吞吐(右侧表格),再用"预测时延 × 流水线深度"折算端到端时延,<b>把超过 TPOT SLO 的候选全部丢掉(上界)</b>;❹ <b>算下界</b>——用滑动窗口内的到达率与长度分布算出"不积压所需的最低吞吐",再加上"超时未服务的等待请求按其剩余预算折算的吞吐",得到必须达到的吞吐门槛,取满足它的最小 chunk;❺ <b>定 chunk</b>——在上下界之间选最小的那个(气泡最少);如果没有任何候选同时满足两条 SLO,就判定系统过载,改为选"满足 TPOT 的最大 chunk",优先排空队列。</span>
+          <span class="pgref">论文集 p.1810</span>
+    </figcaption>
+  </figure>
+
+  <div class="note"><b>这里有一个值得单独记住的设计:</b>TTFT SLO 并没有被直接当成"时延上限"去约束,而是被<b>换算成一个最低吞吐下界</b>(到达率匹配吞吐 + 待服务请求的紧迫度)。这一步把"队列时延"这种与当前批次耦合很紧的指标,转成了"这一轮需要吃下多少 token"这种可以直接和 chunk 大小对照的量——这也是它比 greedy 的阈值法更稳的原因。</div>
+
+  <p>图 6 右侧那张示例候选表还顺手说明了权衡的形状:chunk 从 128 到 2048,预测时延从 45 涨到 467(约 <b>10.4×</b>),而预测吞吐只从 7127 涨到 14745(约 <b>2.07×</b>)。时延涨得比吞吐快一个量级,所以"能小就小"在多数负载下是对的,只有当吞吐下界被顶到 10k tok/s 以上时才有必要往大 chunk 走(推算:按该表的单调关系,目标吞吐约 7k 对应 chunk 128,约 10k 对应 chunk 512)。</p>
+
+  <h3>4.2 Delay scheduling:把请求在 microbatch 之间搬一次</h3>
+  <p>chunk 只能调 prefill 的粒度。当整轮迭代里<b>一个 prefill 都没有</b>(decode-heavy)时,DCP 无从下手——此时决定各 stage 计算量的只有"每个 microbatch 里装了几个请求"。而现有系统一旦把请求分进某个 microbatch,<b>它在整个生命周期里就固定在那里</b>(vLLM、SGLang 都是如此),于是失衡会跨迭代反复出现。</p>
+
+  <figure class="fig">
+    <img src="figs/fig7.png" alt="Figure 7: Reducing pipeline stalls with delay scheduling">
+    <figcaption>
+      <b>Figure 7:</b> Reducing pipeline stalls with delay scheduling
+      <span class="zh">(a) decode-heavy 阶段的朴素 PP:$T_{i+2}$ 时 Worker 0 拿到 $C_3D_3E_2F_2$(4 个请求),Worker 1 只有 $A_3B_3$(2 个),直接失衡;之后每一轮都在重复同样的形状。(b) 打开 delay scheduling:❶ 把 $E$、$F$ 暂时挂起,让两侧负载拉平;❷ 等 $A_3$ 在 $T_{i+2}$ 完成后,把挂起的 $E_2$ 和 $B_4$ 组成新的 microbatch $B_4E_2$;❸❹ 同理,$D_4$ 完成后把 $F_2$ 恢复;❺ 结果右侧标出的 "Saved cycles" 就是省下来的空转。代价是被挂起请求的 TPOT 变长(它们被推迟了),换来的是整条流水线不再反复停摆。</span>
+          <span class="pgref">论文集 p.1811</span>
+    </figcaption>
+  </figure>
+
+  <p>具体策略有三条,都是工程上很"轻"的决定:</p>
+  <ul class="tight">
+    <li><b>对齐硬件台阶</b>:平衡 microbatch 大小时,把批大小对齐到 128 / 256 / 384 这类"划算"的边界。依据正是图 3(c)——129 个 token 和 256 个几乎一样贵,所以多出来的那几个请求是纯亏,不如挪走。</li>
+    <li><b>阈值式抢占</b>:若某 microbatch 的请求数超出最近的边界但<b>溢出量在阈值内</b>,就临时抢占溢出的部分,把批压回边界;若溢出量超过阈值,则改为把该 microbatch 对齐到"全部 microbatch 的平均请求数",并顺带恢复之前挂起的请求来填空。</li>
+    <li><b>按 TPOT 余量选受害者</b>:TPOT 余量不足时,优先抢占<b>较老</b>的请求(它们已经跑了一会儿,更能容忍额外时延),以保护新请求的 TPOT;TPOT 余量充足时,风险变成 KV 耗尽与 TTFT 违约,此时改为抢占<b>较新</b>的请求,让老请求早点跑完、早点释放 KV。</li>
+  </ul>
+
+  <div class="takeaway"><b>本节小结:</b>论文把 PP 的气泡治理拆成两层——<b>粒度层</b>用动态 chunk 把 prefill 切平(greedy 验证可行性、预测式补上滞后),<b>组成层</b>用 delay scheduling 把 decode-only 迭代的请求重新摊平。两层的输入都是 SLO 余量与 KV 余量,输出都是"下一轮怎么组批"。</div>
+</section>
+<section id="s5">
+  <div class="sec-no">05 · Implementation</div>
+  <h2 class="sec">实现:把论文配置落到一次调度决策上</h2>
+
+  <p>论文没有单开"系统实现"一章,实现信息散在 §4 的伪码与 §5.1 的环境里。这里把它整理成一张参数清单,并推演一次真实的调度决策,方便判断复现门槛在哪。</p>
+
+  <p>实现底座是 <b>SGLang 0.4.1</b>(PyTorch 2.5.1、CUDA 12.4、FlashInfer),硬件是单机 4×A100 40GB(PCIe 4.0)+ 128 核 AMD EPYC 9754 + 768 GB 内存,模型是 Qwen2.5 32B / 14B 的 BF16 版本。三套技术都实现在 SGLang 的调度器里:动态 chunk 改的是"这一轮 prefill 允许多少 token",delay scheduling 改的是"这一轮 microbatch 怎么装、要不要挂起/恢复某些请求"。两者的决策点都在<b>每一次调度迭代</b>,输入都是 SLO 余量与 KV 余量。</p>
+
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>论文披露的实现参数与未披露项(据 §4 伪码与 §5.1 整理)</caption>
+    <thead><tr><th>参数 / 组件</th><th>论文给出的取值</th><th>作用</th><th>是否给出具体数值</th></tr></thead>
+    <tbody>
+      <tr><td>候选 chunk 集合 $\mathcal{C}$</td><td>{128, 256, …} 离散集合,离线 profiling 覆盖 128–2048</td><td>搜索空间;预测式逐候选评估</td><td>集合上界给出,完整档位未列</td></tr>
+      <tr><td>初始 chunk</td><td>取集合最小值(如 128)</td><td>greedy 的起点</td><td>给出(示例形式)</td></tr>
+      <tr><td>调节步长 $\delta$</td><td>如 128</td><td>每次 ±1 档</td><td>给出(示例形式)</td></tr>
+      <tr><td>流水线深度 $D_p$</td><td>"每 $D_p$ 轮更新一次"</td><td>决定反馈延迟;由部署的 stage 数决定</td><td><b>未给数值</b>(4 GPU 纯 PP 推出为 4,推算)</td></tr>
+      <tr><td>KV 水位 $\theta_{mem}$</td><td>$\in[0,1]$ 的 watermark</td><td>触发内存优先分支</td><td><b>未给数值</b></td></tr>
+      <tr><td>TTFT 边界 $\alpha,\beta$</td><td>$\in[0,1]$,分别对应"安全"与"危急"</td><td>决定 $\pm\delta$ 的方向</td><td><b>未给数值</b></td></tr>
+      <tr><td>TPOT 边界 $\gamma$</td><td>$\in[0,1]$</td><td>决定放大 chunk 是否安全</td><td><b>未给数值</b></td></tr>
+      <tr><td>RLS 遗忘因子</td><td>未提</td><td>决定预测器对非平稳性的跟随速度</td><td><b>未给</b></td></tr>
+      <tr><td>抢占溢出阈值</td><td>"配置的阈值"</td><td>决定"压回边界"还是"对齐均值"</td><td><b>未给数值</b></td></tr>
+      <tr><td>时延 SLO</td><td>TTFT 2,000 ms / TPOT 200 ms</td><td>约束定义</td><td>给出(MLPerf 口径)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>把配置落到具体决策上,可以算出两个有意思的结论(以下均为<b>推算</b>,依据论文给定的规则与量级):</p>
+  <ul class="tight">
+    <li><b>反馈延迟相对 SLO 是小的。</b>若按 4 卡纯 PP 推断 $D_p=4$(论文只给了 GPU 数,没给 stage 数),一次 chunk 变更要 4 轮迭代才生效。按文中迭代时延的 P90 量级(约 20–50 ms)估算,一个调整周期约 <b>80–200 ms</b>,远小于 2,000 ms 的 TTFT 预算——所以 greedy 的滞后在"稳态"下并不致命。</li>
+    <li><b>但它在"突发"下会掉队。</b>greedy 每次只走一档 $\delta=128$,从最小候选 128 爬到 2048 需要 15 次调整、即 $15\times 4=60$ 轮迭代(约 1.2–3 s)。真实 trace 的高负载是<b>短突发</b>而不是持续高负载,所以这个爬升速度刚好卡在"还没爬到就退了"的区间——这正解释了论文在真实 trace 实验里的观察:greedy 的 SLO 达成率(93.5%)低于预测式(94.5%),差距来自"追不上突发"。预测式因为能直接对候选做一次预测,不需要逐档爬,所以没有这个限制。</li>
+  </ul>
+
+  <p>还有一处值得强调的实现细节:greedy 的<b>内存分支优先级最高</b>。当 $\mathrm{KV}_{free} < \theta_{mem}$ 时,它不再看时延余量,而是直接把 chunk 压到"刚好大于在跑请求数"的最小候选。这在语义上很清楚——KV 快满时,继续用大 chunk 只会让某些 stage 的 KV 分配失败,不如立刻收小、把在途请求排空、把显存腾出来。这条规则也解释了为什么 DCP 在高负载下反而不会 OOM:它不是靠更大的 batch 提高吞吐,而是靠"别把显存赌在一轮上"。</p>
+
+  <div class="takeaway"><b>本节小结:</b>论文的机制本身很轻(一个阈值控制器、一个 RLS 校正的线性模型、一套抢占规则),落地在 SGLang 调度器里;但它把<b>所有需要调的超参都留成了符号</b>($\alpha,\beta,\gamma,\theta_{mem},D_p$,以及抢占阈值与遗忘因子),没有给数值——这是复现与工程移植时最大的不确定项。</div>
+</section>
+
+<section id="s6">
+  <div class="sec-no">06 · Evaluation</div>
+  <h2 class="sec">实验:goodput、尾部时延、真实 trace、预测精度</h2>
+
+  <h3>6.1 设置与负载</h3>
+  <p>四个 workload:Azure Conversation(Conv)、ShareGPT、CNN-DailyMail(CNN)三个真实 trace,外加一个把 CNN 的输入/输出长度分布对调构造出来的 <b>CNN-Reversed</b>(合成 decode-heavy)。此外还有两组合成负载:prefill-heavy(输入 512–1024、输出 32–64)与 decode-heavy(输入 32–64、输出 512–1024),用于 §6.5 的分析。请求按 <b>Poisson 过程</b>到达,批内混排。</p>
+  <p>五组对比:TP(默认 chunk 2,048)、PP<sub>static</sub>(每个 workload 各自离线搜出的最优 chunk)、DCP<sub>greedy</sub>、DCP<sub>pred</sub>、DCP<sub>pred</sub>+DS。指标是 goodput(P90 双 SLO 下的最高请求率),辅以 P90 TTFT / TPOT / E2E 时延。</p>
+
+  <figure class="fig">
+    <img src="figs/fig8.png" alt="Figure 8: Input and output length distributions">
+    <figcaption>
+      <b>Figure 8:</b> Input and output length distributions
+      <span class="zh">三个真实 trace 的输入/输出长度分布,直接决定了每个 workload 会触发哪一类失衡。<b>(a) AzureConv</b>:输入平均 1,161 token、输出平均 212,长输入 + 短输出,是典型的 prefill-heavy,主要病灶是 P-P 与 P-D 失衡。<b>(b) ShareGPT</b>:输入平均 226、输出平均 199,两头都不极端,但输入方差大,仍以 prefill 干扰为主。<b>(c) CNN-DailyMail</b>:输入平均 883、输出平均 65,长输入短输出,prefill 主导;把它对调之后(CNN-Reversed)就变成了"短输入长输出"的 decode-heavy,专门用来暴露 D-D 失衡。</span>
+          <span class="pgref">论文集 p.1811</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.2 主结果:Qwen2.5-32B</h3>
+
+  <figure class="fig">
+    <img src="figs/fig9.png" alt="Figure 9: Goodput, TTFT, TPOT, and E2E latency for Qwen2.5-32B">
+    <figcaption>
+      <b>Figure 9:</b> Goodput, TTFT, TPOT, and E2E latency for Qwen2.5-32B
+      <span class="zh">四行对应四个 workload(AzureConv / CNN / ShareGPT / CNN-Reversed),每行四张子图:goodput(柱)、P90 TTFT、P90 TPOT、P90 E2E(折线,都会随请求率扫)。三个结论:① <b>静态 PP 只要 chunk 选对就已经赢过 TP</b>——AzureConv 最优的 PP<sub>512</sub> 是 8.28 req/s 对 TP 的 3.48;② <b>chunk 选错会崩</b>——同一个 workload 上 PP<sub>1024</sub> 只有 4.35、PP<sub>2048</sub> 只有 3.16,和 TP 差不多;③ <b>动态方案在两个方向都更好</b>——DCP<sub>pred</sub> 在 AzureConv / CNN 上把 goodput 推到 8.47 / 10.17,同时把 TPOT 与 E2E 的折线整体压到 PP<sub>static</sub> 之下。注意时延子图只画了 PP<sub>static</sub>(论文的选择),不是所有 chunk 都画。</span>
+          <span class="pgref">论文集 p.1812</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Qwen2.5-32B 的 goodput(req/s,单位req/s;据 Figure 9 柱标整理,非论文原表)</caption>
+    <thead><tr><th>Workload</th><th>TP</th><th>PP<sub>128</sub></th><th>PP<sub>256</sub></th><th>PP<sub>512</sub></th><th>PP<sub>1024</sub></th><th>PP<sub>2048</sub></th><th>DCP<sub>greedy</sub></th><th>DCP<sub>pred</sub></th><th>+DS</th></tr></thead>
+    <tbody>
+      <tr><td>AzureConv(输入重)</td><td>3.48</td><td>4.27</td><td>7.07</td><td>8.28</td><td>4.35</td><td>3.16</td><td>8.41</td><td class="hl">8.47</td><td>8.47</td></tr>
+      <tr><td>CNN(输入重)</td><td>4.30</td><td>6.28</td><td>9.15</td><td>9.26</td><td>4.48</td><td>3.21</td><td>9.40</td><td class="hl">10.17</td><td>10.16</td></tr>
+      <tr><td>ShareGPT(混合)</td><td>12.45</td><td>14.34</td><td>26.33</td><td>32.46</td><td>14.69</td><td>12.63</td><td>33.17</td><td>36.09</td><td class="hl">36.16</td></tr>
+      <tr><td>CNN-Reversed(输出重)</td><td>5.98</td><td>6.18</td><td>7.27</td><td>7.21</td><td>7.22</td><td>7.23</td><td>7.38</td><td>7.40</td><td class="hl">10.42</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">这张表是本页从图 9 的柱标整理出来的——它比图本身更容易看出一个趋势:<b>prefill-heavy 的三个 workload 上,chunk 超过 512 后 goodput 断崖式下跌;decode-heavy 的 CNN-Reversed 对 chunk 几乎不敏感,只有 delay scheduling 起作用(7.40 → 10.42,正好 1.41×)。</b></p>
+
+  <p>论文正文给出的时延降幅(相对 PP<sub>static</sub>):AzureConv 上 DCP<sub>greedy</sub> 把 TPOT 与 E2E 分别压低 <b>19% / 18%</b>,DCP<sub>pred</sub> 做到 <b>35% / 31%</b>;CNN 上是 <b>27% / 28%</b> 与 <b>42% / 36%</b>;ShareGPT 上 DCP<sub>pred</sub> 为 <b>36% / 24%</b>。一个共同的形态是:<b>DCP 会略微抬高 TTFT,但 goodput 基本不掉,而 TPOT 与 E2E 大幅改善</b>——因为缩小 chunk 让每轮更轻,首 token 代价换来的是整条流水的平滑。</p>
+
+  <figure class="fig">
+    <img src="figs/fig10.png" alt="Figure 10: Goodput, TTFT, TPOT, and E2E latency for Qwen2.5-14B">
+    <figcaption>
+      <b>Figure 10:</b> Goodput, TTFT, TPOT, and E2E latency for Qwen2.5-14B
+      <span class="zh">正文因篇幅只放了两个代表性 workload、两个模型规模里较小的 14B:AzureConv(输入重)与 CNN-Reversed(输出重)。趋势与 32B 一致,但有一个重要差异——<b>最优静态 chunk 变了</b>:14B 的 AzureConv 上 PP<sub>1024</sub> 达到 16.55 req/s(32B 上同一 workload 的 PP<sub>1024</sub> 只有 4.35),DCP<sub>pred</sub> 微升到 16.75。这恰好说明"最优 chunk 与模型绑定",静态配置无法跨模型复用;论文报告 14B 上 DCP 相对 PP<sub>static</sub> 的 TPOT 降幅为 <b>40%(greedy)与 50%(pred)</b>。decode-heavy 侧,DS 把 goodput 从 15.45 推到 19.88。</span>
+          <span class="pgref">论文集 p.1813</span>
+    </figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>Qwen2.5-14B 的 goodput(req/s;据 Figure 10 柱标整理,非论文原表)</caption>
+    <thead><tr><th>Workload</th><th>TP</th><th>PP<sub>128</sub></th><th>PP<sub>256</sub></th><th>PP<sub>512</sub></th><th>PP<sub>1024</sub></th><th>PP<sub>2048</sub></th><th>DCP<sub>greedy</sub></th><th>DCP<sub>pred</sub></th><th>+DS</th></tr></thead>
+    <tbody>
+      <tr><td>AzureConv</td><td>4.52</td><td>6.88</td><td>10.80</td><td>13.10</td><td class="hl">16.55</td><td>10.02</td><td>16.33</td><td>16.75</td><td>16.71</td></tr>
+      <tr><td>CNN-Reversed</td><td>5.37</td><td>8.62</td><td>13.65</td><td>15.16</td><td>15.09</td><td>14.58</td><td>15.25</td><td>15.45</td><td class="hl">19.88</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>6.3 气泡到底少了多少:迭代时延的 CDF</h3>
+
+  <figure class="fig">
+    <img src="figs/fig11.png" alt="Figure 11: CDF of iteration latency for AzureConv, CNN, and CNN-Reversed">
+    <figcaption>
+      <b>Figure 11:</b> CDF of iteration latency for (a) AzureConv, (b) CNN, and (c) CNN-Reversed
+      <span class="zh">这是全文最"直指病灶"的一张图:把每次迭代的时延画成 CDF,曲线越靠左越好。AzureConv 上 P90 迭代时延从 PP<sub>static</sub> 的 <b>51.68 ms</b> 降到 DCP<sub>greedy</sub> 的 29.56 ms、再到 DCP<sub>pred</sub> 的 <b>21.53 ms</b>;P99 从 <b>65.34 ms</b> 降到 <b>30.94 ms</b>(2.11×)。CNN 的形状有个细节:DCP<sub>pred</sub> 在 50 分位以下甚至比 PP<sub>static</sub> 略慢,但过了 60 分位就反超,越往尾部优势越大——这正好对应"气泡主要在尾部"。CNN-Reversed 上三种 DCP 差别很小(短输入长输出留不出多少 prefill 可调),但打开 DS 后 P90 从 28.94 ms 降到 <b>24.53 ms</b>,证明 decode-heavy 的病灶确实要另一个手段。</span>
+          <span class="pgref">论文集 p.1814</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.4 SLO 收紧时的稳健性</h3>
+
+  <figure class="fig">
+    <img src="figs/fig12.png" alt="Figure 12: Goodput comparison of Qwen2.5 32B and 14B under various SLO constraints">
+    <figcaption>
+      <b>Figure 12:</b> Goodput comparison of Qwen2.5 32B and 14B under various SLO constraints.
+      <span class="zh">横轴是 SLO 缩放系数:1.0 = (TTFT 2,000 ms, TPOT 200 ms),越小越严;纵轴是 goodput。两个观察:① <b>SLO 越紧,DCP 的优势越大</b>——32B 上从 2.7×(scale 1.0)涨到 5.4×(scale 0.4),14B 上从 1.7× 涨到 2.4×;② <b>scale 0.2 时所有 PP 方案的 goodput 归零</b>,因为最小的 chunk 也已经违反 TPOT 约束——这是 PP 的物理下限,论文没有回避。右列 decode-heavy 的 AzureConv/CNN-Reversed 上,DS 带来最多 <b>1.4×</b> 的 goodput 提升;但 SLO 缩到 0.6 以下后 DS 迅速失效,因为系统先撞到 TPOT 上限,来不及攒够触发抢占的请求数。</span>
+          <span class="pgref">论文集 p.1814</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.5 合成负载:把两类失衡分开称重</h3>
+
+  <figure class="fig">
+    <img src="figs/fig13.png" alt="Figure 13: TTFT, TPOT, and E2E latency for synthetic prefill-heavy and decode-heavy workloads">
+    <figcaption>
+      <b>Figure 13:</b> TTFT, TPOT, and E2E latency for (a) prefill-heavy and (b) decode-heavy synthetic workloads. Input and output lengths are uniformly sampled from [512, 1024] and [32, 64] tokens for (a), and from [32, 64] and [512, 1024] tokens for (b).
+      <span class="zh">用长度均匀采样的合成负载把两类病灶分开看,每组柱是 MEAN / P90 / P95 / P99。<b>(a) prefill-heavy</b>:TP 与 PP 的 TTFT 差不多,但 PP 的 TPOT 与 E2E 高得多(严重失衡);两种 DCP 在所有指标上都优于 TP 与 PP——说明"压 P-P 失衡"比"用大 chunk 换利用率"更重要;DCP<sub>pred</sub> 相对 DCP<sub>greedy</sub> 把 P99 TPOT 再降 <b>25%</b>、E2E 再降 <b>13%</b>,优势集中在尾部。<b>(b) decode-heavy</b>:PP 三项指标全面优于 TP(平均 TTFT / TPOT / E2E 分别好 <b>2.82× / 1.30× / 1.38×</b>);DCP 与 PP 几乎持平(没有 prefill 可调),但 DS 把 TTFT 显著压低、进而压低 E2E——平均 E2E 降 <b>4,062 ms</b>、P99 降 <b>8,088 ms</b>,代价是 P99 TPOT 比 DCP<sub>pred</sub> 差 <b>15%</b>。</span>
+          <span class="pgref">论文集 p.1815</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.6 真实 trace:静态 chunk 有多脆</h3>
+
+  <p>最贴近生产的一段实验用 AzureConv 真实 trace 回放前 15 分钟,并把到达率压到原始的 0.9×,使 PP<sub>static</sub> 的 SLO 达成率落在约 90%——这样比较才有意义。</p>
+
+  <figure class="fig">
+    <img src="figs/fig14.png" alt="Figure 14: SLO attainment, TPOT latency CDF, and E2E latency CDF for the real Azure trace">
+    <figcaption>
+      <b>Figure 14:</b> Performance of real-trace using Azure Conversation [22]: (a) SLO attainment, (b) TPOT latency CDF (conditional on TTFT<sub>SLO</sub>), and (c) E2E latency CDF (conditional on all SLOs) for Qwen2.5-32B
+      <span class="zh">(a) 是关键:<b>TP 只有 1.9%</b> 的请求同时满足双 SLO,<b>PP<sub>2048</sub> 只有 1.6%</b>(和 TP 一样差),而离线选出的 PP<sub>512</sub> 有 <b>92.5%</b>——注意,同一个 PP 只把 chunk 从 512 换成 1024,SLO 达成率就崩到 <b>6.9%</b>,换 256 掉到 82.8%。这就是"静态 chunk 在真实流量下有多脆"的直接证据。DCP<sub>greedy</sub> / DCP<sub>pred</sub> / +DS 分别是 <b>93.5% / 94.5% / 94.6%</b>:总量提升不大,但 (b)(c) 显示它们把更多请求推进了低时延区间。(c) 里 DCP 的 E2E CDF 整体左移,说明"同样的请求率下,更快完成的请求更多"。论文还给出:把 TPOT SLO 收紧到 150 ms 时,DCP<sub>greedy</sub> 与 DCP<sub>pred</sub> 的达成率是 PP<sub>static</sub> 的 <b>3.06× / 4.14×</b>;60 秒内完成的请求量是 <b>1.3× / 1.6×</b>。</span>
+          <span class="pgref">论文集 p.1816</span>
+    </figcaption>
+  </figure>
+
+  <h3>6.7 预测模型值不值:ALP vs 三种 ML 方法</h3>
+
+  <figure class="fig">
+    <img src="figs/table1.png" alt="Table 1: Comparison of latency prediction models">
+    <figcaption>
+      <b>Table 1:</b> Comparison of latency prediction models
+      <span class="zh">从上到下是 ALP 的四个组件逐项加上去(MAPE 15.85% → 12.21% → 9.69% → 3.48%),再加残差项 $\varepsilon$ 到 <b>3.26%</b>;中间三种是离线训练的 ML 方法(线性回归 4.26%、LightGBM 2.74%、两层 DNN 2.56%);右侧两列是推测耗时与模型体积。读法不是"谁的 MAPE 最低",而是<b>性价比</b>:DNN 的精度更好 0.70 个百分点,但预测耗时高 <b>16×</b>(0.046407 vs 0.002875 ms)、体积大 <b>887×</b>(570 KB vs 0.643 KB),而且需要离线训练;ALP 不需要预训练、能在线自适应。论文的判断是这点精度差不会转化为端到端收益,所以选 ALP。</span>
+          <span class="pgref">论文集 p.1816</span>
+    </figcaption>
+  </figure>
+
+  <div class="takeaway"><b>本节小结:</b>实验的组织方式很"对症":先证明静态最优 PP 已胜 TP(Fig 9/10),再用迭代时延 CDF 证明气泡确实变少(Fig 11),用 SLO 收紧证明鲁棒性(Fig 12),用合成负载分离两类病灶(Fig 13),最后用真实 trace 证明静态配置在真实流量下的脆弱(Fig 14)。<b>最有说服力的不是 35% 的降幅,而是"chunk 512→1024 让 SLO 达成率从 92.5% 掉到 6.9%"这一行</b>。</div>
+</section>
+<section id="s7">
+  <div class="sec-no">07 · Positioning</div>
+  <h2 class="sec">定位:它站在哪条谱系上</h2>
+
+  <p>论文在 §6 把相关工作整理成三条线,而它自己正好卡在三条线的交叉点上。</p>
+
+  <h3>7.1 调度线:从"逐迭代组批"到"逐迭代改 chunk"</h3>
+  <p>ORCA(Yu et al., 2022)提出了 iteration-level scheduling 与 selective batching,让请求可以按迭代进出批次;Sarathi-Serve(Agrawal et al., 2024)在它之上加了 chunked prefill,把长 prompt 切块以保护同批 decode 请求的 TPOT——这两件事现在已经是 vLLM、SGLang、TensorRT-LLM、Dynamo 的默认行为。<b>本文的增量是:把 chunk 大小从"部署时固定的常量"变成"每轮按 SLO 余量求解的变量",并且第一次把流水线结构(端到端时延 ≈ 迭代时延 × $D_p$)显式写进这个求解过程。</b></p>
+
+  <h3>7.2 并行线:训练期的 PP 经验不能直接搬</h3>
+  <p>PP 在训练侧有成熟的方法论:GPipe(Huang et al., 2019)的 micro-batch 流水与 PipeDream(Narayanan et al., 2019)的 1F1B 调度,目标都是在<b>固定、可预测</b>的输入上把流水填满。在线服务的输入是随机到达、长度分布随时间变的,训练期那套"把 batch 切成等大的 microbatch"的前提不再成立——本文三类失衡里有两类(P-P、P-D)正是因为这个前提失效。TP 侧则是 Megatron-LM(Shoeybi et al., 2020)的经典做法,论文承认它在 NVLink 集群上仍是务实选择。</p>
+
+  <h3>7.3 部署线:为什么不走 P-D 分离</h3>
+  <p>另一条主流路线是 phases disaggregation:Splitwise(Patel et al., 2024)、DistServe(Zhong et al., 2024)、Mooncake(Qin et al., 2024)把 prefill 与 decode 放到不同 GPU 上,从物理上消除 P-D 干扰。论文明确不走这条路,理由是那套方案要付出<b>模型权重的重复放置</b>与<b>KV cache 跨机传输</b>的代价,而这些代价在 PCIe 甚至无高速互连的场景里更加不可接受。它选择的是"统一服务 + chunked prefill"的路线,并声称在同等硬件上把气泡压到可接受水平——**注意这里缺一件事:论文没有在同一台机器上跟分离式方案做过端到端对比**(见点评)。</p>
+
+  <h3>7.4 与前作 Niyama 的差别</h3>
+  <p>动态 chunk 并非全新想法:Niyama(Goel et al., 2025)已经做过"SLO 感知的动态分块"。论文对它的定位很具体——Niyama 优先保证 SLO 合规,但<b>忽略了流水线并行的结构约束</b>,因此气泡问题原封不动;本文则把"迭代预测 × 流水线深度"折成端到端时延,再据此设上下界。这句话也可以反过来读:<b>本文的预测模型之所以值得存在,正是因为它多了一个 $D_p$ 因子</b>——如果没有流水线,预测迭代时延本身就够了。</p>
+</section>
+
+<section id="s8">
+  <div class="sec-no">08 · Assessment</div>
+  <h2 class="sec">点评:强在哪、能质疑什么、还有什么没披露</h2>
+
+  <h3>8.1 站得住的地方</h3>
+  <ul class="tight">
+    <li><b>问题选得准。</b>「TP 是唯一解」这个默认假设确实建立在 NVLink 之上,而公共云的 PCIe 机型、AMD GPU、各类 NPU 都是反例。把 PP 重新推上台面,不需要新硬件,只需要把调度补上——这是一个投入产出比很高的方向。</li>
+    <li><b>诊断比方法更有价值。</b>把气泡分成 P-P / P-D / D-D 三类,并各自对应到"长度方差 / 阶段混杂 / 请求数方差",是目前对 PP 服务性能最清晰的一次归因。后来的系统哪怕不用它的算法,也会用它的分类去定位问题。</li>
+    <li><b>基线选得诚实。</b>PP 基线不是"随手一个大 chunk",而是每个 workload 离线搜出来的最优值(近乎 oracle);在这种不利条件下仍然胜出,说服力比打一个弱基线强得多。</li>
+    <li><b>把 TTFT SLO 换算成吞吐下界</b>是一个可复用的建模技巧:它把与批次强耦合的队列时延,变成了一个能与 chunk 大小直接比较的量。</li>
+    <li><b>证据链完整。</b>goodput → 迭代时延 CDF → SLO 收紧 → 合成负载分离病灶 → 真实 trace,每一层都在回答"上一层的数字为什么可信"。</li>
+  </ul>
+
+  <h3>8.2 可以质疑的地方</h3>
+  <ul class="tight">
+    <li><b>两侧基线的调优强度不对称。</b>PP 用的是 per-workload 最优静态 chunk,TP 用的却是默认 2,048——而同一篇论文自己就证明了"chunk 选错能让 goodput 掉一半以上"。如果把 TP 也调到最优,两者的差距会缩小多少?论文没有回答,这是本文最应该补的一个对照。</li>
+    <li><b>只有一个硬件形态。</b>动机里点名 PCIe、AMD GPU 与 NPU,但实验只有一种 PCIe 机型(4×A100 40GB),没有 NVLink 对照组,也没有 AMD/NPU 实测。因此"PP 在带宽受限机器上更好"这个结论目前只在一种机器上被验证。</li>
+    <li><b>goodput 是单标量,容易掩盖代价。</b>论文自己也承认 DCP 会略抬 TTFT(Fig 11 里 CNN 的 50 分位以下 DCP 甚至不如 PP<sub>static</sub>)、DS 会让 P99 TPOT 差 15%。这些代价被"goodput 不掉"概括掉了,但对某些业务(对话首字时延敏感)可能就是不可接受的。</li>
+    <li><b>预测模型的精度论证偏弱。</b>ALP 的 MAPE(3.26%)不如两层 DNN(2.56%),论文用"预测耗时低 16×、体积小 887×、无需预训练"来辩护。这个辩护合理,但缺少一个关键消融:<b>把 DNN 换进同一个调度器,端到端 goodput 会差多少?</b>没有这个数,"精度够用"就只是推断。</li>
+    <li><b>没有和 P-D 分离方案同台。</b>相关工作里花了一整段论证"分离式有额外开销",但唯一的证据是引用,不是测量。在 4 卡这种小规模上,分离式的开销可能确实高,可是读过的人会想要那张对比图。</li>
+    <li><b>规模与模型族单一。</b>两个模型来自同一族(Qwen2.5 14B/32B)、固定 4 卡、单一 PCIe 拓扑。$D_p$ 更大(8/16 stage)时,一次 chunk 变更的生效延迟线性增长,预测式的"提前一轮预测"是否还够,论文没有讨论。</li>
+  </ul>
+
+  <h3>8.3 技术来源一览</h3>
+  <div class="tbl-wrap">
+  <table class="data wrap">
+    <caption>本文各组件的上游与改造(据论文行内引用整理,非论文原表)</caption>
+    <thead><tr><th>组件</th><th>论文标注的上游</th><th>本代的改造 / 集成</th></tr></thead>
+    <tbody>
+      <tr><td>按迭代组批</td><td>iteration-level scheduling(ORCA,Yu et al., 2022)</td><td>作为前提直接沿用,不贡献;但把它"每轮重新组批"的能力用在 chunk 与 microbatch 上</td></tr>
+      <tr><td>prefill 分块</td><td>chunked prefill / Sarathi-Serve(Agrawal et al., 2024)</td><td>chunk 大小从部署期固定改为每轮按 SLO 余量求解(greedy 或预测式)</td></tr>
+      <tr><td>并行切分</td><td>TP:Megatron-LM(Shoeybi et al., 2020);PP:GPipe(Huang et al., 2019)、PipeDream(Narayanan et al., 2019)</td><td>把训练期的 PP 方法论搬到输入不可预测的在线服务,并针对三类失衡重做调度</td></tr>
+      <tr><td>服务侧多路复用</td><td>AlpaServe(Li et al., 2023)</td><td>不走"多模型共享 GPU"路线,而是压单个模型内部的 stage 空转</td></tr>
+      <tr><td>P-D 分离</td><td>Splitwise(Patel et al., 2024)、DistServe(Zhong et al., 2024)、Mooncake(Qin et al., 2024)</td><td>明确不采用,理由是权重重复与 KV 跨机传输开销;改用统一服务 + 动态分块</td></tr>
+      <tr><td>动态分块先例</td><td>Niyama(Goel et al., 2025)</td><td>补上流水线结构约束:端到端时延 = 迭代时延 × $D_p$,并用上下界筛候选</td></tr>
+      <tr><td>KV 管理</td><td>PagedAttention(Kwon et al., 2023)、CachedAttention(Gao et al., 2024)、Pensieve(Yu et al., 2025)、CacheBlend(Yao et al., 2025)</td><td>不作贡献;KV 余量只作为一个安全约束($\theta_{mem}$ 分支)出现</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tbl-note">引用为论文行内标注口径;本页未逐条核对参考文献条目的年份与版本细节。</p>
+
+  <h3>8.4 未披露、值得补测的点</h3>
+  <ul class="tight">
+    <li><b>全部关键超参的数值。</b>$\alpha$、$\beta$、$\gamma$、$\theta_{mem}$、$D_p$、抢占溢出阈值、RLS 遗忘因子都只有符号范围,没有取值与敏感性分析——复现的人必须自己扫一遍。论文也没有说明这些值是否对 workload 敏感。</li>
+    <li><b>"最优 TP"对照。</b>未见论文披露把 TP 的 chunk 与 batch 上限一并调优后的 goodput。这是判断"PP 赢多少"的关键控制变量。</li>
+    <li><b>跨硬件与跨拓扑。</b>未见 NVLink 机型、AMD GPU、NPU 的实测,也未见 8 卡及以上($D_p \ge 8$)的结果;动机与实验之间存在空档。</li>
+    <li><b>与分离式方案的实测对比。</b>未见在同一台机器上与 Splitwise / DistServe 类系统的端到端数字;这一点在相关工作里只做了机理论述。</li>
+    <li><b>DS 的代价分布。</b>真实 trace 上未见被挂起请求的 TPOT 分布(论文只在合成负载里给出 P99 TPOT +15%),也未给出抢占在极端负载下的抖动。</li>
+    <li><b>可获取性。</b>论文未给出代码/artifact 链接;"实现在 SGLang 0.4.1 之上"是否以下游 patch 形式公开,未见披露。</li>
+  </ul>
+
+  <h3>8.5 我的判断</h3>
+  <p>这是一篇"把系统做对"而非"发明新机制"的论文——它的每一块零件(TTFT/TPOT 作为 SLO、chunked prefill、RLS、抢占)都是既有的,新意在于<b>把在线服务的负载动力学真正接到流水线的结构约束上</b>。对读者最有迁移价值的两个技巧是:</p>
+  <ul class="tight">
+    <li><b>把"时延 SLO"翻译成"吞吐下界"</b>——凡是"队列长度会自发调节"的系统,这条换算都能用;</li>
+    <li><b>把批大小对齐硬件的台阶(128 / 256 / 384)</b>——这是个不需要任何模型、只要知道 GEMM tile 粒度就能拿到的免费收益。</li>
+  </ul>
+  <p>适用边界也要说清楚:这套东西在 NVLink 集群上收益有限(TP 本来就省心),在超大规模跨机部署上也不是主角(那是 P-D 分离的战场),它真正的战场是<b>单机多卡、互连普通、模型还能整段切开</b>的那些机器——而这恰好是云上最常见、也最常被"默认上 TP"糊弄过去的那一类。</p>
+</section>
+
+<section id="s9">
+  <div class="sec-no">Glossary</div>
+  <h2 class="sec">术语速查</h2>
+  <p class="muted">阅读中遇到缩写,可随时回到这里;正文里的缩写也可悬停查看释义。</p>
+  <div class="tbl-wrap">
+  <table class="data">
+    <caption>阅读术语表(正文中带虚线下划线的缩写悬停可见)</caption>
+    <thead><tr><th>缩写 / 术语</th><th>全称</th><th>一句话解释</th></tr></thead>
+    <tbody>
+      <tr><td>TP</td><td>Tensor Parallelism</td><td>把层内张量切到多卡,每层 all-reduce 聚合;单 token 时延低但要高带宽</td></tr>
+      <tr><td>PP</td><td>Pipeline Parallelism</td><td>按层深切成 stage,microbatch 依次流过;通信少,但有空转</td></tr>
+      <tr><td>DCP</td><td>Dynamic Chunked Prefill</td><td>本文的动态分块 prefill,分 greedy 与 predictive 两版</td></tr>
+      <tr><td>DS</td><td>Delay Scheduling</td><td>在 decode-only 轮次里把请求在 microbatch 间迁移/挂起再恢复</td></tr>
+      <tr><td>ALP</td><td>Adaptive Latency Predictor</td><td>本文的迭代时延预测模型:离线线性项 + 在线注意力项(RLS 校正)</td></tr>
+      <tr><td>RLS</td><td>Recursive Least Squares</td><td>带协方差矩阵与遗忘因子的在线最小二乘,适应特征量纲差异与非平稳性</td></tr>
+      <tr><td>P-P / P-D / D-D</td><td>Prefill-Prefill / Prefill-Decode / Decode-Decode</td><td>本文归纳的三类 stage 间计算量失衡</td></tr>
+      <tr><td>bubble</td><td>Pipeline Bubble</td><td>某些 stage 无事可做造成的空转时间</td></tr>
+      <tr><td>microbatch</td><td>Micro-batch</td><td>把一整批请求再切分后流经同一条流水的小批次</td></tr>
+      <tr><td>chunked prefill</td><td>Chunked Prefill</td><td>把长 prompt 的 prefill 切成固定大小的小块分多轮算</td></tr>
+      <tr><td>TTFT</td><td>Time To First Token</td><td>首 token 时延;本文 SLO 取 2,000 ms</td></tr>
+      <tr><td>TPOT</td><td>Time Per Output Token</td><td>每个输出 token 的时延;本文 SLO 取 200 ms</td></tr>
+      <tr><td>E2E</td><td>End-to-End latency</td><td>单个请求从到达到完成的总时延</td></tr>
+      <tr><td>goodput</td><td>Goodput</td><td>P90 TTFT 与 TPOT 同时满足 SLO 时的最高请求率</td></tr>
+      <tr><td>SLO</td><td>Service Level Objective</td><td>服务等级目标,本文只约束 TTFT 与 TPOT</td></tr>
+      <tr><td>P90 / P99</td><td>90th / 99th percentile</td><td>分位数时延;P99 反映尾部体验</td></tr>
+      <tr><td>KV cache</td><td>Key-Value Cache</td><td>自回归解码复用的注意力缓存,决定并发上限与显存水位</td></tr>
+      <tr><td>prefill / decode</td><td>Prefill / Decode phase</td><td>两阶段推理:整段 prompt 前向 vs 逐 token 生成</td></tr>
+      <tr><td>MAPE</td><td>Mean Absolute Percentage Error</td><td>预测误差指标,本文用来衡量时延预测器精度</td></tr>
+      <tr><td>PCIe / NVLink</td><td>Peripheral Component Interconnect Express / NVLink</td><td>两种 GPU 互连;前者带宽低但普及,后者仅在部分机型上有</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<button class="back-top" id="backTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<!-- lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="图片大图预览">
+  <button class="lb-close" id="lbClose" aria-label="关闭">×</button>
+  <img id="lbImg" src="" alt="">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    本页面为 OSDI 2026《Revisiting Pipeline Parallelism for LLM Serving》(Soonjae Hwang, Jeongseob Ahn)的人工精读笔记。图片以 300 DPI 摘自论文原文并按比例缩放展示(未裁剪);标注为「整理」「推算」的数据表由本页据原文数字重建;解读与质疑为编者观点。<br>
+    原文:<a href="https://www.usenix.org/system/files/osdi26-hwang.pdf">USENIX OSDI 2026 论文集 p.1803–1819</a><br>
+    <span style="opacity:.75">支持深色模式 · 点击图片看原图 · 打印友好</span>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6" crossorigin="anonymous"></script>
+<!--
+  MAINTAINER NOTE — inline-math delimiter vs literal dollar signs
+  ==============================================================
+  The auto-render config below registers both $$...$$ (display) and a single-dollar
+  inline delimiter. The single-dollar form is fine for a page whose only dollar
+  signs are math, but it silently corrupts any page that also quotes USD costs:
+  the renderer pairs the dollar signs of two amounts into one formula and typesets
+  all the prose between them as italic gibberish. The source stays 100% valid
+  HTML, so structural checks cannot see it — only a browser can.
+
+  RULE: if the paper reports costs / prices / dollar amounts in the prose, delete
+        the single-dollar entry below and write inline math as \( ... \).
+        Keep $$...$$ for display math.
+
+  Why the default is not removed here: many pages legitimately use single-dollar
+  math, and dropping the delimiter would turn every one of those into literal
+  text. So the default stays and two checks guard the edge:
+    * scripts/validate.py      — flags source-level single-dollar vs prose-amount conflicts
+    * scripts/render_assert.py — loads the page in Chromium and asserts every
+                                 amount still appears literally in the rendered text
+-->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});"></script>
+<script>
+(function(){
+  // 深色模式:记忆偏好,默认跟随系统
+  var KEY = 'pr-theme';
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try{ localStorage.setItem(KEY, t); }catch(e){}
+  }
+  var saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  if (!saved) saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  apply(saved);
+  document.querySelector('.theme-toggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur);
+  });
+
+  // lightbox:点击图片查看原图
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg'), lbCap = document.getElementById('lbCap');
+  function openLb(img){
+    lbImg.src = img.currentSrc || img.src;
+    lbImg.alt = img.alt || '';
+    var cap = img.closest('figure');
+    lbCap.textContent = cap ? cap.querySelector('figcaption').innerText.replace(/\s+/g, ' ').trim() : '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+  document.querySelectorAll('figure.fig img').forEach(function(img){
+    img.addEventListener('click', function(){ openLb(img); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLb(); });
+
+  // 回到顶部
+  var bt = document.getElementById('backTop');
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) bt.classList.add('show'); else bt.classList.remove('show');
+  });
+  bt.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+
+  // 阅读进度条 + 窄屏章节条自动跟随当前小节
+  var pr = document.getElementById('readProgress');
+  var bar = document.querySelector('.topbar .linkbar');
+  var jumpLinks = bar ? [].slice.call(bar.querySelectorAll('a')) : [];
+  function syncProgress(){
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var y = window.scrollY || document.documentElement.scrollTop;
+    if (pr) pr.style.transform = 'scaleX(' + (h > 0 ? Math.min(1, Math.max(0, y / h)) : 0) + ')';
+    if (!jumpLinks.length) return;
+    // 高亮当前小节对应 chip
+    var active = null;
+    for (var i = 0; i < jumpLinks.length; i++){
+      var t = document.getElementById(jumpLinks[i].getAttribute('href').slice(1));
+      if (t && t.getBoundingClientRect().top <= 90) active = jumpLinks[i];
+    }
+    for (var j = 0; j < jumpLinks.length; j++){
+      if (jumpLinks[j] === active){
+        jumpLinks[j].style.color = 'var(--accent)';
+        jumpLinks[j].style.borderColor = 'var(--accent)';
+        // 让当前 chip 滚入可视区(仅窄屏条内部滚动,不影响页面)
+        if (active.offsetLeft < bar.scrollLeft ||
+            active.offsetLeft + active.offsetWidth > bar.scrollLeft + bar.clientWidth){
+          bar.scrollLeft = Math.max(0, active.offsetLeft - 16);
+        }
+      } else {
+        jumpLinks[j].style.color = '';
+        jumpLinks[j].style.borderColor = '';
+      }
+    }
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function(){
+    if (!ticking){
+      ticking = true;
+      (window.requestAnimationFrame || setTimeout)(function(){ syncProgress(); ticking = false; });
+    }
+  }, {passive:true});
+  window.addEventListener('resize', syncProgress);
+  syncProgress();
+})();
+</script>
+
+</body>
+</html>

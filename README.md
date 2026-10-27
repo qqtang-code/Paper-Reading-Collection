@@ -2,11 +2,11 @@
 
 我的论文中文精读页合集。每篇论文一个**图文配合**的单文件 HTML 精读页:全部 Figure / Table 以 **300 DPI 高清 PNG** 内嵌在对应讲解段落中(等比缩放、不裁剪),配中文逐点解读,支持深色模式、点击看原图、KaTeX 公式渲染、打印友好。
 
-论文 <b>15</b> 篇 · 图表 <b>124</b> 图 + <b>114</b> 表 · 3 个分类 · 中 / EN
+论文 <b>16</b> 篇 · 图表 <b>138</b> 图 + <b>115</b> 表 · 3 个分类 · 中 / EN
 
-> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——九篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash、CoWindow Attention、HySparse2、KSA V2、Prism Attention、KITE/SST、DoSA、LongHarness Bench)为**完整英译**(`en.html`),其余六篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
+> 🌐 **Bilingual · 中英双语**:每篇论文均提供**中文精读版 + 英文版**——十篇旗舰论文(Declarative Attention、DeepSeek-V4.1-Flash、CoWindow Attention、HySparse2、KSA V2、Prism Attention、KITE/SST、DoSA、LongHarness Bench、Revisiting Pipeline Parallelism)为**完整英译**(`en.html`),其余六篇为**英文速读版**(完整论证摘要 + 全部图表原文图注 + 英文导读)。门户页右上角一键切换 中/EN,首次访问跟随浏览器语言,切换后偏好会被记住。
 >
-> This collection ships a **full Chinese deep-read plus an English edition for every paper** — complete English editions for the nine flagship papers (Declarative Attention, DeepSeek-V4.1-Flash, CoWindow Attention, HySparse2, KSA V2, Prism Attention, KITE/SST, DoSA, LongHarness Bench), and English quick-read editions (full digest of the argument + every figure with its original caption) for the other six. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
+> This collection ships a **full Chinese deep-read plus an English edition for every paper** — complete English editions for the ten flagship papers (Declarative Attention, DeepSeek-V4.1-Flash, CoWindow Attention, HySparse2, KSA V2, Prism Attention, KITE/SST, DoSA, LongHarness Bench, Revisiting Pipeline Parallelism), and English quick-read editions (full digest of the argument + every figure with its original caption) for the other six. Toggle 中/EN from the portal topbar; the site follows your browser language on first visit and remembers your choice.
 
 > 由 [paper-reading-html](https://github.com/qqtang-code/paper-reading-html) skill 制作 · 在线门户:[**qqtang-code.github.io/Paper-Reading-Collection**](https://qqtang-code.github.io/Paper-Reading-Collection/)
 
@@ -47,13 +47,14 @@
 | 11 | **ReSET** — Accurate Latency-Critical NVFP4 Reasoning via Step-Aware Temperature Scaling | [高效推理](efficient-inference/) | 量化 · NVFP4 · 低精度推理 · 温度缩放 | [中](efficient-inference/reset/) · [EN 速读](efficient-inference/reset/en.html) | 2026-08 | 8 图 16 表 | [arXiv:2606.13233](https://arxiv.org/abs/2606.13233) |
 | 12 | **FreeToken** — 边缘原生的 MoE 服务系统(Bandwidth-Adaptive Execution) | [高效推理](efficient-inference/) | MoE · 边缘部署 · 服务系统 · 带宽自适应 | [中](efficient-inference/freetoken/) · [EN 速读](efficient-inference/freetoken/en.html) | 2026-09 | 5 图 1 表 | [arXiv:2608.16157](https://arxiv.org/abs/2608.16157) |
 | 13 | **KITE / SST** — KV-Invariant Transformer Expansion for Efficient Agentic LLM Scaling | [高效推理](efficient-inference/) | 架构扩展 · KV 复用 · Prefill/Decode 成本分离 · MoE · Agentic | [中](efficient-inference/kite/) · [EN 完整版](efficient-inference/kite/en.html) | 2026-09 | 6 图 7 表 | [arXiv:2609.27294](https://arxiv.org/abs/2609.27294) |
-| 14 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
-| 15 | **LongHarness Bench** — Stress-Testing Language Model Harnesses for Long-Context Reasoning | [评测基准](benchmarks/) | Agent Harness · 长上下文推理 · 准确率–成本权衡 | [中](benchmarks/longharness/) · [EN 完整版](benchmarks/longharness/en.html) | 2026-09 | 4 图 6 表 | [arXiv:2609.38137](https://arxiv.org/abs/2609.38137) |
+| 14 | **Revisiting Pipeline Parallelism** — LLM 在线服务的动态分块与跨 stage 延迟调度(OSDI 2026) | [高效推理](efficient-inference/) | 流水线并行 · 动态 Chunked Prefill · 延迟预测模型 · Delay Scheduling · 在线服务 | [中](efficient-inference/pp-serving/) · [EN 完整版](efficient-inference/pp-serving/en.html) | 2026-10 | 14 图 1 表 + 1 算法 | [OSDI 2026](https://www.usenix.org/conference/osdi26/presentation/hwang) |
+| 15 | **MMLongEmbed** — 长上下文场景下的多模态嵌入模型基准 | [评测基准](benchmarks/) | 多模态 · 嵌入模型 · 长上下文 · Benchmark | [中](benchmarks/mmlongembed/) · [EN 速读](benchmarks/mmlongembed/en.html) | 2026-08 | 6 图 16 表 | [GitHub](https://github.com/AmamiSora1228/MMLongEmbed) |
+| 16 | **LongHarness Bench** — Stress-Testing Language Model Harnesses for Long-Context Reasoning | [评测基准](benchmarks/) | Agent Harness · 长上下文推理 · 准确率–成本权衡 | [中](benchmarks/longharness/) · [EN 完整版](benchmarks/longharness/en.html) | 2026-09 | 4 图 6 表 | [arXiv:2609.38137](https://arxiv.org/abs/2609.38137) |
 
 
 ## 机制对照表
 
-把「省什么、谁来决定、要不要训练」三件事横向排开,是这个合集里 15 篇论文最直接的分工图:
+把「省什么、谁来决定、要不要训练」三件事横向排开,是这个合集里 16 篇论文最直接的分工图:
 
 | # | 论文 | 省的是什么 | 机制 / 决策者 | 需要训练吗 | 代表数字 |
 |---|------|-----------|--------------|-----------|---------|
@@ -70,10 +71,11 @@
 | 11 | ReSET | NVFP4 量化带来的精度损失 | 按解码步骤调整 softmax 温度 + 小 M 解码内核 | 零权重改动(免训练) | AIME-120 +2.6(Qwen3-32B 77.5,超 BF16 的 75.8);内核 1.57–2.49× |
 | 12 | FreeToken | 单机显存与内存带宽瓶颈 | 带宽自适应执行 | 系统实现,非训练方法 | 8GB 笔记本跑 35B;台式机跑 284B;单卡工作站跑 753B GLM-5.2 |
 | 13 | KITE / SST | 训练算力与 prefill 计算(扩容不延长 KV 生产路径) | **扩容只加在不产生 KV 的一侧**:Prefiller 产 KV、Decoder 读 KV(结构约束,不冻结权重) | 需要(源 167.98B + 续训 222.55B token,累计算力对齐基线) | 67B SST prefill 活跃参数 1.12B(47B 基线 1.48B);训练损失 1.5900 最低;75:25 成本代理 −6.7% / −31.6% |
-| 14 | MMLongEmbed | —(度量,不优化) | 基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型 | 需要(训练与评测协议) | 现役模型靠表面特征匹配"作弊";细粒度保持随长度衰退 |
-| 15 | LongHarness Bench | —(度量,不优化) | 基准构建:4 任务 × 5 模型 × 5 配置,同时测准确率与成本 | 不需要(评测既有模型–harness 组合) | 最佳仅 68%;同等准确率成本差 12.4×;多推理既不必要也不充分 |
+| 14 | Revisiting Pipeline Parallelism | 跨 stage 空转(pipeline bubble) | **动态 chunk 大小 + 按负载把请求在 microbatch 间迁移**:greedy 用 SLO 余量反馈,ALP 用在线延迟预测定上下界,delay scheduling 把 decode 请求从最重迁到最轻的 stage | 不需要(纯调度;ALP 只做在线 RLS 拟合) | P99 迭代时延 65.34 → 30.94 ms(2.11×);decode-heavy SLO scale 上 goodput +1.4×;SLO 达成率 TP 1.9% / PP_2048 1.6% / PP_static 92.5% / DCP_pred+DS 94.6% |
+| 15 | MMLongEmbed | —(度量,不优化) | 基准构建:4 任务 / 8 数据集 / 8,460 查询 / 11 模型 | 需要(训练与评测协议) | 现役模型靠表面特征匹配"作弊";细粒度保持随长度衰退 |
+| 16 | LongHarness Bench | —(度量,不优化) | 基准构建:4 任务 × 5 模型 × 5 配置,同时测准确率与成本 | 不需要(评测既有模型–harness 组合) | 最佳仅 68%;同等准确率成本差 12.4×;多推理既不必要也不充分 |
 
-点击论文名直达精读页:**[① CoWindow Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/)** · **[② HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[③ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)** · **[④ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑤ Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html)** · **[⑥ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑦ DoSA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/dosa/)** · **[⑧ KSA V2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/ksa-v2/)** · **[⑨ Prism Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/prism-attention/)** · **[⑩ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑪ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[⑫ FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[⑬ KITE / SST](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/)** · **[⑭ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑮ LongHarness Bench](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/longharness/)**
+点击论文名直达精读页:**[① CoWindow Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/cowindow-attention/)** · **[② HySparse2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/hysparse2/)** · **[③ PISA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/pisa/)** · **[④ Elastic Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/elastic-attention/)** · **[⑤ Declarative Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/declarative-attention/Declarative-Attention论文精读_HTML.html)** · **[⑥ Random Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/random-attention/)** · **[⑦ DoSA](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/dosa/)** · **[⑧ KSA V2](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/ksa-v2/)** · **[⑨ Prism Attention](https://qqtang-code.github.io/Paper-Reading-Collection/attention-kv-cache/prism-attention/)** · **[⑩ DeepSeek-V4.1-Flash](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/deepseek-v41-flash/)** · **[⑪ ReSET](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/reset/)** · **[⑫ FreeToken](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/freetoken/)** · **[⑬ KITE / SST](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/kite/)** · **[⑭ Revisiting Pipeline Parallelism](https://qqtang-code.github.io/Paper-Reading-Collection/efficient-inference/pp-serving/)** · **[⑮ MMLongEmbed](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/mmlongembed/)** · **[⑯ LongHarness Bench](https://qqtang-code.github.io/Paper-Reading-Collection/benchmarks/longharness/)**
 
 ## 目录结构
 
@@ -91,17 +93,18 @@ Paper-Reading-Collection/
 │   ├── dosa/                    ← arXiv:2610.13990(12 图)
 │   ├── ksa-v2/                  ← arXiv:2610.18654(13 图 11 表 + 1 自绘)
 │   └── prism-attention/         ← arXiv:2610.22985(14 图 11 表 + 1 算法 + 1 自绘)★ 最新
-├── efficient-inference/         ← 分类二:高效推理与部署(4 篇)
+├── efficient-inference/         ← 分类二:高效推理与部署(5 篇)
 │   ├── deepseek-v41-flash/      ← DeepSeek-V4.1-Flash 技术报告(12 图 5 表)
 │   ├── reset/                   ← arXiv:2606.13233(8 图 16 表)
 │   ├── freetoken/               ← arXiv:2608.16157(5 图 1 表)
-│   └── kite/                    ← arXiv:2609.27294 KITE/SST(6 图 7 表)★ 最新
+│   ├── kite/                    ← arXiv:2609.27294 KITE/SST(6 图 7 表)
+│   └── pp-serving/              ← OSDI 2026 Revisiting Pipeline Parallelism(14 图 1 表 + 1 算法)★ 最新
 └── benchmarks/                  ← 分类三:评测基准(2 篇)
     ├── mmlongembed/             ← 多模态长上下文嵌入基准(6 图 16 表)
     └── longharness/             ← arXiv:2609.38137 LongHarness Bench(4 图 6 表)
 
 每个论文目录:中文精读页(index.html 或 <论文名>精读_HTML.html)
-            + en.html(英文版:CoWA / HySparse2 / DA / DoSA / KSA V2 / Prism / DeepSeek-V4.1-Flash / KITE / LongHarness 为完整英译,其余为英文速读)
+            + en.html(英文版:CoWA / HySparse2 / DA / DoSA / KSA V2 / Prism / DeepSeek-V4.1-Flash / KITE / PP Serving / LongHarness 为完整英译,其余为英文速读)
             + figs/(300 DPI 图表原图,中英文页共用)
 ```
 
@@ -142,7 +145,7 @@ token 级稀疏注意力省下的是「读多少 KV」,但决定读哪些 KV 的
 
 ### ⚡ efficient-inference/ · 高效推理与部署
 
-在模型权重与系统栈上省算力与显存:架构与缓存压缩、低精度量化与内核、服务系统。四篇按「模型 → 权重 → 系统 → 扩容」排列:
+在模型权重与系统栈上省算力与显存:架构与缓存压缩、低精度量化与内核、服务系统。五篇按「模型 → 权重 → 系统 → 扩容 → 调度」排列:
 
 **⑩ DeepSeek-V4.1-Flash(2026-09 · DeepSeek 技术报告)**
 552B 多模态 MoE:Causal Encoder-Decoder 让 prefill 只激活 8B(decode 16B);CSA2 跨层 KV 复用 + FP4(MXFP4)量化把全局 KV Cache 压到**每 token 890 字节**(V4-Flash 的 1/4、V1 的 1/437),SWA Bounded Replay 再把持久缓存压到上代的 1/8;配 196B 条件记忆 Engram 与 45T 多模态 token 预训练,性能反超更大的 V4-Flash——DeepSWE v1.1 **74.2**、Terminal-Bench 2.1 **90.6**、Codeforces **3471**。→ [精读页](efficient-inference/deepseek-v41-flash/) · [项目页](https://github.com/qqtang-code/DeepSeek-V4.1-Flash-Project-Page)
@@ -156,14 +159,17 @@ NVFP4 低精度推理在延迟敏感(交互式)场景下的精度救星:**步骤
 **⑬ KITE / SST(2026-09 · StepFun)**
 扩容时把容量全加在"只读 KV"的一侧:先训 33.8B 小模型,再用中间 checkpoint 扩出一座读 KV 的 Decoder 塔联合续训——**推理时 bulk prefill 只跑原来的 Prefiller 塔(1.12B 活跃参数,比 47B 基线的 1.48B 还少)**,新增容量只在 decode 与末位预测上场(decode 2.15B)。SST 把源塔扩成 67B MoE,在累计理论训练算力对齐 47B/63B 经典 Transformer 的条件下训练 EMA-200 损失最低(**1.5900** vs 1.6006/1.5921),七项下游任务(OpenBookQA 75.00、MMLU 60.54、GSM8K 58.38、MATH 34.36、HumanEval 37.80、MBPP 51.40、BBH 52.74)全部第一;75:25 的 prefill:decode 成本代理比 47B 低 **6.7%**、比 63B 低 **31.6%**,与 63B 在 13.4:86.6、与 47B 在 **65.5:34.5** 打平——prefill 占比越高越划算,正好落在 OpenRouter 实测的 67.4–76.7% 未缓存输入账单区间内。全文只押一条约束:**未来 KV 的产生不得依赖 Decoder 的历史状态**。→ [精读页](efficient-inference/kite/) · [原文](https://arxiv.org/abs/2609.27294)
 
+**⑭ Revisiting Pipeline Parallelism(2026-10 · Korea University · OSDI 2026)**
+把在单机多卡上被 TP 挤到角落的流水线并行重新拿回来做在线服务:先证明**静态调好 chunk 的 PP 已在 goodput 上反超 TP**(通信量小、PCIe 4.0 上尤其划算),再把在线场景里被放大的 pipeline bubble 拆成三类——**P-P**(两条 2048 / 128 的 prompt 前后脚进入 prefill,一次气泡约 **627 ms**)、**P-D**(prefill 与 decode 落在不同 microbatch)、**D-D**(decode-only 迭代里 microbatch 请求数失衡;线性层是 step function,batch 128→129 就有约 **31%** 的时延跳变)。两条抓手分别对应:**DCP_pred** 用「离线线性层项 + 在线注意力项(RLS 拟合)」的 ALP 延迟模型,按 $TPOT_{SLO}$ 定上界、$TTFT_{SLO}$ 定下界,取最小可行 chunk(Table 1 把 MAPE 从 15.85% 压到 **3.26%**);**delay scheduling** 在 decode-only 迭代里把请求从最重的 microbatch 迁到最轻的,并对齐到 128/256/384 的硬件友好边界。AzureConv 上 TPOT/E2E 分别压 **35% / 31%**,P99 迭代时延 65.34 → **30.94 ms(2.11×)**;decode-heavy 的 SLO scale 上 delay scheduling 单独贡献 goodput **+1.4×**;AzureConv 真实 trace 上 SLO 达成率 TP **1.9%** / PP_2048 **1.6%** / PP_static **92.5%** / DCP_pred+DS **94.6%**。代价:被挂起请求的 P99 TPOT 差 15%,SLO 收到 0.6 以下 DS 就失效。→ [精读页](efficient-inference/pp-serving/) · [原文](https://www.usenix.org/system/files/osdi26-hwang.pdf)
+
 ### 📏 benchmarks/ · 评测基准
 
 度量模型真实能力的研究。
 
-**⑭ MMLongEmbed(2026-08)**
+**⑮ MMLongEmbed(2026-08)**
 首个专门评测**多模态嵌入模型(MEM)长上下文能力**的基准:4 个检索任务、8 个数据集、8,460 个查询、11 个模型。核心发现:现役模型依赖表面特征匹配"作弊",细粒度信息保持随上下文长度显著衰退——"窗口大"不等于"读得懂"。→ [精读页](benchmarks/mmlongembed/) · [原文](https://github.com/AmamiSora1228/MMLongEmbed)
 
-**⑮ LongHarness Bench(2026-09 · arXiv:2609.38137)**
+**⑯ LongHarness Bench(2026-09 · arXiv:2609.38137)**
 第一个把 **harness 本身**当评测对象的基准:**4 个信息密集任务 × 5 模型 × 5 配置**,同时测准确率与成本。最好的配置只到 **68%**;同等准确率成本可差 **12.4 倍**;「多推理」既不必要也不充分(RLM 92% 要 $7.23,mini-swe-agent 100% 只要 $0.583)。→ [精读页](benchmarks/longharness/) · [原文](https://arxiv.org/abs/2609.38137)
 
 ## 如何阅读
@@ -184,5 +190,5 @@ NVFP4 低精度推理在延迟敏感(交互式)场景下的精度救星:**步骤
 ## 说明
 
 - 各精读页此前以独立仓库发布(`ReSET-Project-Page`、`MMLongEmbed-PaperReading-Page`、`FreeToken-Project-Page`、`Declarative-Attention-Project-Page`、`DeepSeek-V4.1-Flash-Project-Page`、`Elastic-Attention-Project-Page`、`CoWindow-Attention-Project-Page`),现已整合至本仓库;旧仓库与其 Pages 链接暂时保留,后续可归档。
-- 分类调整历史:注意力层的工作(Declarative / Random / Elastic Attention)已从 `efficient-inference/` 移至 `attention-kv-cache/`,旧链接留有自动重定向页面。最新一次规整把分类依据统一为「**省在哪一层**」,注意力类内部改用「**可见键集合由谁决定**」这条谱系排序,**编号改为按分类顺序**(注意力与 KV Cache ①–⑨、高效推理与部署 ⑩–⑬、评测基准 ⑭–⑮),并新增「机制对照表」;此后 KITE/SST 作为第 4 篇高效推理工作插入,Prism Attention 作为注意力类的第 9 篇插入 ⑨ 位,其后各篇编号整体顺延一位;目录名与 URL 均未改动,旧链接照常可访问。
+- 分类调整历史:注意力层的工作(Declarative / Random / Elastic Attention)已从 `efficient-inference/` 移至 `attention-kv-cache/`,旧链接留有自动重定向页面。最新一次规整把分类依据统一为「**省在哪一层**」,注意力类内部改用「**可见键集合由谁决定**」这条谱系排序,**编号改为按分类顺序**(注意力与 KV Cache ①–⑨、高效推理与部署 ⑩–⑭、评测基准 ⑮–⑯),并新增「机制对照表」;此后 KITE/SST 作为第 4 篇高效推理工作插入,Prism Attention 作为注意力类的第 9 篇插入 ⑨ 位,Revisiting Pipeline Parallelism 作为第 5 篇高效推理工作插入 ⑭ 位,其后各篇编号整体顺延;目录名与 URL 均未改动,旧链接照常可访问。
 - 精读页中的解读文字为编者观点,关键数字均与论文原文核对;图片以 300 DPI 摘自原文,版权归原作者所有,仅供学习研究。

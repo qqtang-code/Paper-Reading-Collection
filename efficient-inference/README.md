@@ -1,6 +1,6 @@
 # ⚡ 高效推理与部署(Efficient Inference & Deployment)
 
-在模型与系统层面让 LLM 推理更快、更省、能部署到更小硬件:低精度量化、架构与 KV 压缩、服务系统,以及"把扩容本身做成省算力手段"的架构工作。每篇均含中文精读页与英文版;编号按分类顺序(⑩–⑬)。
+在模型与系统层面让 LLM 推理更快、更省、能部署到更小硬件:低精度量化、架构与 KV 压缩、服务系统,以及"把扩容本身做成省算力手段"的架构工作。每篇均含中文精读页与英文版;编号按分类顺序(⑩–⑭)。
 
 | 论文 | 主题 | 中文精读 | 英文版 |
 |------|------|----------|--------|
@@ -8,6 +8,7 @@
 | ReSET(2026-08) | 量化 · NVFP4 · 温度缩放 | [reset/](reset/) | [en.html(英文速读)](reset/en.html) |
 | DeepSeek-V4.1-Flash(2026-09) | KV Cache 压缩 · MoE · 多模态 · 长上下文 | [deepseek-v41-flash/](deepseek-v41-flash/) | [en.html(完整英译)](deepseek-v41-flash/en.html) |
 | KITE / SST(2026-09 · StepFun) | 架构扩展 · KV 复用 · Prefill/Decode 成本分离 · MoE | [kite/](kite/) | [en.html(完整英译)](kite/en.html) |
+| Revisiting Pipeline Parallelism(2026-10 · OSDI 2026 · Korea University) | 流水线并行 · 动态 Chunked Prefill · 延迟预测模型 · Delay Scheduling · 在线服务 | [pp-serving/](pp-serving/) | [en.html(完整英译)](pp-serving/en.html) |
 
 注意力层面的工作(稀疏注意力、KV Cache 驱逐、稀疏比路由)见 [attention-kv-cache/](../attention-kv-cache/)。
 
